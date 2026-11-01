@@ -13,7 +13,7 @@ TG_CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 genai.configure(api_key=GEMINI_KEY)
-model = genai.GenerativeModel("gemini-1.5-flash") # 초저가·고속 모델
+model = genai.GenerativeModel("gemini-pro") # 초저가·고속 모델
 
 def send_telegram(msg):
     url = f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage"
