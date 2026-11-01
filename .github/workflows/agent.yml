@@ -1,0 +1,40 @@
+name: Real Estate AI Marketing Agent
+
+on:
+  # 1. 텔레그램에서 새 매물이 들어왔을 때 즉시 실행 (Webhook 트리거)
+  repository_dispatch:
+    types: [new_property]
+  
+  # 2. 매물이 없어도 매일 오전 9시, 오후 6시(한국시간 기준)에 자동 깨어나 홍보글 발행
+  schedule:
+    - cron: '0 0,9 * * *'
+  
+  # 3. 수동 테스트용 버튼
+  workflow_dispatch:
+
+jobs:
+  run-marketing-bot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 코드 불러오기
+        uses: actions/checkout@v4
+
+      - name: 파이썬 설치 및 패키지 세팅
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 필수 라이브러리 설치
+        run: |
+          pip install supabase google-generativeai requests playwright
+          playwright install chromium
+
+      - name: 무인 부동산 분석 및 마케팅 봇 가동
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          PUBLIC_DATA_API_KEY: ${{ secrets.PUBLIC_DATA_API_KEY }}
+        run: python bot_worker.py
