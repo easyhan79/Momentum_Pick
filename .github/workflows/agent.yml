@@ -2,6 +2,7 @@ name: Real Estate AI Marketing Agent
 
 on:
   # 1. 텔레그램에서 새 매물이 들어왔을 때 즉시 실행 (Webhook 트리거)
+  workflow_dispatch:
   repository_dispatch:
     types: [new_property]
   
