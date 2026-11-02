@@ -2,7 +2,8 @@ import os
 import json
 import requests
 from supabase import create_client
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 
 # 1. 환경변수(열쇠) 불러오기
 SUPABASE_URL = os.environ["SUPABASE_URL"]
@@ -12,8 +13,9 @@ TG_TOKEN = os.environ["TELEGRAM_TOKEN"]
 TG_CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-genai.configure(api_key=GEMINI_KEY)
-model = genai.GenerativeModel("gemini-pro") # 초저가·고속 모델
+
+# 2. 최신 클라이언트 방식으로 API 키 연결
+client = genai.Client(api_key=GEMINI_KEY)
 
 def send_telegram(msg):
     url = f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage"
@@ -48,10 +50,15 @@ def process_new_properties():
         }}
         """
         
-        response = model.generate_content(
-            prompt,
-            generation_config={"response_mime_type": "application/json"}
+        # 3. 최신 3.8 Flash 모델 적용 및 JSON 출력 설정
+        response = client.models.generate_content(
+            model='gemini-3.8-flash',
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+            )
         )
+        
         ai_result = json.loads(response.text)
 
         # Supabase DB에 생성된 마케팅 콘텐츠 저장 및 상태 변경
@@ -71,6 +78,3 @@ def process_new_properties():
         )
         send_telegram(report)
     return True
-
-if __name__ == "__main__":
-    process_new_properties()
