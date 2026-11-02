@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import requests
 from typing import List
@@ -17,24 +18,24 @@ TG_CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 client = genai.Client(api_key=GEMINI_KEY)
 
-# 2. 상가·토지·건물 모두 대응하는 범용 JSON 출력 스키마 정의
+# 2. 상가·토지·공장·건물 모두 대응하는 범용 JSON 출력 스키마
 class ShowroomConcept(BaseModel):
-    concept_name: str = Field(description="추천 활용 컨셉명 (상가면 추천업종, 토지면 추천개발/건축방향)")
+    concept_name: str = Field(description="추천 활용 컨셉명 (상가면 추천업종, 토지/공장이면 추천개발·물류·제조·확장 방향)")
     headline: str = Field(description="이 컨셉의 핵심 투자/창업 매력도 한 줄 카피")
-    cost_benefit: str = Field(description="비용 절감 또는 기대 수익 포인트 (예: 토목비 절감, 건폐율 극대화, 인테리어 세이브 등)")
-    zone_plan: List[str] = Field(description="공간/필지 5분할 활용 계획 (상가면 실내외 조닝, 토지면 부지/주차/조경 배치 5가지)")
+    cost_benefit: str = Field(description="비용 절감 또는 기대 수익 포인트 (예: 토목비 절감, 전력/폐수 인허가 확보, 인테리어 세이브 등)")
+    zone_plan: List[str] = Field(description="공간/필지 5분할 활용 계획 (실내외 조닝 또는 부지/확장지 5분할 배치)")
 
 class UniversalMarketingPackage(BaseModel):
-    property_category: str = Field(description="자동 판별된 매물 유형 (예: 상업용 상가, 토지/임야, 수익형 건물, 창고/공장 등)")
+    property_category: str = Field(description="자동 판별된 매물 유형 (예: 상업용 상가, 토지/임야, 대형 공장/물류부지, 수익형 건물 등)")
     detected_targets: List[str] = Field(description="이 매물에 가장 적합한 핵심 매수/임차 타겟층 2~3개")
-    usp_summary: str = Field(description="핵심 셀링 포인트 3줄 요약 (입지, 면적/용도 가성비, 수익성)")
+    usp_summary: str = Field(description="핵심 셀링 포인트 3줄 요약 (입지, 면적/용도/인프라 가성비, 수익성 및 확장성)")
     target_1_blog: str = Field(description="첫 번째 핵심 타겟 맞춤형 네이버 블로그 포스팅 (제목 + 본문 전체)")
     target_2_blog: str = Field(description="두 번째 핵심 타겟 맞춤형 네이버 블로그 포스팅 (제목 + 본문 전체)")
     insta_caption: str = Field(description="인스타그램 카드뉴스 5장 구성안 및 핵심 해시태그 15개")
     landing_copy: str = Field(description="전용 웹 쇼룸 메인 헤드라인 및 입지/수익률 브리핑 문구")
     showroom_concepts: List[ShowroomConcept] = Field(description="웹 쇼룸 시뮬레이터에 들어갈 3가지 추천 활용/개발 컨셉 데이터")
 
-# 3. 텔레그램 안전 전송 함수 (특수문자 충돌 방지 + 4,000자 분할 전송)
+# 3. 텔레그램 안전 전송 함수 (4,000자 분할 전송)
 def send_telegram(msg: str):
     url = f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage"
     max_len = 4000
@@ -45,37 +46,66 @@ def send_telegram(msg: str):
         if not res.ok:
             print(f"Telegram Error Detail: {res.text}")
 
-# 4. 신규 매물 자동 판별 및 맞춤형 마케팅 패키지 생성
+# 4. 텔레그램 첨부파일(PDF/이미지) 다운로드 및 Gemini Part 변환 함수
+def load_telegram_file(file_id: str) -> types.Part:
+    info_url = f"https://api.telegram.org/bot{TG_TOKEN}/getFile?file_id={file_id}"
+    info_res = requests.get(info_url, timeout=15).json()
+    file_path = info_res["result"]["file_path"]
+    
+    down_url = f"https://api.telegram.org/file/bot{TG_TOKEN}/{file_path}"
+    file_bytes = requests.get(down_url, timeout=30).content
+    
+    lower_path = file_path.lower()
+    if lower_path.endswith(".pdf"):
+        mime_type = "application/pdf"
+    elif lower_path.endswith(".png"):
+        mime_type = "image/png"
+    else:
+        mime_type = "image/jpeg"
+        
+    return types.Part.from_bytes(data=file_bytes, mime_type=mime_type)
+
+# 5. 신규 매물 자동 판별 및 맞춤형 마케팅 패키지 생성
 def process_new_properties():
-    # DB에서 아직 분석 안 된 신규 매물('pending') 가져오기
     res = supabase.table("properties").select("*").eq("status", "pending").execute()
     
     if not res.data:
-        print("신규 매물이 없습니다. 기존 매물 재가공 홍보 모드로 대기합니다.")
+        print("신규 매물이 없습니다.")
         return False
 
     for prop in res.data:
-        raw_text = prop["raw_input"]
-        print(f"매물 분석 시작 (ID: {prop['id']}): {raw_text}")
+        raw_text = prop.get("raw_input") or ""
+        print(f"매물 분석 시작 (ID: {prop['id']}): {raw_text[:100]}")
         
-        prompt = f"""
-        당신은 대한민국 최고의 부동산(상가·토지·임야·수익형 빌딩) 개발 기획자이자 마케팅 디렉터입니다.
-        사장님이 입력한 아래 [입력된 매물 정보]를 읽고, 먼저 이 매물이 '상가/오피스'인지, '토지/임야/농지'인지, '주택/건물/창고'인지 성격을 정확히 판별하세요.
+        base_prompt = """
+        당신은 대한민국 최고의 부동산(상가·토지·임야·공장·물류센터·수익형 빌딩) 개발 기획자이자 마케팅 디렉터입니다.
+        전달된 매물 정보(텍스트 및 첨부된 PDF/도면 이미지)를 정밀 분석하여, 먼저 이 매물의 성격을 정확히 판별하세요.
+        첨부파일에 지적도, 배치도, 형광펜 표시, 손글씨 메모(추가 부지 확보안 등)가 있다면 그 수치와 조건까지 빠짐없이 반영하세요.
 
         [유형별 분석 지침]
-        1. 상가/건물일 경우: 배후 수요, 앵커 테넌트, 실사용 면적(테라스 등 서비스 면적 포함) 가성비, 기존 시설 인계에 따른 창업비 절감을 중심으로 가장 유리한 창업 업종 타겟 2~3개를 도출하세요.
-        2. 토지/임야일 경우: 용도지역(계획관리, 농림 등), 도로 접합 및 진출입 여건, 지형/경사도, 인근 개발 호재 및 자연환경을 분석하여 (A) 직접 개발·건축 실수요자(대형 카페, 글램핑, 세컨하우스, 창고 등), (B) 산림/농지 활용 및 중장기 지가상승 투자자 맞춤형으로 타겟과 쇼룸 부지 배치도를 작성하세요.
-        3. 블로그 본문은 실제 네이버 상위 노출 스타일로 전문적이고 설득력 있게 구체적인 문단으로 길게 작성하세요.
-
-        [입력된 매물 정보]
-        {raw_text}
+        1. 상가/오피스: 배후 수요, 앵커 시설, 실사용 면적(테라스 등 서비스 면적) 가성비, 기존 설비 인계 혜택을 중심으로 최적의 창업 업종 타겟을 도출하세요.
+        2. 토지/임야: 용도지역, 도로 접합, 지형/경사도, 주변 개발 호재를 분석하여 개발 실수요자 및 지가상승 투자자 맞춤형 시나리오를 작성하세요.
+        3. 공장/창고/물류용지: 고속도로 IC 접근성, 층고, 전력(kW)·공업용수·오폐수처리시설 등 인허가 인프라, 그리고 인접 추가 부지 확장성(제1안/제2안 등)을 중심으로 기업체·물류 디벨로퍼 타겟 브리핑을 작성하세요.
         """
+
+        contents_list = []
+
+        # raw_input 내에 [FILE_ID:xxx] 태그가 있으면 텔레그램에서 PDF/사진을 직접 내려받아 첨부
+        file_match = re.search(r"\[FILE_ID:([^\]]+)\]", raw_text)
+        clean_text = re.sub(r"\[FILE_ID:[^\]]+\]", "", raw_text).strip()
+
+        if file_match:
+            file_id = file_match.group(1).strip()
+            print(f"첨부파일 감지됨 (file_id: {file_id}). 다운로드 중...")
+            file_part = load_telegram_file(file_id)
+            contents_list.append(file_part)
+
+        contents_list.append(f"{base_prompt}\n\n[입력된 매물 텍스트/메모]\n{clean_text if clean_text else '첨부된 문서 및 도면 이미지를 기준으로 전체 분석을 진행하세요.'}")
         
         try:
-            # 정식 지원 모델 gemini-2.5-flash 및 정형 JSON 스키마 강제 적용
             response = client.models.generate_content(
                 model="gemini-2.5-flash",
-                contents=prompt,
+                contents=contents_list,
                 config=types.GenerateContentConfig(
                     response_mime_type="application/json",
                     response_schema=UniversalMarketingPackage,
@@ -85,23 +115,20 @@ def process_new_properties():
             
             ai_result = json.loads(response.text)
 
-            # Supabase DB에 생성된 마케팅 콘텐츠 저장 및 상태 변경
             supabase.table("properties").update({
                 "ai_contents": ai_result,
                 "status": "analyzed",
                 "post_count": 1
             }).eq("id", prop["id"]).execute()
 
-            # 추출된 타겟 목록 포맷팅
             targets_str = ", ".join(ai_result.get("detected_targets", []))
             category_str = ai_result.get("property_category", "일반 매물")
 
-            # 사장님 텔레그램으로 완료 보고서 즉시 전송
             report = (
                 f"✅ [신규 매물 AI 분석 및 마케팅 패키지 생성 완료]\n\n"
                 f"🏷️ 자동 판별 유형: {category_str}\n"
                 f"🎯 AI 선정 핵심 타겟: {targets_str}\n"
-                f"📌 원본 입력: {raw_text}\n\n"
+                f"📌 원본 입력 요약: {clean_text[:100] if clean_text else '첨부파일(PDF/이미지) 기반 분석'}\n\n"
                 f"💡 핵심 셀링 포인트 (USP):\n{ai_result['usp_summary']}\n\n"
                 f"🖥️ 웹 쇼룸 헤드라인:\n{ai_result['landing_copy'][:180]}...\n\n"
                 f"📝 인스타 캡션 미리보기:\n{ai_result['insta_caption'][:180]}...\n\n"
@@ -116,6 +143,6 @@ def process_new_properties():
 
     return True
 
-# 5. [필수] GitHub Actions가 이 파일을 실행할 때 작동하는 메인 스위치
+# 6. 메인 실행 스위치
 if __name__ == "__main__":
     process_new_properties()
