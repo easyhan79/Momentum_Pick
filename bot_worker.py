@@ -19,7 +19,8 @@ client = genai.Client(api_key=GEMINI_KEY)
 
 def send_telegram(msg):
     url = f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage"
-    requests.post(url, json={"chat_id": TG_CHAT_ID, "text": msg, "parse_mode": "Markdown"})
+    res = requests.post(url, json={"chat_id": TG_CHAT_ID, "text": msg})
+    print(f"Telegram API Response: {res.text}")
 
 def process_new_properties():
     # DB에서 아직 분석 안 된 신규 매물('pending') 가져오기
@@ -70,11 +71,11 @@ def process_new_properties():
 
         # 사장님 텔레그램으로 완료 보고서 즉시 전송
         report = (
-            f"✅ **[신규 매물 분석 및 홍보물 생성 완료]**\n\n"
-            f"📌 **입력 매물:** {raw_text}\n\n"
-            f"💡 **핵심 셀링 포인트:**\n{ai_result['usp_summary']}\n\n"
-            f"📝 **인스타 캡션 미리보기:**\n{ai_result['insta_caption'][:200]}...\n\n"
-            f"🚀 *웹 쇼룸 배포 및 블로그 스케줄링 대기열에 등록되었습니다.*"
+            f"✅ [신규 매물 분석 및 홍보물 생성 완료]\n\n"
+            f"📌 입력 매물: {raw_text}\n\n"
+            f"💡 핵심 셀링 포인트:\n{ai_result['usp_summary']}\n\n"
+            f"📝 인스타 캡션 미리보기:\n{ai_result['insta_caption'][:200]}...\n\n"
+            f"🚀 웹 쇼룸 배포 및 블로그 스케줄링 대기열에 등록되었습니다."
         )
         send_telegram(report)
     return True
