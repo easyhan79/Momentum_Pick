@@ -125,7 +125,7 @@ def process_new_properties():
 
             contents_list.append(f"{base_prompt}\n\n[입력된 매물 텍스트/메모]\n{clean_text if clean_text else '첨부된 문서 및 도면 이미지를 기준으로 전체 분석을 진행하세요.'}")
             response = client.models.generate_content(
-                model="gemini-2.5-flash",
+                model="gemini-3.8-flash",
                 contents=contents_list,
                 config=types.GenerateContentConfig(
                     response_mime_type="application/json",
