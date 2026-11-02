@@ -1,5 +1,6 @@
 import os
 import re
+import time
 import json
 import requests
 from typing import List
@@ -43,8 +44,6 @@ def send_telegram(msg: str):
         chunk = msg[i:i + max_len]
         res = requests.post(url, json={"chat_id": TG_CHAT_ID, "text": chunk}, timeout=15)
         print(f"Telegram API Status: {res.status_code}")
-        if not res.ok:
-            print(f"Telegram Error Detail: {res.text}")
 
 # 4. 텔레그램 첨부파일(PDF/이미지) 다운로드 및 Gemini Part 변환 함수
 def load_telegram_file(file_id: str) -> types.Part:
@@ -65,15 +64,42 @@ def load_telegram_file(file_id: str) -> types.Part:
         
     return types.Part.from_bytes(data=file_bytes, mime_type=mime_type)
 
-# 5. 신규 매물 자동 판별 및 맞춤형 마케팅 패키지 생성
+# 5.503 서버 과부하 시 자동 재시도(최대 3회) 함수
+def generate_with_retry(contents_list, max_retries=3):
+    for attempt in range(1, max_retries + 1):
+        try:
+            return client.models.generate_content(
+                model="gemini-3.8-flash",
+                contents=contents_list,
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    response_schema=UniversalMarketingPackage,
+                    temperature=0.7,
+                )
+            )
+        except Exception as e:
+            err_str = str(e)
+            if ("503" in err_str or "UNAVAILABLE" in err_str or "429" in err_str) and attempt < max_retries:
+                wait_sec = attempt * 6
+                print(f"구글 AI 서버 일시 혼잡(503). {wait_sec}초 후 자동 재시도합니다... ({attempt}/{max_retries})")
+                time.sleep(wait_sec)
+            else:
+                raise e
+
+# 6. 신규 매물 자동 판별 및 맞춤형 마케팅 패키지 생성
 def process_new_properties():
+    # 최신 대기 매물부터 순차 처리
     res = supabase.table("properties").select("*").eq("status", "pending").execute()
     
     if not res.data:
         print("신규 매물이 없습니다.")
         return False
 
-    for prop in res.data:
+    for idx, prop in enumerate(res.data):
+        # 여러 개가 밀려 있을 때 구글 서버 과부하 방지용 3초 숨고르기
+        if idx > 0:
+            time.sleep(3)
+
         raw_text = prop.get("raw_input") or ""
         print(f"매물 분석 시작 (ID: {prop['id']}): {raw_text[:100]}")
         
@@ -90,7 +116,6 @@ def process_new_properties():
 
         contents_list = []
 
-        # raw_input 내에 [FILE_ID:xxx] 태그가 있으면 텔레그램에서 PDF/사진을 직접 내려받아 첨부
         file_match = re.search(r"\[FILE_ID:([^\]]+)\]", raw_text)
         clean_text = re.sub(r"\[FILE_ID:[^\]]+\]", "", raw_text).strip()
 
@@ -103,16 +128,8 @@ def process_new_properties():
         contents_list.append(f"{base_prompt}\n\n[입력된 매물 텍스트/메모]\n{clean_text if clean_text else '첨부된 문서 및 도면 이미지를 기준으로 전체 분석을 진행하세요.'}")
         
         try:
-            response = client.models.generate_content(
-                model="gemini-3.8-flash",
-                contents=contents_list,
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json",
-                    response_schema=UniversalMarketingPackage,
-                    temperature=0.7,
-                )
-            )
-            
+            # 자동 재시도 함수로 안전하게 호출
+            response = generate_with_retry(contents_list)
             ai_result = json.loads(response.text)
 
             supabase.table("properties").update({
@@ -143,6 +160,6 @@ def process_new_properties():
 
     return True
 
-# 6. 메인 실행 스위치
+# 7. 메인 실행 스위치
 if __name__ == "__main__":
     process_new_properties()
