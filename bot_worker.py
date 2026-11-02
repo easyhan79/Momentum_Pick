@@ -1,7 +1,7 @@
 import os
 import re
-import time
 import json
+import sys
 import requests
 from typing import List
 from pydantic import BaseModel, Field
@@ -44,6 +44,18 @@ def send_telegram(msg: str):
         chunk = msg[i:i + max_len]
         res = requests.post(url, json={"chat_id": TG_CHAT_ID, "text": chunk}, timeout=15)
         print(f"Telegram API Status: {res.status_code}")
+        res.raise_for_status()
+        api_response = res.json()
+        if not api_response.get("ok", False):
+            raise RuntimeError(f"텔레그램 API 오류: {api_response.get('description', 'unknown')}")
+
+
+def notify_telegram(msg: str):
+    """알림 전송 실패가 이미 저장된 매물 분석 결과를 무효화하지 않도록 분리."""
+    try:
+        send_telegram(msg)
+    except Exception as exc:
+        print(f"경고: 텔레그램 알림 전송 실패: {type(exc).__name__}: {exc}")
 
 # 4. 텔레그램 첨부파일(PDF/이미지) 다운로드 및 Gemini Part 변환 함수
 def load_telegram_file(file_id: str) -> types.Part:
@@ -64,42 +76,17 @@ def load_telegram_file(file_id: str) -> types.Part:
         
     return types.Part.from_bytes(data=file_bytes, mime_type=mime_type)
 
-# 5.503 서버 과부하 시 자동 재시도(최대 3회) 함수
-def generate_with_retry(contents_list, max_retries=3):
-    for attempt in range(1, max_retries + 1):
-        try:
-            return client.models.generate_content(
-                model="gemini-3.8-flash",
-                contents=contents_list,
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json",
-                    response_schema=UniversalMarketingPackage,
-                    temperature=0.7,
-                )
-            )
-        except Exception as e:
-            err_str = str(e)
-            if ("503" in err_str or "UNAVAILABLE" in err_str or "429" in err_str) and attempt < max_retries:
-                wait_sec = attempt * 6
-                print(f"구글 AI 서버 일시 혼잡(503). {wait_sec}초 후 자동 재시도합니다... ({attempt}/{max_retries})")
-                time.sleep(wait_sec)
-            else:
-                raise e
-
-# 6. 신규 매물 자동 판별 및 맞춤형 마케팅 패키지 생성
+# 5. 신규 매물 자동 판별 및 맞춤형 마케팅 패키지 생성
 def process_new_properties():
-    # 최신 대기 매물부터 순차 처리
     res = supabase.table("properties").select("*").eq("status", "pending").execute()
     
     if not res.data:
         print("신규 매물이 없습니다.")
-        return False
+        return 0
 
-    for idx, prop in enumerate(res.data):
-        # 여러 개가 밀려 있을 때 구글 서버 과부하 방지용 3초 숨고르기
-        if idx > 0:
-            time.sleep(3)
-
+    failed_ids = []
+    success_count = 0
+    for prop in res.data:
         raw_text = prop.get("raw_input") or ""
         print(f"매물 분석 시작 (ID: {prop['id']}): {raw_text[:100]}")
         
@@ -107,6 +94,12 @@ def process_new_properties():
         당신은 대한민국 최고의 부동산(상가·토지·임야·공장·물류센터·수익형 빌딩) 개발 기획자이자 마케팅 디렉터입니다.
         전달된 매물 정보(텍스트 및 첨부된 PDF/도면 이미지)를 정밀 분석하여, 먼저 이 매물의 성격을 정확히 판별하세요.
         첨부파일에 지적도, 배치도, 형광펜 표시, 손글씨 메모(추가 부지 확보안 등)가 있다면 그 수치와 조건까지 빠짐없이 반영하세요.
+
+        [검증 및 표기 원칙]
+        - 제공되지 않은 시세, 수익률, 인허가, 도로 접합, 전력, 폐수 시설, 배후수요, 개발 호재 등을 확인된 사실처럼 쓰지 마세요.
+        - 확인할 수 없는 정보는 반드시 '확인 필요'로 표시하세요.
+        - 토지면적, 건축면적, 연면적을 구분하고, 단위나 명칭이 모호하면 임의로 확정하지 마세요.
+        - 제안하는 활용 컨셉은 가설임을 명시하고 실제 적법성은 별도 인허가 확인이 필요함을 알리세요.
 
         [유형별 분석 지침]
         1. 상가/오피스: 배후 수요, 앵커 시설, 실사용 면적(테라스 등 서비스 면적) 가성비, 기존 설비 인계 혜택을 중심으로 최적의 창업 업종 타겟을 도출하세요.
@@ -116,27 +109,44 @@ def process_new_properties():
 
         contents_list = []
 
+        # raw_input 내에 [FILE_ID:xxx] 태그가 있으면 텔레그램에서 PDF/사진을 직접 내려받아 첨부
         file_match = re.search(r"\[FILE_ID:([^\]]+)\]", raw_text)
         clean_text = re.sub(r"\[FILE_ID:[^\]]+\]", "", raw_text).strip()
 
-        if file_match:
-            file_id = file_match.group(1).strip()
-            print(f"첨부파일 감지됨 (file_id: {file_id}). 다운로드 중...")
-            file_part = load_telegram_file(file_id)
-            contents_list.append(file_part)
-
-        contents_list.append(f"{base_prompt}\n\n[입력된 매물 텍스트/메모]\n{clean_text if clean_text else '첨부된 문서 및 도면 이미지를 기준으로 전체 분석을 진행하세요.'}")
-        
         try:
-            # 자동 재시도 함수로 안전하게 호출
-            response = generate_with_retry(contents_list)
-            ai_result = json.loads(response.text)
+            if not clean_text and not file_match:
+                raise ValueError("매물 원본 내용과 첨부파일이 모두 비어 있습니다.")
 
-            supabase.table("properties").update({
+            if file_match:
+                file_id = file_match.group(1).strip()
+                print("첨부파일 감지됨. 다운로드 중...")
+                file_part = load_telegram_file(file_id)
+                contents_list.append(file_part)
+
+            contents_list.append(f"{base_prompt}\n\n[입력된 매물 텍스트/메모]\n{clean_text if clean_text else '첨부된 문서 및 도면 이미지를 기준으로 전체 분석을 진행하세요.'}")
+            response = client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=contents_list,
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    response_schema=UniversalMarketingPackage,
+                    temperature=0.7,
+                )
+            )
+            
+            if not response.text:
+                raise RuntimeError("Gemini가 빈 응답을 반환했습니다.")
+            ai_result = json.loads(response.text)
+            UniversalMarketingPackage.model_validate(ai_result)
+
+            # AI 콘텐츠 생성은 '게시'가 아니므로 post_count를 변경하지 않습니다.
+            update_res = supabase.table("properties").update({
                 "ai_contents": ai_result,
-                "status": "analyzed",
-                "post_count": 1
-            }).eq("id", prop["id"]).execute()
+                "status": "analyzed"
+            }).eq("id", prop["id"]).eq("status", "pending").execute()
+            if not update_res.data:
+                raise RuntimeError("매물 저장 결과가 0건입니다. 상태 및 DB 권한을 확인하세요.")
+            success_count += 1
 
             targets_str = ", ".join(ai_result.get("detected_targets", []))
             category_str = ai_result.get("property_category", "일반 매물")
@@ -151,15 +161,31 @@ def process_new_properties():
                 f"📝 인스타 캡션 미리보기:\n{ai_result['insta_caption'][:180]}...\n\n"
                 f"🚀 Supabase DB(ai_contents) 저장이 완료되었습니다."
             )
-            send_telegram(report)
+            notify_telegram(report)
 
         except Exception as e:
-            error_msg = f"⚠️ [매물 분석 중 오류 발생]\n매물 ID: {prop['id']}\n오류 내용: {str(e)}"
+            # pending은 유지하여 다음 Actions 실행에서 동일 매물을 다시 분석할 수 있도록 합니다.
+            failed_ids.append(str(prop["id"]))
+            error_msg = (
+                f"⚠️ [매물 분석 중 오류 발생]\n"
+                f"매물 ID: {prop['id']}\n"
+                f"오류 종류: {type(e).__name__}\n"
+                f"오류 내용: {str(e)[:1000]}"
+            )
             print(error_msg)
-            send_telegram(error_msg)
+            notify_telegram(error_msg)
 
-    return True
+    print(f"실행 요약: 분석 성공 {success_count}건 / 분석 실패 {len(failed_ids)}건")
+    if failed_ids:
+        raise RuntimeError(
+            f"분석 실패 {len(failed_ids)}건. pending 상태로 유지: {', '.join(failed_ids)}"
+        )
+    return success_count
 
-# 7. 메인 실행 스위치
+# 6. 메인 실행 스위치
 if __name__ == "__main__":
-    process_new_properties()
+    try:
+        process_new_properties()
+    except Exception as exc:
+        print(f"GitHub Actions 실패 보고: {type(exc).__name__}: {exc}")
+        sys.exit(1)
