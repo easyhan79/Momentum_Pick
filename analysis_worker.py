@@ -5,6 +5,8 @@ No raw input, attachment identifiers, provider error text or credentials are log
 """
 import json
 import re
+from datetime import datetime, timezone
+from ai_providers import Generation, ProviderError, generate_with_fallback
 
 MODEL = 'gemini-3.8-flash'
 PROMPT = '''당신은 대한민국 부동산 광고·개발 기획자입니다. 제공 텍스트와 PDF/사진을 바탕으로
@@ -19,6 +21,8 @@ PROMPT = '''당신은 대한민국 부동산 광고·개발 기획자입니다. 
 
 def failure(exc):
     """Classify without copying potentially secret-bearing provider messages."""
+    if isinstance(exc, ProviderError):
+        return exc.safe_code, exc.retryable
     code = getattr(exc, 'code', None)
     if code in (408, 429, 500, 502, 503, 504):
         return 'provider_' + str(code), True
@@ -44,7 +48,10 @@ def run(api, generate, attachment, validate, notify, emit=print, limit=3):
                 raise ValueError('empty_input')
             parts = [attachment(tags[0])] if tags else []
             parts.append(PROMPT + '\n[입력 자료]\n' + (clean or '첨부 문서를 기준으로 분석하세요.'))
-            result = validate(generate(parts))
+            generated = generate(parts)
+            result = validate(generated.text if isinstance(generated, Generation) else generated)
+            if isinstance(generated, Generation):
+                result['_generation'] = {'provider': generated.provider, 'model': generated.model, 'at': datetime.now(timezone.utc).isoformat()}
         except Exception as exc:
             code, retryable = failure(exc)
             accepted = api('analysis_complete', {'p_id': job['id'], 'p_token': job['token'], 'p_result': None, 'p_error': code, 'p_retryable': retryable})
@@ -101,13 +108,30 @@ def synchronize_drafts(api):
         existing.add(prop['id']); count += 1
     return count
 
+from typing import List
+from pydantic import BaseModel, Field
+
+class ShowroomConcept(BaseModel):
+    concept_name: str = Field(description="추천 활용 컨셉명 (상가면 추천업종, 토지/공장이면 추천개발·물류·제조·확장 방향)")
+    headline: str = Field(description="이 컨셉의 핵심 투자/창업 매력도 한 줄 카피")
+    cost_benefit: str = Field(description="비용 절감 또는 기대 수익 포인트 (예: 토목비 절감, 전력/폐수 인허가 확보, 인테리어 세이브 등)")
+    zone_plan: List[str] = Field(description="공간/필지 5분할 활용 계획 (실내외 조닝 또는 부지/확장지 5분할 배치)")
+
+class UniversalMarketingPackage(BaseModel):
+    property_category: str = Field(description="자동 판별된 매물 유형 (예: 상업용 상가, 토지/임야, 대형 공장/물류부지, 수익형 건물 등)")
+    detected_targets: List[str] = Field(description="이 매물에 가장 적합한 핵심 매수/임차 타겟층 2~3개")
+    usp_summary: str = Field(description="핵심 셀링 포인트 3줄 요약 (입지, 면적/용도/인프라 가성비, 수익성 및 확장성)")
+    target_1_blog: str = Field(description="첫 번째 핵심 타겟 맞춤형 네이버 블로그 포스팅 (제목 + 본문 전체)")
+    target_2_blog: str = Field(description="두 번째 핵심 타겟 맞춤형 네이버 블로그 포스팅 (제목 + 본문 전체)")
+    insta_caption: str = Field(description="인스타그램 카드뉴스 5장 구성안 및 핵심 해시태그 15개")
+    landing_copy: str = Field(description="전용 웹 쇼룸 메인 헤드라인 및 입지/수익률 브리핑 문구")
+    showroom_concepts: List[ShowroomConcept] = Field(description="웹 쇼룸 시뮬레이터에 들어갈 3가지 추천 활용/개발 컨셉 데이터")
+
 def main():
     import os
     import requests
     from google import genai
     from google.genai import types
-    # Reuse the established output contract, without running the original worker.
-    from bot_worker import UniversalMarketingPackage
 
     # Configuration validates the exact project and server-role key without logging it.
     # Keep this independent from the notification script's configuration contract.
@@ -163,7 +187,7 @@ def main():
         mime = 'application/pdf' if data.startswith(b'%PDF-') else 'image/png' if data.startswith(b'\x89PNG\r\n\x1a\n') else 'image/jpeg' if data.startswith(b'\xff\xd8\xff') else 'image/webp' if data[:4] == b'RIFF' and data[8:12] == b'WEBP' else None
         if not mime:
             raise ValueError('attachment_unsupported')
-        return types.Part.from_bytes(data=data, mime_type=mime)
+        return {'data': data, 'mime_type': mime}
 
     def notify(message):
         try:
@@ -172,21 +196,32 @@ def main():
         except Exception:
             print('analysis notification failed', flush=True)
 
-    client = genai.Client(api_key=os.environ['GEMINI_API_KEY'], http_options=types.HttpOptions(timeout=90000, retry_options=types.HttpRetryOptions(attempts=1)))
-    def generate(parts):
-        return client.models.generate_content(model=MODEL, contents=parts, config=types.GenerateContentConfig(response_mime_type='application/json', response_schema=UniversalMarketingPackage, temperature=0.7)).text
+    def gemini_generate(parts, model, timeout):
+        with genai.Client(api_key=os.environ['GEMINI_API_KEY'], http_options=types.HttpOptions(timeout=int(timeout*1000), retry_options=types.HttpRetryOptions(attempts=1))) as client:
+            response = client.models.generate_content(model=model, contents=[types.Part.from_bytes(data=p['data'], mime_type=p['mime_type']) if isinstance(p, dict) else p for p in parts], config=types.GenerateContentConfig(response_mime_type='application/json', response_schema=UniversalMarketingPackage, temperature=0.7))
+            if getattr(getattr(response, 'prompt_feedback', None), 'block_reason', None) not in (None, 0, 'BLOCK_REASON_UNSPECIFIED'):
+                raise ProviderError('gemini_refusal', allow_fallback=False)
+            for candidate in response.candidates or []:
+                reason = str(getattr(candidate, 'finish_reason', '')).split('.')[-1]
+                if reason in ('SAFETY', 'PROHIBITED_CONTENT', 'BLOCKLIST', 'SPII'):
+                    raise ProviderError('gemini_refusal', allow_fallback=False)
+                if reason == 'MAX_TOKENS':
+                    raise ProviderError('gemini_incomplete', True)
+            return response.text
 
     def validate(value):
         if not value:
             raise ValueError('empty_response')
         return UniversalMarketingPackage.model_validate_json(value).model_dump()
 
+    def generate(parts):
+        return generate_with_fallback(parts, UniversalMarketingPackage.model_json_schema(), validate, os.environ, requests.post, gemini_generate)
+
     try:
-        run(api, generate, attachment, validate, notify)
+        run(api, generate, attachment, validate, notify, limit=2)
     finally:
         # Successful properties get drafts even if a different item or provider fails.
         sync_drafts()
-        client.close()
 
 
 if __name__ == '__main__':
