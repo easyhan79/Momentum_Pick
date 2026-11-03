@@ -1,0 +1,102 @@
+name: Showroom inquiry notifications
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+    inputs:
+      send_test_notification:
+        description: Send one operational test notification to the configured Telegram chat
+        required: false
+        default: false
+        type: boolean
+  push:
+    branches: [feature/inquiry-crm]
+    paths: [.github/workflows/showroom-inquiry-notifications.yml]
+permissions: {}
+concurrency:
+  group: showroom-inquiry-notifications
+  cancel-in-progress: false
+jobs:
+  deliver-inquiries:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Deliver queued inquiries and expire closed contact details
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          SEND_TEST_NOTIFICATION: ${{ inputs.send_test_notification || 'false' }}
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          """Deliver durable inquiry notifications and expire closed contact details. Never log PII."""
+          import base64
+          import json
+          import os
+          import re
+          from urllib.error import HTTPError
+          from urllib.request import Request, build_opener, HTTPRedirectHandler
+          
+          PROJECT='aklcylhqslgntkgloqpi'
+          
+          class NoRedirect(HTTPRedirectHandler):
+              def redirect_request(self,*args,**kwargs):return None
+          
+          class DeliveryError(Exception):pass
+          
+          class Client:
+              def __init__(self,url,key,token,chat):
+                  if url.rstrip('/')!=f'https://{PROJECT}.supabase.co':raise DeliveryError('project_mismatch')
+                  if not key.startswith('sb_secret_'):
+                      try:payload=json.loads(base64.urlsafe_b64decode(key.split('.')[1]+'==='))
+                      except Exception:raise DeliveryError('server_key_required') from None
+                      if payload.get('role')!='service_role' or payload.get('ref')!=PROJECT:raise DeliveryError('server_key_required')
+                  if not re.fullmatch(r'[0-9]+:[A-Za-z0-9_-]+',token or '') or not chat:raise DeliveryError('telegram_config_required')
+                  self.url,self.key,self.token,self.chat=url.rstrip('/'),key,token,chat
+                  self.opener=build_opener(NoRedirect())
+              def post(self,url,data,headers):
+                  try:
+                      with self.opener.open(Request(url,data=json.dumps(data,ensure_ascii=False).encode(),headers={'Content-Type':'application/json',**headers},method='POST'),timeout=20) as response:
+                          raw=response.read(1024*1024+1)
+                          if len(raw)>1024*1024:raise DeliveryError('response_too_large')
+                          return json.loads(raw) if raw.strip() else None
+                  except Exception:raise DeliveryError('request_failed') from None
+              def rpc(self,name,data):
+                  headers={'apikey':self.key}
+                  if not self.key.startswith('sb_secret_'):headers['Authorization']='Bearer '+self.key
+                  return self.post(self.url+'/rest/v1/rpc/'+name,data,headers)
+              def send(self,message):
+                  result=self.post(f'https://api.telegram.org/bot{self.token}/sendMessage',{'chat_id':self.chat,'text':message},{})
+                  if not isinstance(result,dict) or result.get('ok') is not True:raise DeliveryError('telegram_failed')
+          
+          def deliver(client,test_notification=False):
+              stats={'sent':0,'failed':0,'redacted':client.rpc('crm_retention_cleanup',{}),'test_sent':False}
+              if test_notification:
+                  client.send('[Momentum Pick] 문의 알림 연결 테스트입니다. 실제 고객 문의나 결제가 등록된 것은 아닙니다.')
+                  stats['test_sent']=True
+              # A bounded batch; remaining and failed requests are retried by the next scheduled run.
+              rows=client.rpc('crm_claim_notifications',{'p_limit':20,'p_id':None})
+              for row in rows or []:
+                  sent=False
+                  try:
+                      client.send(f"[Momentum Pick 새 문의]\n접수 ID: {row['id']}\n성함: {row['name']}\n연락처: {row['phone']}\n문의 구분: {row['service_interest']}\n관심 내용: {row['intended_use']}\n상담 관리: https://momentum-pick-showroom-20261102.ljc3534.chatgpt.site/?admin=1")
+                      sent=True
+                  except Exception:pass
+                  client.rpc('crm_complete_notification',{'p_id':row['id'],'p_attempt':row['notification_attempts'],'p_success':sent})
+                  stats['sent' if sent else 'failed']+=1
+              return stats
+          
+          def main():
+              client=Client(os.environ.get('SUPABASE_URL',''),os.environ.get('SUPABASE_KEY',''),os.environ.get('TELEGRAM_TOKEN',''),os.environ.get('TELEGRAM_CHAT_ID',''))
+              stats=deliver(client,os.environ.get('SEND_TEST_NOTIFICATION','false')=='true')
+              print('Inquiry delivery completed:',json.dumps(stats,sort_keys=True))
+              if stats['failed']:raise DeliveryError('pending_retry')
+          
+          if __name__=='__main__':
+              try:main()
+              except Exception:
+                  print('Inquiry delivery failed; no credentials, customer details or Telegram responses logged.')
+                  raise SystemExit(1)
+          PY
