@@ -5,9 +5,9 @@ on:
   repository_dispatch:
     types: [new_property]
   
-  # 2. 매일 오전 9시, 오후 6시(한국시간)에 남은 pending 매물 재분석
+  # 2. 즉시 트리거 유실과 일시 오류 복구 (DB가 최대5회·대기시간을 제어)
   schedule:
-    - cron: '0 0,9 * * *'
+    - cron: '3,18,33,48 * * * *'
   
   # 3. 수동 테스트용 버튼
   workflow_dispatch:
@@ -21,6 +21,9 @@ concurrency:
 jobs:
   run-marketing-bot:
     runs-on: ubuntu-latest
+    timeout-minutes: 9
+    permissions:
+      contents: read
     steps:
       - name: 코드 불러오기
         uses: actions/checkout@v4
@@ -33,7 +36,7 @@ jobs:
       - name: 필수 라이브러리 설치
         run: |
           python -m pip install --upgrade pip
-          pip install supabase google-genai requests pydantic
+          pip install supabase==2.33.0 google-genai==2.34.0 requests==2.34.2 pydantic==2.14.2
 
       - name: 무인 부동산 분석 및 마케팅 봇 가동
         env:
@@ -43,4 +46,4 @@ jobs:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           PUBLIC_DATA_API_KEY: ${{ secrets.PUBLIC_DATA_API_KEY }}
-        run: python bot_worker.py
+        run: python -u analysis_worker.py
