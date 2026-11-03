@@ -222,6 +222,8 @@ def main():
     finally:
         # Successful properties get drafts even if a different item or provider fails.
         sync_drafts()
+        from plan_analysis import analyze_uploaded_plans
+        analyze_uploaded_plans(url, headers, os.environ['GEMINI_API_KEY'], requests)
 
 
 if __name__ == '__main__':
