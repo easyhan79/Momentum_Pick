@@ -1,0 +1,244 @@
+name: Showroom private Telegram media
+on:
+  repository_dispatch:
+    types: [new_property]
+  workflow_run:
+    workflows: [Real Estate AI Marketing Agent]
+    types: [completed]
+    branches: [main]
+  schedule:
+    - cron: '12,27,42,57 * * * *'
+  workflow_dispatch:
+  push:
+    branches: [feature/telegram-private-media]
+    paths: [.github/workflows/showroom-telegram-media.yml]
+permissions: {}
+concurrency:
+  group: showroom-private-telegram-media
+  cancel-in-progress: false
+jobs:
+  import-private-images:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Import attachments without changing original analysis or publication
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          """Import Telegram image attachments privately; never change original properties or publish."""
+          import base64
+          import json
+          import os
+          import re
+          import uuid
+          from urllib.error import HTTPError
+          from urllib.parse import quote
+          from urllib.request import Request, build_opener, HTTPRedirectHandler
+          
+          PROJECT = 'aklcylhqslgntkgloqpi'
+          BUCKET = 'showroom-private-media'
+          MAX_FILE = 8 * 1024 * 1024
+          
+          
+          class SyncError(Exception):
+              pass
+          
+          
+          class NoRedirect(HTTPRedirectHandler):
+              def redirect_request(self, *args, **kwargs):
+                  return None
+          
+          
+          def attachment_ids(raw):
+              if not isinstance(raw, str):
+                  return []
+              ids = []
+              for value in re.findall(r'\[FILE_ID:([^\]]+)\]', raw):
+                  value = value.strip()
+                  if not re.fullmatch(r'[A-Za-z0-9_-]{1,1024}', value):
+                      raise SyncError('invalid_attachment')
+                  if value not in ids:
+                      ids.append(value)
+              return ids
+          
+          
+          def identity(property_id, file_id):
+              return str(uuid.uuid5(uuid.NAMESPACE_URL, f'momentum-private-media:{property_id}:{file_id}'))
+          
+          
+          def image_type(data):
+              if len(data) >= 24 and data[:8] == b'\x89PNG\r\n\x1a\n':
+                  return 'image/png', 'png'
+              if len(data) >= 12 and data[:3] == b'\xff\xd8\xff':
+                  return 'image/jpeg', 'jpg'
+              if len(data) >= 12 and data[:4] == b'RIFF' and data[8:12] == b'WEBP':
+                  return 'image/webp', 'webp'
+              return None
+          
+          
+          class Client:
+              def __init__(self, url, key, token):
+                  if url.rstrip('/') != f'https://{PROJECT}.supabase.co':
+                      raise SyncError('project_mismatch')
+                  if not key.startswith('sb_secret_'):
+                      try:
+                          payload = json.loads(base64.urlsafe_b64decode(key.split('.')[1] + '==='))
+                      except Exception:
+                          raise SyncError('server_credential_required') from None
+                      if payload.get('role') != 'service_role' or payload.get('ref') != PROJECT:
+                          raise SyncError('server_credential_required')
+                  if not re.fullmatch(r'[0-9]+:[A-Za-z0-9_-]+', token or ''):
+                      raise SyncError('telegram_credential_required')
+                  self.url, self.key, self.token = url.rstrip('/'), key, token
+                  self.opener = build_opener(NoRedirect())
+          
+              def request(self, url, method='GET', body=None, headers=None, limit=16*1024*1024):
+                  try:
+                      with self.opener.open(Request(url, data=body, method=method, headers=headers or {}), timeout=25) as response:
+                          data = response.read(limit + 1)
+                          if len(data) > limit:
+                              raise SyncError('response_too_large')
+                          return response.status, data
+                  except HTTPError as error:
+                      # Do not propagate URL/response text; Telegram URL contains a bot token.
+                      return error.code, b''
+                  except SyncError:
+                      raise
+                  except Exception:
+                      raise SyncError('network_unavailable') from None
+          
+              def supabase(self, path, method='GET', body=None, headers=None, binary=False):
+                  auth = {'apikey': self.key}
+                  if not self.key.startswith('sb_secret_'):
+                      auth['Authorization'] = 'Bearer ' + self.key
+                  if body is not None and not binary:
+                      body = json.dumps(body, ensure_ascii=False).encode()
+                      auth['Content-Type'] = 'application/json'
+                  auth.update(headers or {})
+                  status, raw = self.request(self.url + '/' + path, method, body, auth)
+                  if not 200 <= status < 300:
+                      raise SyncError('supabase_unavailable')
+                  return json.loads(raw) if raw.strip() else None
+          
+              def pages(self, path):
+                  offset = 0
+                  while True:
+                      rows = self.supabase(f'rest/v1/{path}&limit=100&offset={offset}')
+                      yield from rows
+                      if len(rows) < 100:
+                          break
+                      offset += 100
+          
+              def properties(self):
+                  return self.pages('properties?select=id,raw_input&order=id')
+          
+              def existing(self):
+                  return {row['id'] for row in self.pages(f'property_assets?bucket_id=eq.{BUCKET}&select=id&order=id')}
+          
+              def telegram_file(self, file_id):
+                  status, raw = self.request(f'https://api.telegram.org/bot{self.token}/getFile', 'POST', json.dumps({'file_id': file_id}).encode(), {'Content-Type': 'application/json'}, 65536)
+                  if status != 200:
+                      raise SyncError('telegram_unavailable')
+                  try:
+                      info = json.loads(raw)
+                      if info.get('ok') is not True:
+                          raise ValueError()
+                      result = info['result']
+                      path = result['file_path']
+                      if not isinstance(path, str) or not re.fullmatch(r'[A-Za-z0-9_./-]{1,1024}', path) or path.startswith('/') or any(p in ('', '.', '..') for p in path.split('/')):
+                          raise ValueError()
+                  except Exception:
+                      raise SyncError('invalid_telegram_response') from None
+                  if path.lower().endswith('.pdf'):
+                      return None, 'unsupported'
+                  if result.get('file_size', 0) > MAX_FILE:
+                      return None, 'oversized'
+                  status, data = self.request(f'https://api.telegram.org/file/bot{self.token}/{path}', limit=MAX_FILE)
+                  if status != 200:
+                      raise SyncError('telegram_download_failed')
+                  return data, None
+          
+              def ensure_bucket(self):
+                  try:
+                      config = self.supabase(f'storage/v1/bucket/{BUCKET}')
+                  except SyncError:
+                      try:
+                          self.supabase('storage/v1/bucket', 'POST', {'id': BUCKET, 'name': BUCKET, 'public': False, 'file_size_limit': MAX_FILE, 'allowed_mime_types': ['image/jpeg', 'image/png', 'image/webp']})
+                      except SyncError:
+                          pass  # Another authorized uploader may have just created it.
+                      config = self.supabase(f'storage/v1/bucket/{BUCKET}')
+                  if not isinstance(config, dict) or config.get('public') is not False:
+                      raise SyncError('private_bucket_required')
+          
+              def store(self, property_id, asset_id, data, mime, ext):
+                  path = f'{property_id}/{asset_id}.{ext}'
+                  try:
+                      self.supabase(f'storage/v1/object/{BUCKET}/{path}', 'POST', data, {'Content-Type': mime, 'x-upsert': 'false', 'Cache-Control': 'max-age=0'}, binary=True)
+                  except SyncError:
+                      # A previous run may have stored bytes before metadata failed. Never overwrite.
+                      self.supabase(f'storage/v1/object/info/{BUCKET}/{path}')
+                  self.supabase('rest/v1/property_assets?on_conflict=bucket_id,storage_path', 'POST', {
+                      'id': asset_id, 'property_id': property_id, 'kind': 'document', 'bucket_id': BUCKET,
+                      'storage_path': path, 'source_type': 'owner_provided', 'is_approved': False,
+                      'caption': '텔레그램 첨부 이미지 · 제공 자료 / 미검증 · 사진·도면 분류 및 사용권 검토 필요',
+                  }, {'Prefer': 'resolution=ignore-duplicates,return=minimal'})
+          
+          
+          def synchronize(client):
+              existing = client.existing()
+              counts = dict(imported=0, existing=0, unsupported=0, oversized=0, failed=0)
+              bucket_ready = False
+              for prop in client.properties():
+                  try:
+                      property_id = str(uuid.UUID(prop['id']))
+                      files = attachment_ids(prop.get('raw_input'))
+                  except Exception:
+                      counts['failed'] += 1
+                      continue
+                  for file_id in files:
+                      asset_id = identity(property_id, file_id)
+                      if asset_id in existing:
+                          counts['existing'] += 1
+                          continue
+                      try:
+                          data, reason = client.telegram_file(file_id)
+                          if reason:
+                              counts[reason] += 1
+                              continue
+                          if len(data) > MAX_FILE:
+                              counts['oversized'] += 1
+                              continue
+                          detected = image_type(data)
+                          if not detected:
+                              counts['unsupported'] += 1
+                              continue
+                          if not bucket_ready:
+                              client.ensure_bucket()
+                              bucket_ready = True
+                          client.store(property_id, asset_id, data, *detected)
+                          existing.add(asset_id)
+                          counts['imported'] += 1
+                      except Exception:
+                          counts['failed'] += 1
+              return counts
+          
+          
+          def main():
+              result = synchronize(Client(os.environ.get('SUPABASE_URL', ''), os.environ.get('SUPABASE_KEY', ''), os.environ.get('TELEGRAM_TOKEN', '')))
+              print('Private Telegram media sync:', json.dumps(result, sort_keys=True))
+              if result['failed']:
+                  raise SyncError('some_attachments_failed')
+          
+          
+          if __name__ == '__main__':
+              try:
+                  main()
+              except Exception:
+                  print('Private Telegram media sync failed; no credentials, IDs, URLs or file contents logged.')
+                  raise SystemExit(1)
+          PY
