@@ -1,3 +1,4 @@
+import {queuePlan,dispatchPlan} from '../_shared/plan-queue.ts';
 // No client-supplied claims are trusted. Auth is checked against GoTrue on every request.
 // Only explicitly approved snapshots may be published; original properties are never written.
 type Json = Record<string, any>;
@@ -32,8 +33,8 @@ export function marketingContent(ai:unknown,saved:unknown={}) {
   const source=object(ai), edits=object(saved);
   return Object.fromEntries(marketingFields.map(field=>[field,text(Object.hasOwn(edits,field)?edits[field]:source[field],18000)]));
 }
-type Config = {url:string;key:string;fetcher?:typeof fetch};
-export function createHandler({url,key,fetcher=fetch}:Config) {
+type Config = {url:string;key:string;fetcher?:typeof fetch;githubTokens?:string[]};
+export function createHandler({url,key,fetcher=fetch,githubTokens=[]}:Config) {
   async function db(path:string, options:RequestInit={}) {
     const response=await fetcher(`${url}/rest/v1/${path}`,{...options,redirect:'error',headers:{apikey:key,Authorization:`Bearer ${key}`,'Content-Type':'application/json',...options.headers},signal:AbortSignal.timeout(15000)});
     if(!response.ok) throw new ApiError(502,'database_unavailable');
@@ -61,7 +62,7 @@ export function createHandler({url,key,fetcher=fetch}:Config) {
       }
       if(req.method==='GET'&&query.get('action')==='draft') {
         const id=query.get('propertyId')||'';if(!UUID.test(id)) throw new ApiError(400,'invalid_property_id');
-        const rows=await db(`property_showrooms?property_id=eq.${id}&select=id,property_id,slug,showroom_status,draft_content,revision,updated_at`);
+        const rows=await db(`property_showrooms?property_id=eq.${id}&select=id,property_id,slug,showroom_status,published_revision,draft_content,revision,updated_at`);
         if(!rows.length) throw new ApiError(404,'draft_not_found');
         return reply({showroom:rows[0]});
       }
@@ -79,6 +80,11 @@ export function createHandler({url,key,fetcher=fetch}:Config) {
       let body:Json;try{body=object(JSON.parse(raw));}catch{throw new ApiError(400,'invalid_json');}
       if(body.action!=='save-marketing'&&bodyBytes>65536)throw new ApiError(413,'body_too_large');
       const id=body.propertyId;if(typeof id!=='string'||!UUID.test(id)) throw new ApiError(400,'invalid_property_id');
+      if(req.method==='POST'&&body.action==='analyze-plan'){
+        if(!UUID.test(body.assetId||'')||!Number.isSafeInteger(body.revision))throw new ApiError(400,'invalid_plan');
+        let showroom;try{showroom=await queuePlan(db,id,body.assetId,body.revision);}catch(e){throw new ApiError(409,e instanceof Error?e.message:'plan_queue_failed');}
+        const dispatched=await dispatchPlan(githubTokens,fetcher);return reply({showroom,dispatched});
+      }
       if(req.method==='POST'&&['request-review','publish','unpublish'].includes(body.action)) {
         if(!Number.isSafeInteger(body.revision)||body.revision<1||body.revision>=2147483647)throw new ApiError(400,'invalid_revision');
         const rows=await db(`property_showrooms?property_id=eq.${id}&select=*`);
@@ -90,6 +96,7 @@ export function createHandler({url,key,fetcher=fetch}:Config) {
           const review=object(body.review);
           if(!['facts','rights','claims','privacy'].every(k=>review[k]===true)||text(review.notes).length<10)throw new ApiError(400,'checklist_required');
           const draft=object(current.draft_content);
+          if(['queued','running','failed'].includes(object(draft.planAnalysis).state))throw new ApiError(409,'plan_analysis_pending');
           if(!text(draft.title)||!text(draft.subtitle)||!text(draft.summary)||draft.subtitle.length>100)throw new ApiError(400,'content_review_required');
           for(const c of (draft.concepts||[])){if(!c.plan)continue;
             if(!c.zones?.length||c.zones.some((z:Json)=>!z.position))throw new ApiError(400,'plan_positions_required');
@@ -101,7 +108,7 @@ export function createHandler({url,key,fetcher=fetch}:Config) {
           const prior=object(current.published_content)._reviewHistory;
           Object.assign(patch,{showroom_status:'published',published_content:{...draft,_review:record,_reviewHistory:[...(Array.isArray(prior)?prior:[]),record]},published_revision:body.revision+1,approved_by:user.id,approved_at:now,published_at:now});
         }else patch.showroom_status=body.action==='request-review'?'in_review':'unpublished';
-        const saved=await db(`property_showrooms?property_id=eq.${id}&revision=eq.${body.revision}&select=id,property_id,slug,showroom_status,draft_content,revision,updated_at`,{method:'PATCH',headers:{Prefer:'return=representation'},body:JSON.stringify(patch)});
+        const saved=await db(`property_showrooms?property_id=eq.${id}&revision=eq.${body.revision}&select=id,property_id,slug,showroom_status,published_revision,draft_content,revision,updated_at`,{method:'PATCH',headers:{Prefer:'return=representation'},body:JSON.stringify(patch)});
         if(!saved.length)throw new ApiError(409,'revision_conflict');return reply({showroom:saved[0]});
       }
       if(req.method==='POST'&&body.action==='create-draft') {
@@ -109,7 +116,7 @@ export function createHandler({url,key,fetcher=fetch}:Config) {
         if(!rows.length) throw new ApiError(404,'property_not_found');
         if(rows[0].status!=='analyzed') throw new ApiError(409,'analysis_not_ready');
         await db('property_showrooms?on_conflict=property_id',{method:'POST',headers:{Prefer:'resolution=ignore-duplicates,return=minimal'},body:JSON.stringify({property_id:id,slug:`property-${id}`,draft_content:toDraft(rows[0])})});
-        const saved=await db(`property_showrooms?property_id=eq.${id}&select=id,property_id,slug,showroom_status,draft_content,revision,updated_at`);
+        const saved=await db(`property_showrooms?property_id=eq.${id}&select=id,property_id,slug,showroom_status,published_revision,draft_content,revision,updated_at`);
         return reply({showroom:saved[0]});
       }
       if(req.method==='PATCH'&&body.action==='save-marketing') {
@@ -148,8 +155,10 @@ export function createHandler({url,key,fetcher=fetch}:Config) {
             return {...original.zones[j],label:text(z.label,100),title:text(z.title,120),body:text(z.body),evidence:z.evidence==='owner_provided'?'owner_provided':'ai_hypothesis',...(position?{position}:{})};});
           validated.push({...original,plan,zones});
         }
-        const content={...prior,concepts:validated,title:edits.title.trim(),subtitle:edits.subtitle.trim(),summary:edits.summary.trim()};
-        const saved=await db(`property_showrooms?property_id=eq.${id}&revision=eq.${body.revision}&select=id,property_id,slug,showroom_status,draft_content,revision,updated_at`,{method:'PATCH',headers:{Prefer:'return=representation'},body:JSON.stringify({draft_content:content,revision:body.revision+1})});
+        const manualComplete=validated.some(c=>c.plan)&&validated.every(c=>!c.plan||c.zones.every((z:Json)=>z.position));
+        const planAnalysis=manualComplete&&['failed','needs_review'].includes(object(prior.planAnalysis).state)?{...prior.planAnalysis,state:'manual_reviewed'}:prior.planAnalysis;
+        const content={...prior,planAnalysis,concepts:validated,title:edits.title.trim(),subtitle:edits.subtitle.trim(),summary:edits.summary.trim()};
+        const saved=await db(`property_showrooms?property_id=eq.${id}&revision=eq.${body.revision}&select=id,property_id,slug,showroom_status,published_revision,draft_content,revision,updated_at`,{method:'PATCH',headers:{Prefer:'return=representation'},body:JSON.stringify({draft_content:content,revision:body.revision+1})});
         if(!saved.length) throw new ApiError(409,'revision_conflict');
         return reply({showroom:saved[0]});
       }
@@ -161,4 +170,4 @@ export function createHandler({url,key,fetcher=fetch}:Config) {
 }
 // Supabase injects existing server credentials. They never enter browser code.
 declare const Deno: {env:{get(name:string):string|undefined};serve(handler:(req:Request)=>Promise<Response>):void};
-if(typeof Deno!=='undefined') Deno.serve(createHandler({url:Deno.env.get('SUPABASE_URL')!,key:Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!}));
+if(typeof Deno!=='undefined') Deno.serve(createHandler({url:Deno.env.get('SUPABASE_URL')!,key:Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,githubTokens:[Deno.env.get('GITHUB_TOKEN')||'',Deno.env.get('GH_PAT')||'']}));

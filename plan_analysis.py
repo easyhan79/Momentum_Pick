@@ -51,11 +51,19 @@ def analyze_uploaded_plans(url, headers, gemini_key, requests, emit=print):
         property_id, content = row['property_id'], row['draft_content']
         if not re.fullmatch(r'[0-9a-f-]{36}', property_id) or not content.get('concepts'):
             continue
-        assets = rest(f'property_assets?property_id=eq.{property_id}&kind=eq.provided_plan&bucket_id=eq.showroom-private-media&select=id,caption,storage_path&order=created_at.desc&limit=1')
+        state = content.get('planAnalysis', {})
+        requested = state.get('assetId') if state.get('state') in ('queued', 'running', 'failed') else None
+        if requested and not re.fullmatch(r'[0-9a-f-]{36}', requested):
+            continue
+        if state.get('state') == 'running':
+            started = state.get('startedAt')
+            if started and (datetime.now(timezone.utc)-datetime.fromisoformat(started)).total_seconds() < 600:
+                continue
+        selection = f'id=eq.{requested}' if requested else 'kind=eq.provided_plan'
+        assets = rest(f'property_assets?property_id=eq.{property_id}&{selection}&bucket_id=eq.showroom-private-media&select=id,caption,storage_path&order=created_at.desc&limit=1')
         if not assets:
             continue
         asset = assets[0]
-        state = content.get('planAnalysis', {})
         if state.get('assetId') == asset['id'] and (state.get('state') in ('done', 'needs_review') or state.get('attempts', 0) >= 3):
             continue
         # Preserve an explicitly selected/manual plan until a new upload is supplied.
@@ -65,7 +73,7 @@ def analyze_uploaded_plans(url, headers, gemini_key, requests, emit=print):
         if not re.fullmatch(re.escape(property_id)+r'/[0-9a-f-]+\.(jpg|png|webp)', path):
             continue
         attempt = state.get('attempts', 0)+1 if state.get('assetId') == asset['id'] else 1
-        marker = {'assetId':asset['id'], 'state':'running', 'attempts':attempt}
+        marker = {**state, 'assetId':asset['id'], 'state':'running', 'attempts':attempt, 'startedAt':datetime.now(timezone.utc).isoformat()}
         claimed = rest(f"property_showrooms?property_id=eq.{property_id}&revision=eq.{row['revision']}", 'PATCH', {'draft_content':{**content, 'planAnalysis':marker}, 'revision':row['revision']+1})
         if not claimed:
             continue
@@ -83,9 +91,10 @@ def analyze_uploaded_plans(url, headers, gemini_key, requests, emit=print):
             incomplete = any(not z.get('position') for c in output['concepts'] for z in c['zones'])
             marker.update(state='needs_review' if incomplete else 'done', at=datetime.now(timezone.utc).isoformat())
             emit('plan analysis completed; review required', flush=True)
-        except Exception:
+        except Exception as exc:
             output = content
             marker['state'] = 'failed'
+            marker['errorCode'] = 'provider_'+str(exc.code) if isinstance(getattr(exc,'code',None),int) else 'invalid_plan_response' if isinstance(exc,(ValueError,KeyError,TypeError)) else 'plan_service_unavailable'
             emit('plan analysis deferred' if attempt < 3 else 'plan analysis stopped', flush=True)
         output['planAnalysis'] = marker
         # A simultaneous editor save wins; never overwrite a newer revision.

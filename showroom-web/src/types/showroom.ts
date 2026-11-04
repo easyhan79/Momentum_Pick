@@ -20,7 +20,7 @@ export type Asset = {
   kind: 'example' | 'photo' | 'concept' | 'provided_plan'; approved: boolean;
 };
 export type Showroom = {
-  planAnalysis?: {assetId:string;state:string;attempts:number};
+  planAnalysis?: {assetId:string;state:string;attempts:number;errorCode?:string;queuedAt?:string;startedAt?:string};
   schema_version: '1.0'; id: string; category: PropertyCategory;
   title: string; subtitle: string; address?: string; addressEvidence?: EvidenceStatus;
   summary: string; heroAsset?: Asset; facts: Fact[]; concepts: Concept[];
