@@ -16,7 +16,7 @@ export type Concept = {
   feasibility: 'not_checked' | 'reviewed'; zones: Zone[];
 };
 export type Asset = {
-  id: string; url: string; alt: string; caption: string;
+  id: string; url: string; alt: string; caption: string; generated?:boolean;conceptId?:string;
   kind: 'example' | 'photo' | 'concept' | 'provided_plan'; approved: boolean;
 };
 export type Showroom = {

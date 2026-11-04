@@ -1,0 +1,16 @@
+import {useEffect,useRef,useState} from 'react';
+import {api} from '../lib/adminApi';
+import type {Concept} from '../types/showroom';
+type Job={id:string;slot:string;state:string;attempts:number;asset_id?:string;last_error_code:string};
+export type ImagePackage={jobs:Job[];budget:{limit_krw:number;reserved_krw:number}};
+const labels:Record<string,string>={queued:'실행 대기',running:'생성 중',done:'완료',failed:'실패 · 재시도 가능',budget_blocked:'예산 부족'};
+export function ImageStudio({propertyId,concepts,onImagesChanged}:{propertyId:string;concepts:Concept[];onImagesChanged:()=>void}){
+ const [data,setData]=useState<ImagePackage>(),[busy,setBusy]=useState(false),[message,setMessage]=useState('');
+ const completed=useRef('');
+ function accept(value:ImagePackage){const signature=value.jobs.filter(j=>j.state==='done').map(j=>j.id).sort().join(',');if(signature!==completed.current){completed.current=signature;onImagesChanged();}setData(value);}
+ async function refresh(){accept(await api<ImagePackage>(`action=image-package&propertyId=${propertyId}`));}
+ useEffect(()=>{let active=true;const read=()=>{void api<ImagePackage>(`action=image-package&propertyId=${propertyId}`).then(value=>{if(active)accept(value);}).catch(()=>{if(active)setMessage('이미지 생성 상태를 불러오지 못했습니다. 상태 새로고침을 눌러 주세요.');});};read();const timer=setInterval(read,10000);return()=>{active=false;clearInterval(timer);};},[propertyId]);
+ async function request(slot:string,retry:boolean){setBusy(true);setMessage('');try{const r=await api<{dispatched:boolean}>('','POST',{action:'generate-image',propertyId,slot,retry});await refresh();setMessage(r.dispatched?'이미지 생성을 요청했습니다. 완료되면 미리보기에 표시됩니다.':'요청을 저장했습니다. 정기 작업에서 처리하며 상태를 자동 확인합니다.');}catch(e){setMessage(e instanceof Error?e.message:'이미지를 요청하지 못했습니다.');}finally{setBusy(false);}}
+ const budget=data?.budget||{limit_krw:2500,reserved_krw:0};
+ return <section className="image-studio glass"><p className="eyebrow">IMAGE PRODUCTION / SOURCE FIRST</p><h3>대표 이미지와 활용 예상도</h3><p>대표 이미지는 매물당 1장만 생성합니다. 컨셉 예상도는 필요한 컨셉만 선택하세요. 카드뉴스는 제공 사진에 문구를 자동 배치합니다.</p><p><strong>생성 요청 예산 {budget.reserved_krw.toLocaleString()} / {budget.limit_krw.toLocaleString()}원</strong> · 남은 예산 {(budget.limit_krw-budget.reserved_krw).toLocaleString()}원</p><p className="image-budget-note">Flash Image 1K · 호출당 안전 예산 500원을 확보합니다. 실패·재시도도 포함하며 실제 청구액과는 다릅니다. 환율·세금·요금 변동에 따른 차이가 있습니다.</p><div className="image-job-grid">{[{slot:'hero',name:'대표 이미지 · 자동 1장'},...concepts.slice(0,3).map(c=>({slot:c.id,name:c.conceptName+' · 선택 1장'}))].map(item=>{const job=data?.jobs.find(j=>j.slot===item.slot),retry=job?.state==='failed'||job?.state==='budget_blocked';return <article key={item.slot}><strong>{item.name}</strong><p>{job?labels[job.state]||job.state:'아직 생성하지 않음'}</p><button type="button" className="button button-outline" disabled={busy||!data||budget.reserved_krw+500>budget.limit_krw||!!job&&!retry} onClick={()=>void request(item.slot,!!retry)}>{retry?'재시도 · 예산 500원':'1장 생성 · 예산 500원'}</button></article>;})}</div><button type="button" className="button button-outline" disabled={busy} onClick={()=>void refresh().catch(()=>setMessage('상태를 불러오지 못했습니다.'))}>생성 상태 새로고침</button>{message&&<p role="status">{message}</p>}<p>생성 이미지는 AI 활용 예시로 표시하고, 비공개 초안에 보관합니다. 검수·승인 후 고객 화면에 반영됩니다.</p></section>;
+}

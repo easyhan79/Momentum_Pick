@@ -66,9 +66,12 @@ export function createAssetsHandler({url,key,fetcher=fetch,githubTokens=[]}:{url
       const uploaded=await upstream(`storage/v1/object/${BUCKET}/${path}`,{method:'POST',headers:{'Content-Type':type.mime,'x-upsert':'false','Cache-Control':'max-age=0'},body:fileBytes});if(!uploaded.ok)throw new MediaError(502,'upload_failed');
       try{await db('property_assets',{method:'POST',body:JSON.stringify({id:assetId,property_id:id,kind,source_type:source,caption:caption.trim(),bucket_id:BUCKET,storage_path:path,is_approved:false})});}
       catch{try{await upstream(`storage/v1/object/${BUCKET}`,{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({prefixes:[path]})});}catch{/* Orphan contains only a newly generated private path. */}throw new MediaError(502,'metadata_save_failed');}
-      let analysis='not_requested';
-      if(kind==='provided_plan'){try{await queuePlan(db,id,assetId);analysis=await dispatchPlan(githubTokens,fetcher)?'queued_immediate':'queued_scheduled';}catch{analysis='queue_failed';}}
-      return reply({id:assetId,status:'private_review_pending',analysis},201);
+      let analysis='not_requested',imageStatus='queue_failed';let dispatchNeeded=false;
+      if(kind==='provided_plan'){try{await queuePlan(db,id,assetId);analysis='queued_scheduled';dispatchNeeded=true;}catch{analysis='queue_failed';}}
+      try{const job=await db('rpc/image_enqueue',{method:'POST',body:JSON.stringify({p_property:id,p_slot:'hero'})});imageStatus=job.state;dispatchNeeded=dispatchNeeded||job.state==='queued';await db('rpc/image_sync_assets',{method:'POST',body:JSON.stringify({p_property:id})});}catch{/* Source remains stored; administrator can request generation again. */}
+      const dispatched=dispatchNeeded?await dispatchPlan(githubTokens,fetcher):false;
+      if(analysis==='queued_scheduled'&&dispatched)analysis='queued_immediate';
+      return reply({id:assetId,status:'private_review_pending',analysis,imageStatus,dispatched},201);
     }catch(error){return reply({error:error instanceof MediaError?error.code:'media_unavailable'},error instanceof MediaError?error.status:503);}
   };
 }

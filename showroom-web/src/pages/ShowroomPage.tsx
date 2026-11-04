@@ -1,3 +1,4 @@
+import {useMediaLibrary} from '../lib/useMediaLibrary';
 import { useState } from 'react';
 import { ArrowUpRight, Check, Copy } from 'lucide-react';
 import type { Showroom } from '../types/showroom';
@@ -11,7 +12,10 @@ import { Gallery } from '../components/Gallery';
 import { Inquiry } from '../components/Inquiry';
 import { LiveInquiry } from '../components/LiveInquiry';
 
-export function ShowroomPage({ data, selector, liveDraft=false, published=false, inquirySlug }: { data: Showroom; selector: React.ReactNode; liveDraft?:boolean;published?:boolean;inquirySlug?:string }) {
+export function ShowroomPage({ data:sourceData, selector, liveDraft=false, published=false, inquirySlug }: { data: Showroom; selector: React.ReactNode; liveDraft?:boolean;published?:boolean;inquirySlug?:string }) {
+  const media=useMediaLibrary(sourceData.id,0,liveDraft);
+  const resolve=(asset:NonNullable<Showroom['heroAsset']>)=>({...asset,url:media.images.find(i=>i.id===asset.id)?.url||'',approved:true});
+  const data:Showroom=liveDraft?{...sourceData,assets:sourceData.assets.map(resolve),heroAsset:sourceData.heroAsset?resolve(sourceData.heroAsset):undefined}:sourceData;
   const concepts = data.concepts.slice(0, 3);
   const [activeId, setActiveId] = useState(concepts[0]?.id ?? '');
   const [shareMessage, setShareMessage] = useState('');

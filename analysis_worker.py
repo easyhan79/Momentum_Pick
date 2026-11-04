@@ -224,6 +224,8 @@ def main():
         sync_drafts()
         from plan_analysis import analyze_uploaded_plans
         analyze_uploaded_plans(url, headers, os.environ['GEMINI_API_KEY'], requests)
+        from image_worker import process_image_jobs
+        process_image_jobs(url, headers, os.environ['GEMINI_API_KEY'], requests)
 
 
 if __name__ == '__main__':

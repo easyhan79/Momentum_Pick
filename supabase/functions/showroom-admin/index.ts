@@ -74,12 +74,24 @@ export function createHandler({url,key,fetcher=fetch,githubTokens=[]}:Config) {
         const rooms=await db(`property_showrooms?property_id=eq.${id}&select=draft_content`);
         return reply({content:marketingContent(properties[0].ai_contents,object(rooms[0]?.draft_content).marketing)});
       }
+      if(req.method==='GET'&&query.get('action')==='image-package'){
+        const id=query.get('propertyId')||'';if(!UUID.test(id))throw new ApiError(400,'invalid_property_id');
+        const jobs=await db(`property_image_jobs?property_id=eq.${id}&select=id,slot,state,attempts,asset_id,last_error_code,usage&order=updated_at`);
+        const budgets=await db(`property_image_budgets?property_id=eq.${id}&select=limit_krw,reserved_krw`);
+        return reply({jobs,budget:budgets[0]||{limit_krw:2500,reserved_krw:0}});
+      }
       if(req.method==='GET') throw new ApiError(400,'invalid_action');
       if(Number(req.headers.get('Content-Length')||0)>200000) throw new ApiError(413,'body_too_large');
       const raw=await req.text();const bodyBytes=new TextEncoder().encode(raw).length;if(bodyBytes>200000) throw new ApiError(413,'body_too_large');
       let body:Json;try{body=object(JSON.parse(raw));}catch{throw new ApiError(400,'invalid_json');}
       if(body.action!=='save-marketing'&&bodyBytes>65536)throw new ApiError(413,'body_too_large');
       const id=body.propertyId;if(typeof id!=='string'||!UUID.test(id)) throw new ApiError(400,'invalid_property_id');
+      if(req.method==='POST'&&body.action==='generate-image'){
+        if(!['hero','concept-1','concept-2','concept-3'].includes(body.slot)||body.retry!==undefined&&typeof body.retry!=='boolean')throw new ApiError(400,'invalid_image_slot');
+        const job=await db('rpc/image_enqueue',{method:'POST',body:JSON.stringify({p_property:id,p_slot:body.slot,p_retry:body.retry===true})});
+        await db('rpc/image_sync_assets',{method:'POST',body:JSON.stringify({p_property:id})});
+        const dispatched=job.state==='queued'?await dispatchPlan(githubTokens,fetcher):false;return reply({job,dispatched});
+      }
       if(req.method==='POST'&&body.action==='analyze-plan'){
         if(!UUID.test(body.assetId||'')||!Number.isSafeInteger(body.revision))throw new ApiError(400,'invalid_plan');
         let showroom;try{showroom=await queuePlan(db,id,body.assetId,body.revision);}catch(e){throw new ApiError(409,e instanceof Error?e.message:'plan_queue_failed');}
@@ -103,6 +115,15 @@ export function createHandler({url,key,fetcher=fetch,githubTokens=[]}:Config) {
             const assets=await db(`property_assets?id=eq.${c.plan.assetId}&property_id=eq.${id}&bucket_id=eq.showroom-private-media&kind=eq.provided_plan&select=id`);
             if(!assets.length)throw new ApiError(400,'invalid_plan');
           }
+          const imageJobs=await db(`property_image_jobs?property_id=eq.${id}&select=state`);
+          if(imageJobs.some((j:Json)=>['queued','running'].includes(j.state)))throw new ApiError(409,'image_generation_pending');
+          const selected=Array.isArray(draft.assets)?draft.assets:[];
+          if(selected.length>24||selected.some((a:Json)=>!UUID.test(a.id||'')))throw new ApiError(400,'invalid_media');
+          if(selected.length){
+            const media=await db(`property_assets?property_id=eq.${id}&bucket_id=eq.showroom-private-media&select=id,kind,caption,source_type`);
+            draft.assets=selected.map((item:Json)=>{const a=media.find((a:Json)=>a.id===item.id);if(!a)throw new ApiError(400,'invalid_media');return{id:a.id,url:'',kind:a.kind==='provided_plan'?'provided_plan':a.source_type==='ai_generated'?'concept':'photo',alt:text(a.caption),caption:text(a.caption),generated:a.source_type==='ai_generated',conceptId:text(item.conceptId,100),approved:true};});
+            if(draft.heroAsset){const hero=draft.assets.find((a:Json)=>a.id===draft.heroAsset.id);if(!hero)throw new ApiError(400,'invalid_media');draft.heroAsset=hero;}
+          }else if(draft.heroAsset)throw new ApiError(400,'invalid_media');
           const now=new Date().toISOString();
           const record={notes:text(review.notes),checks:{facts:true,rights:true,claims:true,privacy:true},by:user.id,at:now,revision:body.revision+1};
           const prior=object(current.published_content)._reviewHistory;

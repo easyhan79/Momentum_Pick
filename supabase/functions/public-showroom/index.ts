@@ -21,10 +21,16 @@ export function createPublicHandler(url:string,key:string,fetcher:typeof fetch=f
  const rows=await r.json(),row=rows[0];
  if(!row||!row.approved_by||!row.approved_at||!row.published_at||!row.published_revision)return reply({error:'not_found'},404);
  const data=publicDto(row.published_content);if(!data)return reply({error:'not_found'},404);
- const assetId=new URL(req.url).searchParams.get('plan');
+ const params=new URL(req.url).searchParams;
+ const assetId=params.get('plan')||params.get('image');
+ const media=list(obj(row.published_content).assets).map(obj).filter(a=>a.approved===true&&/^[0-9a-f-]{36}$/i.test(a.id||'')).slice(0,24);
+ const imageDto=(a:Json)=>({id:a.id,url:`${url}/functions/v1/public-showroom?slug=${encodeURIComponent(slug)}&image=${a.id}`,alt:str(a.alt),caption:str(a.caption),kind:['photo','provided_plan','concept'].includes(a.kind)?a.kind:'photo',approved:true,generated:a.generated===true});
+ Object.assign(data,{assets:media.map(imageDto)});
+ const heroId=obj(obj(row.published_content).heroAsset).id;
+ const hero=media.find(a=>a.id===heroId);if(hero)Object.assign(data,{heroAsset:imageDto(hero)});
  const originals=list(obj(row.published_content).concepts);
  if(assetId){
-   if(!/^[0-9a-f-]{36}$/i.test(assetId)||!originals.some(c=>obj(obj(c).plan).assetId===assetId))return reply({error:'not_found'},404);
+   if(!/^[0-9a-f-]{36}$/i.test(assetId)||!(originals.some(c=>obj(obj(c).plan).assetId===assetId)||media.some(a=>a.id===assetId)))return reply({error:'not_found'},404);
    const propertyId=obj(row.published_content).id;
    if(!/^[0-9a-f-]{36}$/i.test(propertyId))return reply({error:'not_found'},404);
    const a=await fetcher(`${url}/rest/v1/property_assets?id=eq.${assetId}&property_id=eq.${propertyId}&bucket_id=eq.showroom-private-media&select=storage_path`,{headers:{apikey:key,Authorization:`Bearer ${key}`},redirect:'error',signal:AbortSignal.timeout(10000)});
