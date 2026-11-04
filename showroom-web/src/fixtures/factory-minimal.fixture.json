@@ -1,0 +1,13 @@
+{
+  "schema_version":"1.0","id":"factory-demo","category":"industrial","title":"공장 · 물류부지 검토 예시",
+  "subtitle":"기업의 다음 거점을,\n근거부터 살펴봅니다.",
+  "summary":"제조와 물류 활용을 검토하는 합성 예시입니다. 소재지, 면적, 기반시설 자료가 확보되기 전 활용 가능성을 확정하지 않습니다.",
+  "facts":[
+    {"key":"land_area","label":"토지면적","value":null,"evidence":"needs_review","source":"실측·공부 확인 필요"},
+    {"key":"power","label":"전력 용량","value":null,"unit":"kW","evidence":"needs_review","source":"전력 공급 자료 확인 필요"},
+    {"key":"road","label":"도로 접합","value":null,"evidence":"needs_review","source":"도로 현황 확인 필요"},
+    {"key":"permit","label":"인허가 조건","value":null,"evidence":"needs_review","source":"관할 기관 확인 필요"}
+  ],
+  "concepts":[{"id":"logistics","conceptName":"제조 · 보관 활용 검토","headline":"생산과 보관의 연결 가능성","rationale":"용도·진입로·기반시설을 확인하기 위한 검토 가설입니다. 아래 조닝은 실측 배치도가 아닙니다.","feasibility":"not_checked","zones":[{"id":"production","label":"제조 검토 구역","title":"시설 배치 검토","indoorOutdoor":"site"},{"id":"storage","label":"보관 검토 구역","title":"보관·출하 동선 검토","indoorOutdoor":"site"}]}],
+  "unknowns":["정확한 소재지와 경계","토지·건축 면적","용도지역 및 인허가","전력·용수·폐수 조건","차량 진입로와 도로 접합"],"assets":[]
+}

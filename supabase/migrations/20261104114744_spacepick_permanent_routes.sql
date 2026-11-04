@@ -1,0 +1,1 @@
+-- Reserved migration entry; no schema changes. See following v1 migration.

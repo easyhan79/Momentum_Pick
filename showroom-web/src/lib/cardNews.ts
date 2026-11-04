@@ -27,7 +27,7 @@ export function drawNewsCard(canvas:HTMLCanvasElement,card:NewsCard,photo?:HTMLI
   const background=ctx.createLinearGradient(0,0,1080,1350);background.addColorStop(0,'#142a38');background.addColorStop(1,'#08121d');ctx.fillStyle=background;ctx.fillRect(0,0,1080,1350);
   if(photo){const scale=Math.max(1080/photo.naturalWidth,1350/photo.naturalHeight),w=photo.naturalWidth*scale,h=photo.naturalHeight*scale;ctx.drawImage(photo,(1080-w)/2,(1350-h)/2,w,h);ctx.fillStyle='rgba(4,15,25,0.82)';ctx.fillRect(0,0,1080,1350);}
   ctx.strokeStyle='#c5a870';ctx.lineWidth=2;ctx.strokeRect(52,52,976,1246);
-  ctx.fillStyle='#c5a870';ctx.font='500 24px sans-serif';ctx.fillText('MOMENTUM / PICK',88,110);
+  ctx.fillStyle='#c5a870';ctx.font='500 24px sans-serif';ctx.fillText('SPACEPICK',88,110);
   ctx.fillStyle='#69b49e';ctx.font='500 22px sans-serif';ctx.fillText(photo?(imageLabel||'제공 자료 · 검수 전'):'PROPERTY CONTENT STUDIO',88,161);
   ctx.fillStyle='#c5a870';ctx.font='500 122px sans-serif';ctx.fillText(String(card.number).padStart(2,'0'),82,330);
   ctx.fillStyle='#86939d';ctx.font='24px sans-serif';ctx.fillText('/ 05',260,327);

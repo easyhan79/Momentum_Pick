@@ -1,0 +1,23 @@
+import {PGlite} from '@electric-sql/pglite';import assert from 'node:assert/strict';import {readFile} from 'node:fs/promises';
+const db=new PGlite(),id='10000000-0000-4000-8000-000000000001',other='10000000-0000-4000-8000-000000000002',actor='20000000-0000-4000-8000-000000000001';
+await db.exec(`CREATE ROLE anon NOLOGIN;CREATE ROLE authenticated NOLOGIN;CREATE ROLE service_role NOLOGIN BYPASSRLS;GRANT USAGE ON SCHEMA public TO anon,authenticated,service_role;ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon,authenticated,service_role;CREATE SCHEMA auth;CREATE TABLE auth.users(id uuid PRIMARY KEY);CREATE TABLE properties(id uuid PRIMARY KEY,raw_input text NOT NULL);`);
+for(const file of ['migrations/20261102115440_showroom_private_schema.sql','migrations/20261103081255_inquiry_crm.sql'])await db.exec(await readFile(new URL('../'+file,import.meta.url),'utf8'));
+await db.query('INSERT INTO properties VALUES($1,$3),($2,$3)',[id,other,'synthetic']);await db.query('INSERT INTO auth.users VALUES($1)',[actor]);
+await db.query("INSERT INTO property_showrooms(property_id,slug) VALUES($1,'old-property'),($2,'other-property')",[id,other]);
+await db.exec(await readFile(new URL('../review/spacepick_routes.sql',import.meta.url),'utf8'));
+assert.equal((await db.query('SELECT * FROM spacepick_resolve_slug($1)',['old-property'])).rows.length,0);
+await db.query("UPDATE property_showrooms SET showroom_status='published',published_content='{}'::jsonb||jsonb_build_object('title','sample'),published_revision=1,approved_by=$1,approved_at=now(),published_at=now() WHERE property_id=$2",[actor,id]);
+await db.exec('SET ROLE service_role');
+const rename=async(slug,revision)=>(await db.query('SELECT spacepick_set_slug($1,$2,$3) AS room',[id,slug,revision])).rows[0].room;
+const room=await rename('anseong-logistics',1);assert.equal(room.revision,2);assert.equal(room.published_content.title,'sample');
+await assert.rejects(rename('admin',2),/invalid_slug/);await assert.rejects(rename('other-property',2),/slug_taken/);await assert.rejects(rename('new-name',1),/revision_conflict/);
+await rename('anseong-logistics-a01',2);
+for(const slug of ['old-property','anseong-logistics','anseong-logistics-a01'])assert.equal((await db.query('SELECT * FROM spacepick_resolve_slug($1)',[slug])).rows[0].slug,'anseong-logistics-a01');
+await assert.rejects(db.query('SELECT spacepick_set_slug($1,$2,1)',[other,'old-property']),/slug_taken/);
+const data={name:'synthetic',phone:'01000000000',deal_type:'both',intended_use:'sample',memo:'',consent_version:'test',service_interest:'property',source_channel:'showroom'};
+const inquiry=()=>db.query('SELECT crm_register_inquiry($1,$2,$3,$4,$5,false,$6)',[crypto.randomUUID(),'a'.repeat(64),'b'.repeat(64),'old-property',null,data]);
+await inquiry();await db.query("SELECT spacepick_set_listing_state($1,'closed',3)",[id]);
+await assert.rejects(inquiry(),/showroom_unavailable/);assert.equal((await db.query('SELECT * FROM spacepick_resolve_slug($1)',['old-property'])).rows[0].listing_state,'closed');
+await db.query("SELECT spacepick_set_listing_state($1,'active',4)",[id]);await inquiry();
+await db.exec('RESET ROLE');for(const role of ['anon','authenticated']){await db.exec('SET ROLE '+role);for(const sql of ['SELECT * FROM property_showroom_routes',"SELECT spacepick_resolve_slug('old-property')"])await assert.rejects(db.query(sql),e=>e.code==='42501');await db.exec('RESET ROLE');}
+await db.close();console.log('PASS: slug aliases, conflicts, revision, snapshot, closed inquiries and role permissions');

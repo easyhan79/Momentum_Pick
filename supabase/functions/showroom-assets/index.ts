@@ -1,3 +1,4 @@
+import {originAllowed,corsOrigin} from '../_shared/site.ts';
 import {queuePlan,dispatchPlan} from '../_shared/plan-queue.ts';
 // Private media API: no public URLs, signed URLs, or browser database/storage grants.
 const ORIGIN='https://momentum-pick-showroom-20261102.ljc3534.chatgpt.site';
@@ -28,9 +29,9 @@ export function createAssetsHandler({url,key,fetcher=fetch,githubTokens=[]}:{url
   }
   return async(req:Request)=>{
     const headers:Record<string,string>={'Content-Type':'application/json','Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Vary':'Origin'};
-    if(req.headers.get('Origin')===ORIGIN)Object.assign(headers,{'Access-Control-Allow-Origin':ORIGIN,'Access-Control-Allow-Headers':'authorization,apikey,content-type','Access-Control-Allow-Methods':'GET,POST,OPTIONS'});
+    if(corsOrigin(req.headers.get('Origin')))Object.assign(headers,{'Access-Control-Allow-Origin':corsOrigin(req.headers.get('Origin'))!,'Access-Control-Allow-Headers':'authorization,apikey,content-type','Access-Control-Allow-Methods':'GET,POST,OPTIONS'});
     const reply=(data:unknown,status=200)=>new Response(JSON.stringify(data),{status,headers});
-    if(req.headers.has('Origin')&&req.headers.get('Origin')!==ORIGIN)return reply({error:'origin_denied'},403);
+    if(!originAllowed(req.headers.get('Origin')))return reply({error:'origin_denied'},403);
     if(req.method==='OPTIONS')return new Response(null,{status:204,headers});
     try{
       if(!['GET','POST'].includes(req.method))throw new MediaError(405,'method_not_allowed');

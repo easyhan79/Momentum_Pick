@@ -1,0 +1,102 @@
+{
+  "schema_version": "1.0",
+  "id": "untrusted-demo",
+  "category": "commercial",
+  "title": "<img src=x onerror=alert(1)>",
+  "subtitle": "있는 정보만,\n정확한 범위로 보여줍니다.",
+  "summary": "<script>window.__injected=true</script>긴 텍스트 긴 텍스트 긴 텍스트 긴 텍스트 긴 텍스트 긴 텍스트 긴 텍스트 긴 텍스트 긴 텍스트 긴 텍스트 긴 텍스트 긴 텍스트 긴 텍스트 긴 텍스트 긴 텍스트 긴 텍스트 긴 텍스트 긴 텍스트 긴 텍스트 긴 텍스트 긴 텍스트 긴 텍스트 긴 텍스트 긴 텍스트 긴 텍스트 긴 텍스트 긴 텍스트 긴 텍스트 긴 텍스트 긴 텍스트 긴 텍스트 긴 텍스트 긴 텍스트 긴 텍스트 긴 텍스트 긴 텍스트 긴 텍스트 긴 텍스트 긴 텍스트 긴 텍스트 긴 텍스트 긴 텍스트 긴 텍스트 긴 텍스트 긴 텍스트 긴 텍스트 긴 텍스트 긴 텍스트 긴 텍스트 긴 텍스트 긴 텍스트 긴 텍스트 긴 텍스트 긴 텍스트 긴 텍스트 긴 텍스트 긴 텍스트 긴 텍스트 긴 텍스트 긴 텍스트 ",
+  "facts": [
+    {
+      "key": "area",
+      "label": "전용면적",
+      "value": null,
+      "evidence": "needs_review",
+      "source": "제공 자료 없음"
+    }
+  ],
+  "concepts": [
+    {
+      "id": "edge-0",
+      "conceptName": "존 0개 검토",
+      "headline": "제공된 구역 0개",
+      "rationale": "합성 데이터로 표시 개수와 상태 전환을 확인합니다.",
+      "feasibility": "not_checked",
+      "zones": []
+    },
+    {
+      "id": "edge-1",
+      "conceptName": "존 1개 검토",
+      "headline": "제공된 구역 1개",
+      "rationale": "합성 데이터로 표시 개수와 상태 전환을 확인합니다.",
+      "feasibility": "not_checked",
+      "zones": [
+        {
+          "id": "z-0",
+          "label": "구역 1",
+          "title": "<svg onload=alert(1)>텍스트</svg>",
+          "indoorOutdoor": "site"
+        }
+      ]
+    },
+    {
+      "id": "edge-6",
+      "conceptName": "존 6개 검토",
+      "headline": "제공된 구역 6개",
+      "rationale": "합성 데이터로 표시 개수와 상태 전환을 확인합니다.",
+      "feasibility": "not_checked",
+      "zones": [
+        {
+          "id": "z-0",
+          "label": "구역 1",
+          "title": "구역 1 상세",
+          "indoorOutdoor": "site"
+        },
+        {
+          "id": "z-1",
+          "label": "구역 2",
+          "title": "구역 2 상세",
+          "indoorOutdoor": "site"
+        },
+        {
+          "id": "z-2",
+          "label": "구역 3",
+          "title": "구역 3 상세",
+          "indoorOutdoor": "site"
+        },
+        {
+          "id": "z-3",
+          "label": "구역 4",
+          "title": "구역 4 상세",
+          "indoorOutdoor": "site"
+        },
+        {
+          "id": "z-4",
+          "label": "구역 5",
+          "title": "구역 5 상세",
+          "indoorOutdoor": "site"
+        },
+        {
+          "id": "z-5",
+          "label": "구역 6",
+          "title": "구역 6 상세",
+          "indoorOutdoor": "site"
+        }
+      ]
+    }
+  ],
+  "unknowns": [
+    "지역과 소재지",
+    "면적과 사용 범위",
+    "시설과 사진"
+  ],
+  "assets": [
+    {
+      "id": "unsafe",
+      "url": "javascript:alert(1)",
+      "alt": "위험 URL 검증",
+      "caption": "링크 안전성 검토 예시",
+      "kind": "example",
+      "approved": true
+    }
+  ]
+}

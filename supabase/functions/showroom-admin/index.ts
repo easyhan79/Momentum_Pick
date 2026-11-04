@@ -1,3 +1,4 @@
+import {originAllowed,corsOrigin,validSlug,slugSuggestions} from '../_shared/site.ts';
 import {queuePlan,dispatchPlan} from '../_shared/plan-queue.ts';
 // No client-supplied claims are trusted. Auth is checked against GoTrue on every request.
 // Only explicitly approved snapshots may be published; original properties are never written.
@@ -37,15 +38,15 @@ type Config = {url:string;key:string;fetcher?:typeof fetch;githubTokens?:string[
 export function createHandler({url,key,fetcher=fetch,githubTokens=[]}:Config) {
   async function db(path:string, options:RequestInit={}) {
     const response=await fetcher(`${url}/rest/v1/${path}`,{...options,redirect:'error',headers:{apikey:key,Authorization:`Bearer ${key}`,'Content-Type':'application/json',...options.headers},signal:AbortSignal.timeout(15000)});
-    if(!response.ok) throw new ApiError(502,'database_unavailable');
+    if(!response.ok){const e=await response.json().catch(()=>({}));const code=e.code==='23505'?'slug_taken':e.message;if(['slug_taken','revision_conflict','invalid_slug','invalid_listing_state'].includes(code))throw new ApiError(code.startsWith('invalid_')?400:409,code);throw new ApiError(502,'database_unavailable');}
     const responseText=await response.text();
     return responseText.trim()?JSON.parse(responseText):null;
   }
   return async function handler(req:Request):Promise<Response> {
     const headers:Record<string,string>={'Content-Type':'application/json','Cache-Control':'no-store','Vary':'Origin','X-Content-Type-Options':'nosniff'};
-    if(req.headers.get('Origin')===ORIGIN) Object.assign(headers,{'Access-Control-Allow-Origin':ORIGIN,'Access-Control-Allow-Headers':'authorization, apikey, content-type, x-client-info','Access-Control-Allow-Methods':'GET, POST, PATCH, OPTIONS'});
+    if(corsOrigin(req.headers.get('Origin'))) Object.assign(headers,{'Access-Control-Allow-Origin':corsOrigin(req.headers.get('Origin'))!,'Access-Control-Allow-Headers':'authorization, apikey, content-type, x-client-info','Access-Control-Allow-Methods':'GET, POST, PATCH, OPTIONS'});
     const reply=(data:unknown,status=200)=>new Response(JSON.stringify(data),{status,headers});
-    if(req.headers.has('Origin')&&req.headers.get('Origin')!==ORIGIN) return reply({error:'origin_denied'},403);
+    if(!originAllowed(req.headers.get('Origin'))) return reply({error:'origin_denied'},403);
     if(req.method==='OPTIONS') return new Response(null,{status:204,headers});
     try {
       if(!['GET','POST','PATCH'].includes(req.method)) throw new ApiError(405,'method_not_allowed');
@@ -62,7 +63,7 @@ export function createHandler({url,key,fetcher=fetch,githubTokens=[]}:Config) {
       }
       if(req.method==='GET'&&query.get('action')==='draft') {
         const id=query.get('propertyId')||'';if(!UUID.test(id)) throw new ApiError(400,'invalid_property_id');
-        const rows=await db(`property_showrooms?property_id=eq.${id}&select=id,property_id,slug,showroom_status,published_revision,draft_content,revision,updated_at`);
+        const rows=await db(`property_showrooms?property_id=eq.${id}&select=id,property_id,slug,showroom_status,listing_state,published_revision,draft_content,revision,updated_at`);
         if(!rows.length) throw new ApiError(404,'draft_not_found');
         return reply({showroom:rows[0]});
       }
@@ -80,12 +81,28 @@ export function createHandler({url,key,fetcher=fetch,githubTokens=[]}:Config) {
         const budgets=await db(`property_image_budgets?property_id=eq.${id}&select=limit_krw,reserved_krw`);
         return reply({jobs,budget:budgets[0]||{limit_krw:2500,reserved_krw:0}});
       }
+      if(req.method==='GET'&&query.get('action')==='slug-info'){
+        const id=query.get('propertyId')||'';if(!UUID.test(id))throw new ApiError(400,'invalid_property_id');
+        const rooms=await db(`property_showrooms?property_id=eq.${id}&select=slug,listing_state,revision,draft_content`);if(!rooms.length)throw new ApiError(404,'draft_not_found');
+        const properties=await db(`properties?id=eq.${id}&select=ai_contents`);
+        const aliases=await db(`property_showroom_routes?property_id=eq.${id}&select=slug&order=created_at`);
+        return reply({slug:rooms[0].slug,listing_state:rooms[0].listing_state,revision:rooms[0].revision,aliases:aliases.map((a:Json)=>a.slug),suggestions:slugSuggestions(rooms[0].draft_content,id,object(properties[0]?.ai_contents).url_slug_candidates)});
+      }
       if(req.method==='GET') throw new ApiError(400,'invalid_action');
       if(Number(req.headers.get('Content-Length')||0)>200000) throw new ApiError(413,'body_too_large');
       const raw=await req.text();const bodyBytes=new TextEncoder().encode(raw).length;if(bodyBytes>200000) throw new ApiError(413,'body_too_large');
       let body:Json;try{body=object(JSON.parse(raw));}catch{throw new ApiError(400,'invalid_json');}
       if(body.action!=='save-marketing'&&bodyBytes>65536)throw new ApiError(413,'body_too_large');
       const id=body.propertyId;if(typeof id!=='string'||!UUID.test(id)) throw new ApiError(400,'invalid_property_id');
+      if(req.method==='POST'&&['set-slug','set-listing-state'].includes(body.action)){
+        if(!Number.isSafeInteger(body.revision)||body.revision<1)throw new ApiError(400,'invalid_revision');
+        if(body.action==='set-slug'){
+          if(!validSlug(body.slug))throw new ApiError(400,'invalid_slug');
+          return reply({showroom:await db('rpc/spacepick_set_slug',{method:'POST',body:JSON.stringify({p_property:id,p_slug:body.slug,p_revision:body.revision})})});
+        }
+        if(!['active','closed'].includes(body.listing_state))throw new ApiError(400,'invalid_listing_state');
+        return reply({showroom:await db('rpc/spacepick_set_listing_state',{method:'POST',body:JSON.stringify({p_property:id,p_state:body.listing_state,p_revision:body.revision})})});
+      }
       if(req.method==='POST'&&body.action==='generate-image'){
         if(!['hero','concept-1','concept-2','concept-3'].includes(body.slot)||body.retry!==undefined&&typeof body.retry!=='boolean')throw new ApiError(400,'invalid_image_slot');
         const job=await db('rpc/image_enqueue',{method:'POST',body:JSON.stringify({p_property:id,p_slot:body.slot,p_retry:body.retry===true})});
@@ -129,7 +146,7 @@ export function createHandler({url,key,fetcher=fetch,githubTokens=[]}:Config) {
           const prior=object(current.published_content)._reviewHistory;
           Object.assign(patch,{showroom_status:'published',published_content:{...draft,_review:record,_reviewHistory:[...(Array.isArray(prior)?prior:[]),record]},published_revision:body.revision+1,approved_by:user.id,approved_at:now,published_at:now});
         }else patch.showroom_status=body.action==='request-review'?'in_review':'unpublished';
-        const saved=await db(`property_showrooms?property_id=eq.${id}&revision=eq.${body.revision}&select=id,property_id,slug,showroom_status,published_revision,draft_content,revision,updated_at`,{method:'PATCH',headers:{Prefer:'return=representation'},body:JSON.stringify(patch)});
+        const saved=await db(`property_showrooms?property_id=eq.${id}&revision=eq.${body.revision}&select=id,property_id,slug,showroom_status,listing_state,published_revision,draft_content,revision,updated_at`,{method:'PATCH',headers:{Prefer:'return=representation'},body:JSON.stringify(patch)});
         if(!saved.length)throw new ApiError(409,'revision_conflict');return reply({showroom:saved[0]});
       }
       if(req.method==='POST'&&body.action==='create-draft') {
@@ -137,7 +154,7 @@ export function createHandler({url,key,fetcher=fetch,githubTokens=[]}:Config) {
         if(!rows.length) throw new ApiError(404,'property_not_found');
         if(rows[0].status!=='analyzed') throw new ApiError(409,'analysis_not_ready');
         await db('property_showrooms?on_conflict=property_id',{method:'POST',headers:{Prefer:'resolution=ignore-duplicates,return=minimal'},body:JSON.stringify({property_id:id,slug:`property-${id}`,draft_content:toDraft(rows[0])})});
-        const saved=await db(`property_showrooms?property_id=eq.${id}&select=id,property_id,slug,showroom_status,published_revision,draft_content,revision,updated_at`);
+        const saved=await db(`property_showrooms?property_id=eq.${id}&select=id,property_id,slug,showroom_status,listing_state,published_revision,draft_content,revision,updated_at`);
         return reply({showroom:saved[0]});
       }
       if(req.method==='PATCH'&&body.action==='save-marketing') {
@@ -179,7 +196,7 @@ export function createHandler({url,key,fetcher=fetch,githubTokens=[]}:Config) {
         const manualComplete=validated.some(c=>c.plan)&&validated.every(c=>!c.plan||c.zones.every((z:Json)=>z.position));
         const planAnalysis=manualComplete&&['failed','needs_review'].includes(object(prior.planAnalysis).state)?{...prior.planAnalysis,state:'manual_reviewed'}:prior.planAnalysis;
         const content={...prior,planAnalysis,concepts:validated,title:edits.title.trim(),subtitle:edits.subtitle.trim(),summary:edits.summary.trim()};
-        const saved=await db(`property_showrooms?property_id=eq.${id}&revision=eq.${body.revision}&select=id,property_id,slug,showroom_status,published_revision,draft_content,revision,updated_at`,{method:'PATCH',headers:{Prefer:'return=representation'},body:JSON.stringify({draft_content:content,revision:body.revision+1})});
+        const saved=await db(`property_showrooms?property_id=eq.${id}&revision=eq.${body.revision}&select=id,property_id,slug,showroom_status,listing_state,published_revision,draft_content,revision,updated_at`,{method:'PATCH',headers:{Prefer:'return=representation'},body:JSON.stringify({draft_content:content,revision:body.revision+1})});
         if(!saved.length) throw new ApiError(409,'revision_conflict');
         return reply({showroom:saved[0]});
       }

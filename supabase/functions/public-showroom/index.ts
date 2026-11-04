@@ -16,10 +16,21 @@ export function createPublicHandler(url:string,key:string,fetcher:typeof fetch=f
  const slug=new URL(req.url).searchParams.get('slug')||'';
  if(!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(slug)||slug.length<3||slug.length>120)return reply({error:'not_found'},404);
  try{
- const r=await fetcher(`${url}/rest/v1/property_showrooms?slug=eq.${encodeURIComponent(slug)}&showroom_status=eq.published&select=published_content,published_revision,approved_by,approved_at,published_at&limit=1`,{headers:{apikey:key,Authorization:`Bearer ${key}`},redirect:'error',signal:AbortSignal.timeout(10000)});
+ let r=await fetcher(`${url}/rest/v1/property_showrooms?slug=eq.${encodeURIComponent(slug)}&showroom_status=eq.published&select=slug,listing_state,published_content,published_revision,approved_by,approved_at,published_at&limit=1`,{headers:{apikey:key,Authorization:`Bearer ${key}`},redirect:'error',signal:AbortSignal.timeout(10000)});
  if(!r.ok)return reply({error:'service_unavailable'},503);
- const rows=await r.json(),row=rows[0];
+ let rows=await r.json(),row=rows[0];
+ if(!row){
+   const resolved=await fetcher(`${url}/rest/v1/rpc/spacepick_resolve_slug`,{method:'POST',headers:{apikey:key,Authorization:`Bearer ${key}`,'Content-Type':'application/json'},body:JSON.stringify({p_slug:slug}),redirect:'error',signal:AbortSignal.timeout(10000)});
+   if(!resolved.ok)return reply({error:'service_unavailable'},503);
+   const aliases=await resolved.json(),canonical=aliases[0]?.slug;
+   if(!canonical||!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(canonical))return reply({error:'not_found'},404);
+   r=await fetcher(`${url}/rest/v1/property_showrooms?slug=eq.${encodeURIComponent(canonical)}&showroom_status=eq.published&select=slug,listing_state,published_content,published_revision,approved_by,approved_at,published_at&limit=1`,{headers:{apikey:key,Authorization:`Bearer ${key}`},redirect:'error',signal:AbortSignal.timeout(10000)});
+   if(!r.ok)return reply({error:'service_unavailable'},503);rows=await r.json();row=rows[0];
+ }
+
  if(!row||!row.approved_by||!row.approved_at||!row.published_at||!row.published_revision)return reply({error:'not_found'},404);
+ const canonicalSlug=row.slug||slug;
+ if(row.listing_state==='closed'){if(new URL(req.url).searchParams.has('image')||new URL(req.url).searchParams.has('plan'))return reply({error:'not_found'},404);return reply({closed:true,listing_state:'closed',canonical_slug:canonicalSlug});}
  const data=publicDto(row.published_content);if(!data)return reply({error:'not_found'},404);
  const params=new URL(req.url).searchParams;
  const assetId=params.get('plan')||params.get('image');
@@ -45,7 +56,7 @@ export function createPublicHandler(url:string,key:string,fetcher:typeof fetch=f
    if(/^[0-9a-f-]{36}$/i.test(plan.assetId||''))Object.assign(data.concepts[i],{plan:{assetId:plan.assetId,caption:str(plan.caption),url:`${url}/functions/v1/public-showroom?slug=${encodeURIComponent(slug)}&plan=${plan.assetId}`}});
    data.concepts[i].zones.forEach((z:Json,j:number)=>{const source=obj(list(original.zones)[j]),p=obj(source.position);if(Number.isFinite(p.x)&&Number.isFinite(p.y)&&p.x>=0&&p.x<=100&&p.y>=0&&p.y<=100)z.position={x:p.x,y:p.y};z.evidence=source.evidence==='owner_provided'?'owner_provided':'ai_hypothesis';});
  }
- return reply({showroom:data});
+ return reply({showroom:data,canonical_slug:canonicalSlug,listing_state:'active'});
  }catch{return reply({error:'service_unavailable'},503);}
 };}
 declare const Deno:{env:{get(n:string):string|undefined};serve(h:(r:Request)=>Promise<Response>):void};

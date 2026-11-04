@@ -74,14 +74,14 @@ jobs:
           def deliver(client,test_notification=False):
               stats={'sent':0,'failed':0,'redacted':client.rpc('crm_retention_cleanup',{}),'test_sent':False}
               if test_notification:
-                  client.send('[Momentum Pick] 문의 알림 연결 테스트입니다. 실제 고객 문의나 결제가 등록된 것은 아닙니다.')
+                  client.send('[Spacepick] 문의 알림 연결 테스트입니다. 실제 고객 문의나 결제가 등록된 것은 아닙니다.')
                   stats['test_sent']=True
               # A bounded batch; remaining and failed requests are retried by the next scheduled run.
               rows=client.rpc('crm_claim_notifications',{'p_limit':20,'p_id':None})
               for row in rows or []:
                   sent=False
                   try:
-                      client.send(f"[Momentum Pick 새 문의]\n접수 ID: {row['id']}\n성함: {row['name']}\n연락처: {row['phone']}\n문의 구분: {row['service_interest']}\n관심 내용: {row['intended_use']}\n상담 관리: https://momentum-pick-showroom-20261102.ljc3534.chatgpt.site/?admin=1")
+                      client.send(f"[Spacepick 새 문의]\n접수 ID: {row['id']}\n상담 관리: https://momentum-pick-showroom-20261102.ljc3534.chatgpt.site/admin")
                       sent=True
                   except Exception:pass
                   client.rpc('crm_complete_notification',{'p_id':row['id'],'p_attempt':row['notification_attempts'],'p_success':sent})

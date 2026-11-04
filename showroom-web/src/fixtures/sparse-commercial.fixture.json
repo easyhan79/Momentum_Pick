@@ -1,0 +1,7 @@
+{
+  "schema_version":"1.0","id":"sparse-demo","category":"commercial","title":"자료 확인 중인 상가 예시",
+  "subtitle":"확인된 자료부터,\n차근차근 담습니다.",
+  "summary":"지역·업종·면적·테라스·사진이 없는 합성 데이터입니다. 누락값을 임의 숫자로 채우지 않습니다.",
+  "facts":[{"key":"area","label":"전용면적","value":null,"evidence":"needs_review","source":"제공 자료 없음"}],
+  "concepts":[],"unknowns":["지역과 소재지","면적과 사용 범위","시설과 사진"],"assets":[]
+}
