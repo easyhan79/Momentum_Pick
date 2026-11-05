@@ -5,11 +5,7 @@ export function createHandler(config:Config){
  async function rpc(name:string,body:unknown){const response=await fetcher(`${config.url}/rest/v1/rpc/${name}`,{method:'POST',headers:{apikey:config.key,Authorization:`Bearer ${config.key}`,'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.timeout(10000),redirect:'error'});if(!response.ok)throw Error('database_unavailable');const text=await response.text();return text?JSON.parse(text):null;}
  return async(req:Request)=>{
   if(req.method==='GET'){
-   const supplied=req.headers.get('Authorization')?.match(/^Bearer (\S+)$/)?.[1];
-   if(!supplied)return new Response('Unauthorized',{status:401});
-   if(supplied!==config.key){
-    try{const headers:Record<string,string>={apikey:supplied};if(!supplied.startsWith('sb_secret_'))headers.Authorization=`Bearer ${supplied}`;const check=await fetcher(`${config.url}/rest/v1/property_analysis_jobs?select=property_id&limit=0`,{headers,redirect:'error',signal:AbortSignal.timeout(5000)});if(!check.ok)return new Response('Unauthorized',{status:401});}catch{return new Response('Unauthorized',{status:401});}
-   }
+   if(req.headers.get('Authorization')!==`Bearer ${config.key}`)return new Response('Unauthorized',{status:401});
    return Response.json({telegram_configured:!!config.telegramToken,dispatch_configured:config.githubTokens.some(Boolean),webhook_secret_configured:!!config.telegramSecret});
   }
   if(req.method!=='POST')return new Response('Method not allowed',{status:405});
@@ -48,4 +44,4 @@ export function createHandler(config:Config){
  };
 }
 declare const Deno:{env:{get(name:string):string|undefined};serve(handler:(req:Request)=>Promise<Response>):void};
-if(typeof Deno!=='undefined'){const env=Deno.env;Deno.serve(createHandler({url:env.get('SUPABASE_URL')||'',key:env.get('SUPABASE_SERVICE_ROLE_KEY')||'',githubTokens:[env.get('SPACEPICK_GITHUB_TOKEN')||'',env.get('GITHUB_TOKEN')||'',env.get('GH_PAT')||''],repository:env.get('GITHUB_REPO')||'easyhan79/Momentum_Pick',telegramToken:env.get('TELEGRAM_TOKEN')||env.get('TELEGRAM_BOT_TOKEN')||env.get('BOT_TOKEN')||'',telegramSecret:env.get('TELEGRAM_WEBHOOK_SECRET')||''}));}
+if(typeof Deno!=='undefined'){const env=Deno.env;console.log('intake configuration telegram='+!!(env.get('TELEGRAM_TOKEN')||env.get('TELEGRAM_BOT_TOKEN')||env.get('BOT_TOKEN'))+' dispatch='+!!(env.get('SPACEPICK_GITHUB_TOKEN')||env.get('GITHUB_TOKEN')||env.get('GH_PAT'))+' webhook_secret='+!!env.get('TELEGRAM_WEBHOOK_SECRET'));Deno.serve(createHandler({url:env.get('SUPABASE_URL')||'',key:env.get('SUPABASE_SERVICE_ROLE_KEY')||'',githubTokens:[env.get('SPACEPICK_GITHUB_TOKEN')||'',env.get('GITHUB_TOKEN')||'',env.get('GH_PAT')||''],repository:env.get('GITHUB_REPO')||'easyhan79/Momentum_Pick',telegramToken:env.get('TELEGRAM_TOKEN')||env.get('TELEGRAM_BOT_TOKEN')||env.get('BOT_TOKEN')||'',telegramSecret:env.get('TELEGRAM_WEBHOOK_SECRET')||''}));}
