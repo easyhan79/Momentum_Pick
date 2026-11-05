@@ -53,7 +53,7 @@ export function createAssetsHandler({url,key,fetcher=fetch,githubTokens=[]}:{url
         const bytes=await boundedBody(req);if(bytes.length>4096)throw new MediaError(413,'body_too_large');
         let body;try{body=JSON.parse(new TextDecoder().decode(bytes));}catch{throw new MediaError(400,'invalid_metadata');}
         if(!UUID.test(body?.assetId||'')||!['photo','provided_plan','document'].includes(body?.kind))throw new MediaError(400,'invalid_metadata');
-        const rows=await db(`property_assets?id=eq.${body.assetId}&property_id=eq.${id}&bucket_id=eq.${BUCKET}&select=id,kind`,{method:'PATCH',headers:{Prefer:'return=representation'},body:JSON.stringify({kind:body.kind})});
+        const rows=await db(`property_assets?id=eq.${body.assetId}&property_id=eq.${id}&bucket_id=eq.${BUCKET}&source_type=neq.ai_generated&kind=neq.concept&select=id,kind`,{method:'PATCH',headers:{Prefer:'return=representation'},body:JSON.stringify({kind:body.kind})});
         if(!rows.length)throw new MediaError(404,'asset_not_found');return reply({asset:rows[0]});
       }
       if(req.method!=='POST'||action!=='upload')throw new MediaError(400,'invalid_action');

@@ -5,7 +5,7 @@ import {createPublicHandler} from '../functions/public-showroom/index.ts';
 const id='5f0c0bc1-9dc7-496c-8511-0e9ecc066f17',asset='3408c9f7-3e76-466a-b5a3-8b020c3043df';
 test('plan request preserves edits and published snapshot, checks revision and scopes media',async()=>{
  const calls:any[]=[];
- const db=async(path:string,init?:RequestInit)=>{calls.push([path,init]);if(path.startsWith('property_assets')){assert.match(path,new RegExp(`property_id=eq.${id}`));return[{id:asset}];}if(!init)return[{revision:6,draft_content:{title:'edited',concepts:[]}}];const patch=JSON.parse(init.body as string);assert.deepEqual(Object.keys(patch).sort(),['draft_content','revision']);assert.match(path,/revision=eq.6/);assert.equal(patch.draft_content.title,'edited');assert.equal(patch.draft_content.planAnalysis.state,'queued');return[{revision:7,draft_content:patch.draft_content}];};
+ const db=async(path:string,init?:RequestInit)=>{calls.push([path,init]);if(path.startsWith('property_assets')){assert.match(path,new RegExp(`property_id=eq.${id}`));assert.match(path,/source_type=neq.ai_generated&kind=neq.concept/);return[{id:asset}];}if(!init)return[{revision:6,draft_content:{title:'edited',concepts:[]}}];const patch=JSON.parse(init.body as string);assert.deepEqual(Object.keys(patch).sort(),['draft_content','revision']);assert.match(path,/revision=eq.6/);assert.equal(patch.draft_content.title,'edited');assert.equal(patch.draft_content.planAnalysis.state,'queued');return[{revision:7,draft_content:patch.draft_content}];};
  assert.equal((await queuePlan(db,id,asset,6)).revision,7);
  await assert.rejects(queuePlan(db,id,asset,5),/revision_conflict/);
  await assert.rejects(queuePlan(async()=>[],id,asset,6),/asset_missing/);
