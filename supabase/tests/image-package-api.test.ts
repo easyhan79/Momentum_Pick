@@ -21,3 +21,8 @@ test('approved media and hero get scoped URLs; draft-only media remain inaccessi
  const dto=await (await handler(new Request('https://x?slug=test-property'))).json();assert.equal(dto.showroom.assets.length,1);assert.equal(dto.showroom.heroAsset.generated,true);assert.ok(!JSON.stringify(dto).includes('PRIVATE'));
  assert.equal((await handler(new Request(`https://x?slug=test-property&image=${asset}`))).status,200);assert.equal((await handler(new Request(`https://x?slug=test-property&image=${id}`))).status,404);assert.equal(storage,1);
 });
+
+test('missing generation source returns an actionable error without leaking database details',async()=>{
+ const handler=createHandler({url:'https://db',key:'SECRET',fetcher:(async url=>String(url).endsWith('/auth/v1/user')?Response.json(admin):Response.json({code:'P0001',message:'source_missing',details:'PRIVATE'},{status:400})) as typeof fetch});
+ const r=await handler(new Request('https://x',{method:'POST',headers:{Authorization:'Bearer user'},body:JSON.stringify({action:'generate-image',propertyId:id,slot:'hero'})}));assert.equal(r.status,400);assert.deepEqual(await r.json(),{error:'source_missing'});
+});

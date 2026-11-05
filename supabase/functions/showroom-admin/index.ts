@@ -38,7 +38,7 @@ type Config = {url:string;key:string;fetcher?:typeof fetch;githubTokens?:string[
 export function createHandler({url,key,fetcher=fetch,githubTokens=[]}:Config) {
   async function db(path:string, options:RequestInit={}) {
     const response=await fetcher(`${url}/rest/v1/${path}`,{...options,redirect:'error',headers:{apikey:key,Authorization:`Bearer ${key}`,'Content-Type':'application/json',...options.headers},signal:AbortSignal.timeout(15000)});
-    if(!response.ok){const e=await response.json().catch(()=>({}));const code=e.code==='23505'?'slug_taken':e.message;if(['slug_taken','revision_conflict','invalid_slug','invalid_listing_state'].includes(code))throw new ApiError(code.startsWith('invalid_')?400:409,code);throw new ApiError(502,'database_unavailable');}
+    if(!response.ok){const e=await response.json().catch(()=>({}));const code=e.code==='23505'?'slug_taken':e.message;if(['source_missing','draft_missing','concept_missing','invalid_slot'].includes(code))throw new ApiError(400,code);if(['slug_taken','revision_conflict','invalid_slug','invalid_listing_state'].includes(code))throw new ApiError(code.startsWith('invalid_')?400:409,code);throw new ApiError(502,'database_unavailable');}
     const responseText=await response.text();
     return responseText.trim()?JSON.parse(responseText):null;
   }

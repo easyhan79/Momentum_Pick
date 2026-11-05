@@ -75,9 +75,11 @@ def process_image_jobs(url, headers, gemini_key, requests, limit=4, emit=print):
         error = ''
         try:
             draft = rest(f'property_showrooms?property_id=eq.{pid}&select=draft_content')[0]['draft_content']
-            assets = rest(f'property_assets?property_id=eq.{pid}&bucket_id=eq.showroom-private-media&source_type=neq.ai_generated&kind=in.(photo,provided_plan)&select=storage_path,kind&order=created_at.desc&limit=4')
+            assets = rest(f'property_assets?property_id=eq.{pid}&bucket_id=eq.showroom-private-media&source_type=neq.ai_generated&kind=in.(photo,provided_plan,document)&select=storage_path,kind,source_type&order=created_at.desc&limit=4')
             parts = []
             for asset in assets:
+                if asset['kind']=='document' and asset.get('source_type') not in ('owner_provided','photographed'):
+                    continue
                 path = asset['storage_path']
                 if not re.fullmatch(re.escape(pid)+r'/[0-9a-f-]+\.(jpg|png|webp)', path):
                     raise ValueError('invalid_source_path')

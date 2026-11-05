@@ -40,6 +40,15 @@ class ImageWorkerTest(unittest.TestCase):
         self.assertIsNotNone(r.completed['p_asset']);self.assertEqual(r.completed['p_usage']['reserved_krw'],500)
         asset=next(c[2] for c in r.calls if c[1]=='property_assets')
         self.assertFalse(asset['is_approved']);self.assertEqual(asset['source_type'],'ai_generated')
+    def test_imported_raster_document_is_usable_without_public_reclassification(self):
+        class Imported(Requests):
+            def request(self,method,url,**kwargs):
+                result=super().request(method,url,**kwargs)
+                if '/rest/v1/property_assets?' in url:
+                    for item in result.data:item.update(kind='document',source_type='owner_provided')
+                return result
+        r=Imported();process_image_jobs('https://db',{},'SECRET',r,emit=lambda *a,**k:None)
+        self.assertIsNotNone(r.completed['p_asset']);self.assertEqual(sum(c[1].endswith(':generateContent') for c in r.calls),1)
     def test_oversized_input_stops_before_paid_generation(self):
         r=Requests(too_big=True);process_image_jobs('https://db',{},'SECRET',r,emit=lambda *a,**k:None)
         self.assertFalse(any(c[1].endswith(':generateContent') for c in r.calls));self.assertEqual(r.completed['p_error'],'input_budget_exceeded')
