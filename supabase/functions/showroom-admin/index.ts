@@ -58,7 +58,7 @@ export function createHandler({url,key,fetcher=fetch,githubTokens=[]}:Config) {
       if(!user.id||user.is_anonymous||object(user.app_metadata).showroom_admin!==true) throw new ApiError(403,'admin_required');
       const query=new URL(req.url).searchParams;
       if(req.method==='GET'&&query.get('action')==='list') {
-        const rows=await db('properties?select=id,address,status,created_at&order=created_at.desc&limit=100');
+        const rows=await db('properties?status=neq.merged&select=id,address,status,created_at&order=created_at.desc&limit=100');
         return reply({properties:rows});
       }
       if(req.method==='GET'&&query.get('action')==='draft') {

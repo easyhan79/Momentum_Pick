@@ -233,6 +233,8 @@ def main():
     finally:
         # Successful properties get drafts even if a different item or provider fails.
         sync_drafts()
+        from scripts.sync_telegram_media import Client as MediaClient, synchronize as sync_media
+        print('private media sync '+json.dumps(sync_media(MediaClient(url,key,token)),sort_keys=True),flush=True)
         from plan_analysis import analyze_uploaded_plans
         analyze_uploaded_plans(url, headers, os.environ['GEMINI_API_KEY'], requests)
         from image_worker import process_image_jobs

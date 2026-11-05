@@ -135,7 +135,7 @@ jobs:
                       offset += 100
           
               def properties(self):
-                  return self.pages('properties?select=id,raw_input&order=id')
+                  return self.pages('properties?status=neq.merged&select=id,raw_input&order=id')
           
               def existing(self):
                   return {row['id'] for row in self.pages(f'property_assets?bucket_id=eq.{BUCKET}&select=id&order=id')}
