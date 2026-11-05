@@ -1,6 +1,6 @@
 import base64
 import unittest
-from image_worker import process_image_jobs,estimate_upper_krw,MAX_INPUT_TOKENS,MAX_OUTPUT_TOKENS,prompt_for
+from image_worker import process_image_jobs,estimate_upper_krw,MAX_INPUT_TOKENS,MAX_OUTPUT_TOKENS,prompt_for,zoning_for
 
 PID='5f0c0bc1-9dc7-496c-8511-0e9ecc066f17'
 PNG=b'\x89PNG\r\n\x1a\n'+b'0'*24
@@ -55,6 +55,22 @@ class ImageWorkerTest(unittest.TestCase):
     def test_empty_result_fails_once_and_retains_usage(self):
         r=Requests(no_image=True);process_image_jobs('https://db',{},'SECRET',r,emit=lambda *a,**k:None)
         self.assertEqual(r.completed['p_error'],'single_image_required');self.assertEqual(r.completed['p_usage']['total_tokens'],2200)
+    def test_text_only_analysis_generates_without_source_images(self):
+        class NoSources(Requests):
+            def request(self,method,url,**kwargs):
+                if '/rest/v1/property_assets?' in url:return Response([])
+                return super().request(method,url,**kwargs)
+            def get(self,*args,**kwargs):raise AssertionError('No source download expected')
+        r=NoSources();process_image_jobs('https://db',{},'SECRET',r,emit=lambda *a,**k:None)
+        self.assertIsNotNone(r.completed['p_asset'])
+        paid=next(c[2] for c in r.calls if c[1].endswith(':generateContent'))
+        self.assertTrue(all('inlineData' not in p for p in paid['contents'][0]['parts']))
+    def test_zones_and_analysis_are_in_spatial_prompt_and_usage(self):
+        draft={'summary':'analysis detail','concepts':[{'id':'concept-1','zones':[{'id':'z1','title':'Loading area'},{'id':'z2','title':'Storage'}]}]}
+        prompt=prompt_for('concept-1',draft)
+        self.assertIn('analysis detail',prompt);self.assertIn('Loading area',prompt)
+        self.assertIn('overhead/isometric',prompt);self.assertIn('27',prompt)
+        self.assertEqual(zoning_for(draft,'concept-1'),[{'zoneId':'z1','x':27,'y':28},{'zoneId':'z2','x':73,'y':28}])
     def test_conservative_max_request_is_below_reservation(self):
         self.assertLessEqual(estimate_upper_krw(MAX_INPUT_TOKENS,MAX_OUTPUT_TOKENS),500)
         with self.assertRaises(ValueError):prompt_for('concept-2',{'concepts':[]})

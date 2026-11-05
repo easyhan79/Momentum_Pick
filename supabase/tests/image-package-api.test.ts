@@ -26,3 +26,13 @@ test('missing generation source returns an actionable error without leaking data
  const handler=createHandler({url:'https://db',key:'SECRET',fetcher:(async url=>String(url).endsWith('/auth/v1/user')?Response.json(admin):Response.json({code:'P0001',message:'source_missing',details:'PRIVATE'},{status:400})) as typeof fetch});
  const r=await handler(new Request('https://x',{method:'POST',headers:{Authorization:'Bearer user'},body:JSON.stringify({action:'generate-image',propertyId:id,slot:'hero'})}));assert.equal(r.status,400);assert.deepEqual(await r.json(),{error:'source_missing'});
 });
+
+test('whole package queues one hero plus supported concepts and never retries completed images',async()=>{
+ const slots:string[]=[];const handler=createHandler({url:'https://db',key:'server',fetcher:(async(url,init)=>{const p=String(url);if(p.endsWith('/auth/v1/user'))return Response.json(admin);if(p.includes('/property_showrooms?'))return Response.json([{draft_content:{concepts:[{id:'concept-1'},{id:'concept-2'},{id:'arbitrary'},{id:'concept-1'}]}}]);if(p.endsWith('/rpc/image_enqueue')){const body=JSON.parse(init!.body as string);assert.equal(body.p_retry,false);slots.push(body.p_slot);return Response.json({state:'done'});}if(p.endsWith('/rpc/image_sync_assets'))return Response.json(null);throw Error('unexpected');}) as typeof fetch});
+ const r=await handler(new Request('https://x',{method:'POST',headers:{Authorization:'Bearer user'},body:JSON.stringify({action:'generate-package',propertyId:id})}));assert.equal(r.status,200);assert.deepEqual(slots,['hero','concept-1','concept-2']);assert.equal((await r.json()).dispatched,false);
+});
+test('public generated concept image includes bounded zone coordinates and concept identity',async()=>{
+ const content={schema_version:'1.0',id,title:'Title',subtitle:'Subtitle',concepts:[],assets:[{id:asset,kind:'concept',approved:true,generated:true,conceptId:'concept-1',zoning:[{zoneId:'z1',x:27,y:28},{zoneId:'bad',x:999,y:10}]}]};
+ const handler=createPublicHandler('https://db','server',(async()=>Response.json([{approved_by:'admin',approved_at:'now',published_at:'now',published_revision:1,published_content:content}])) as typeof fetch);
+ const result=await (await handler(new Request('https://x?slug=test-property'))).json();assert.equal(result.showroom.assets[0].conceptId,'concept-1');assert.deepEqual(result.showroom.assets[0].zoning,[{zoneId:'z1',x:27,y:28}]);
+});

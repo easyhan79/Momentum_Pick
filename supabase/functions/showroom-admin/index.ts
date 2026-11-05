@@ -21,7 +21,7 @@ export function toDraft(property: Json) {
         .map((v:string,j:number)=>({id:`zone-${i+1}-${j+1}`,label:`구역 ${j+1}`,title:text(v,120),body:text(v),indoorOutdoor:'unknown'}))};
   });
   if (!concepts.length) unknowns.push('활용 컨셉 자료 확인 필요');
-  return {schema_version:'1.0',id:property.id,category:/공장|물류|창고/.test(category)?'industrial':/토지|임야/.test(category)?'land':/건물|수익형/.test(category)?'income':/상가|오피스/.test(category)?'commercial':'unknown',
+  return {visualMode:'ai_generated',schema_version:'1.0',id:property.id,category:/공장|물류|창고/.test(category)?'industrial':/토지|임야/.test(category)?'land':/건물|수익형/.test(category)?'income':/상가|오피스/.test(category)?'commercial':'unknown',
     title:'매물 검토 초안',subtitle:headline(ai.landing_copy),
     summary:text(ai.usp_summary),address:text(property.address,300)||undefined,addressEvidence:'owner_provided',
     facts:[],concepts,unknowns,assets:[]};
@@ -111,6 +111,21 @@ export function createHandler({url,key,fetcher=fetch,githubTokens=[]}:Config) {
         if(!['active','closed'].includes(body.listing_state))throw new ApiError(400,'invalid_listing_state');
         return reply({showroom:await db('rpc/spacepick_set_listing_state',{method:'POST',body:JSON.stringify({p_property:id,p_state:body.listing_state,p_revision:body.revision})})});
       }
+      if(req.method==='POST'&&body.action==='use-generated-layout'){
+        if(!Number.isSafeInteger(body.revision))throw new ApiError(400,'invalid_revision');
+        const rows=await db(`property_showrooms?property_id=eq.${id}&select=draft_content,revision`);
+        if(!rows.length)throw new ApiError(404,'draft_not_found');if(rows[0].revision!==body.revision)throw new ApiError(409,'revision_conflict');
+        const prior=object(rows[0].draft_content),content={...prior,visualMode:'ai_generated',planAnalysis:undefined,concepts:(prior.concepts||[]).map((c:Json)=>({...c,plan:undefined}))};
+        const saved=await db(`property_showrooms?property_id=eq.${id}&revision=eq.${body.revision}&select=*`,{method:'PATCH',headers:{Prefer:'return=representation'},body:JSON.stringify({draft_content:content,revision:body.revision+1})});
+        if(!saved.length)throw new ApiError(409,'revision_conflict');return reply({showroom:saved[0]});
+      }
+      if(req.method==='POST'&&body.action==='generate-package'){
+        const rooms=await db(`property_showrooms?property_id=eq.${id}&select=draft_content`);if(!rooms.length)throw new ApiError(404,'draft_not_found');
+        const slots=['hero',...(rooms[0].draft_content.concepts||[]).map((c:Json)=>c.id).filter((slot:string)=>['concept-1','concept-2','concept-3'].includes(slot))];
+        const jobs=[];for(const slot of [...new Set(slots)])jobs.push(await db('rpc/image_enqueue',{method:'POST',body:JSON.stringify({p_property:id,p_slot:slot,p_retry:false})}));
+        await db('rpc/image_sync_assets',{method:'POST',body:JSON.stringify({p_property:id})});
+        return reply({jobs,dispatched:jobs.some(j=>j.state==='queued')?await dispatchPlan(githubTokens,fetcher):false});
+      }
       if(req.method==='POST'&&body.action==='generate-image'){
         if(!['hero','concept-1','concept-2','concept-3'].includes(body.slot)||body.retry!==undefined&&typeof body.retry!=='boolean')throw new ApiError(400,'invalid_image_slot');
         const job=await db('rpc/image_enqueue',{method:'POST',body:JSON.stringify({p_property:id,p_slot:body.slot,p_retry:body.retry===true})});
@@ -146,7 +161,7 @@ export function createHandler({url,key,fetcher=fetch,githubTokens=[]}:Config) {
           if(selected.length>24||selected.some((a:Json)=>!UUID.test(a.id||'')))throw new ApiError(400,'invalid_media');
           if(selected.length){
             const media=await db(`property_assets?property_id=eq.${id}&bucket_id=eq.showroom-private-media&select=id,kind,caption,source_type`);
-            draft.assets=selected.map((item:Json)=>{const a=media.find((a:Json)=>a.id===item.id);if(!a)throw new ApiError(400,'invalid_media');return{id:a.id,url:'',kind:a.kind==='provided_plan'?'provided_plan':a.source_type==='ai_generated'?'concept':'photo',alt:text(a.caption),caption:text(a.caption),generated:a.source_type==='ai_generated',conceptId:text(item.conceptId,100),approved:true};});
+            draft.assets=selected.map((item:Json)=>{const a=media.find((a:Json)=>a.id===item.id);if(!a)throw new ApiError(400,'invalid_media');return{id:a.id,url:'',kind:a.kind==='provided_plan'?'provided_plan':a.source_type==='ai_generated'?'concept':'photo',alt:text(a.caption),caption:text(a.caption),generated:a.source_type==='ai_generated',conceptId:text(item.conceptId,100),zoning:Array.isArray(item.zoning)?item.zoning.filter((p:Json)=>typeof p.zoneId==='string'&&Number.isFinite(p.x)&&Number.isFinite(p.y)&&p.x>=0&&p.x<=100&&p.y>=0&&p.y<=100).slice(0,5):[],approved:true};});
             if(draft.heroAsset){const hero=draft.assets.find((a:Json)=>a.id===draft.heroAsset.id);if(!hero)throw new ApiError(400,'invalid_media');draft.heroAsset=hero;}
           }else if(draft.heroAsset)throw new ApiError(400,'invalid_media');
           const now=new Date().toISOString();

@@ -59,6 +59,8 @@ def analyze_uploaded_plans(url, headers, gemini_key, requests, emit=print):
             started = state.get('startedAt')
             if started and (datetime.now(timezone.utc)-datetime.fromisoformat(started)).total_seconds() < 600:
                 continue
+        if not requested and content.get('visualMode') == 'ai_generated':
+            continue
         selection = f'id=eq.{requested}' if requested else 'kind=eq.provided_plan'
         assets = rest(f'property_assets?property_id=eq.{property_id}&{selection}&bucket_id=eq.showroom-private-media&select=id,caption,storage_path&order=created_at.desc&limit=1')
         if not assets:

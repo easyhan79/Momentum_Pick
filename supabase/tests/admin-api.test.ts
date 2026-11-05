@@ -109,3 +109,12 @@ test('unpublishing preserves snapshot and detects concurrent change',async()=>{
     return[{revision:2,showroom_status:'published'}];
   });assert.equal((await h.handler(req('POST',{propertyId:id,action:'unpublish',revision:2}))).status,409);
 });
+
+test('AI layout switch cancels reference plan marker with revision CAS and preserves originals and publication',async()=>{
+ let patch:any;
+ const prior={title:'keep',marketing:{target_1_blog:'keep'},planAnalysis:{state:'queued'},concepts:[{id:'concept-1',plan:{assetId:id},zones:[{id:'z1'}]}]};
+ const h=harness({id,app_metadata:{showroom_admin:true}},(url,init)=>{assert.match(url,/property_showrooms/);if(init.method==='PATCH'){assert.match(url,/revision=eq.5/);patch=JSON.parse(init.body as string);return [{revision:6,draft_content:patch.draft_content}];}return [{revision:5,draft_content:prior}];});
+ const result=await h.handler(req('POST',{action:'use-generated-layout',propertyId:id,revision:5}));assert.equal(result.status,200);
+ assert.equal(patch.draft_content.visualMode,'ai_generated');assert.equal(patch.draft_content.planAnalysis,undefined);assert.equal(patch.draft_content.concepts[0].plan,undefined);assert.deepEqual(patch.draft_content.marketing,prior.marketing);assert.deepEqual(Object.keys(patch).sort(),['draft_content','revision']);
+ assert.equal((await h.handler(req('POST',{action:'use-generated-layout',propertyId:id,revision:4}))).status,409);
+});

@@ -16,10 +16,11 @@ export type Concept = {
   feasibility: 'not_checked' | 'reviewed'; zones: Zone[];
 };
 export type Asset = {
-  id: string; url: string; alt: string; caption: string; generated?:boolean;conceptId?:string;
+  id: string; url: string; alt: string; caption: string; generated?:boolean;conceptId?:string;zoning?:{zoneId:string;x:number;y:number}[];
   kind: 'example' | 'photo' | 'concept' | 'provided_plan'; approved: boolean;
 };
 export type Showroom = {
+  visualMode?: 'ai_generated';
   planAnalysis?: {assetId:string;state:string;attempts:number;errorCode?:string;queuedAt?:string;startedAt?:string};
   schema_version: '1.0'; id: string; category: PropertyCategory;
   title: string; subtitle: string; address?: string; addressEvidence?: EvidenceStatus;
