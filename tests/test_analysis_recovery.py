@@ -54,6 +54,11 @@ class Recovery(unittest.TestCase):
     def test_all_album_files_are_sent_once(self):
         gen=Mock(return_value='{}');self.execute([self.job(raw='[FILE_ID:first] [FILE_ID:second] [FILE_ID:first] caption')],gen)
         self.assertEqual(gen.call_args.args[0][:-1],['offline-file','offline-file'])
+    def test_editorial_status_is_saved_and_unfinished_copy_not_announced_complete(self):
+        job=self.job();api=Mock(side_effect=[job,True,None]);notify=Mock();edit=Mock(return_value={'usp_summary':'kept','_editorial':{'status':'needs_revision'}})
+        worker.run(api,lambda _:'{}',Mock(),json.loads,notify,Mock(),edit=edit)
+        self.assertEqual(edit.call_args.args[1],'offline private input');self.assertEqual(api.call_args_list[1].args[1]['p_result']['_editorial']['status'],'needs_revision')
+        self.assertNotIn('자동 편집 완료',''.join(c.args[0] for c in notify.call_args_list))
     def test_stale_completion_raises_and_does_not_notify_success(self):
         api=Mock(side_effect=[self.job(),False]);notify=Mock()
         with self.assertRaisesRegex(RuntimeError,'claim_lost'):

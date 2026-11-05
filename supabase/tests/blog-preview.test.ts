@@ -5,3 +5,4 @@ test('escaped linebreaks and section markers become readable blocks without losi
  const parsed=parseBlog(input);assert.equal(parsed.title,'매물 소개');assert.ok(parsed.blocks.some(b=>b.kind==='heading'&&b.text==='입지'));assert.ok(parsed.blocks.some(b=>b.text.includes('허가 유효성 확인 필요')));assert.equal(normalizeCopy(input).includes('\\n'),false);
 });
 test('untrusted HTML is retained as plain text for React escaping',()=>{assert.ok(parseBlog('제목: test\n<script>alert(1)</script>').blocks[0].text.includes('<script>'));});
+test('legacy single-paragraph article is not rendered as an enormous title and is preserved',()=>{const original='제공된 자료를 설명하는 문장입니다. '.repeat(100);const parsed=parseBlog(original);assert.equal(parsed.title,'매물 소개');assert.equal(parsed.blocks[0].text,original.trim());});

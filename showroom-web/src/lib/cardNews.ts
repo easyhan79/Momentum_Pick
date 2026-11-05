@@ -32,14 +32,18 @@ export function drawNewsCard(canvas:HTMLCanvasElement,card:NewsCard,photo?:HTMLI
   ctx.fillStyle='#c5a870';ctx.font='500 122px sans-serif';ctx.fillText(String(card.number).padStart(2,'0'),82,330);
   ctx.fillStyle='#86939d';ctx.font='24px sans-serif';ctx.fillText('/ 05',260,327);
   ctx.fillStyle='#c5a870';ctx.fillRect(88,380,80,5);
-  let fontSize=54,lines:string[]=[];
-  for(;fontSize>=24;fontSize-=2){ctx.font=`600 ${fontSize}px "Malgun Gothic", sans-serif`;lines=wrapCardText(ctx,card.body,896);if(lines.length*fontSize*1.6<=710)break;}
-  const fits=fontSize>=24;
+  const [headline,...paragraphs]=card.body.split('\n'),body=paragraphs.join('\n').trim();
+  let titleSize=64,titleLines:string[]=[];
+  for(;titleSize>=32;titleSize-=2){ctx.font=`700 ${titleSize}px "Malgun Gothic", sans-serif`;titleLines=wrapCardText(ctx,headline,896);if(titleLines.length*titleSize*1.4<=300)break;}
+  const titleHeight=titleLines.length*titleSize*1.4;
+  let fontSize=42,lines:string[]=[];
+  for(;fontSize>=26;fontSize-=2){ctx.font=`400 ${fontSize}px "Malgun Gothic", sans-serif`;lines=body?wrapCardText(ctx,body,896):[];if(titleHeight+48+lines.length*fontSize*1.65<=710)break;}
+  const fits=titleSize>=32&&fontSize>=26;
   ctx.fillStyle='#f0eee7';ctx.textBaseline='top';
-  if(fits)lines.forEach((line,i)=>ctx.fillText(line,88,440+i*fontSize*1.6));
+  if(fits){ctx.font=`700 ${titleSize}px "Malgun Gothic", sans-serif`;titleLines.forEach((line,i)=>ctx.fillText(line,88,440+i*titleSize*1.4));ctx.fillStyle='#c5d1d1';ctx.font=`400 ${fontSize}px "Malgun Gothic", sans-serif`;lines.forEach((line,i)=>ctx.fillText(line,88,440+titleHeight+48+i*fontSize*1.65));}
   else {ctx.font='500 36px sans-serif';ctx.fillText('문구가 너무 깁니다.',88,470);ctx.fillText('구성안에서 이 카드의 내용을 줄여 주세요.',88,540);}
   ctx.textBaseline='alphabetic';ctx.strokeStyle='#33434d';ctx.beginPath();ctx.moveTo(88,1195);ctx.lineTo(992,1195);ctx.stroke();
-  ctx.fillStyle='#c5a870';ctx.font='500 25px "Malgun Gothic", sans-serif';ctx.fillText('검수 전 초안 · 외부 게시 승인 아님',88,1246);
-  ctx.fillStyle='#a2adb3';ctx.font='20px "Malgun Gothic", sans-serif';ctx.fillText('매물 사실·가격·인허가·사용권 확인 필요',88,1280);
+  ctx.fillStyle='#c5a870';ctx.font='500 25px "Malgun Gothic", sans-serif';ctx.fillText('제공 자료 기반 · SPACEPICK',88,1246);
+  ctx.fillStyle='#a2adb3';ctx.font='20px "Malgun Gothic", sans-serif';ctx.fillText('가격·거래 조건은 상담 시 확인',88,1280);
   return fits;
 }
