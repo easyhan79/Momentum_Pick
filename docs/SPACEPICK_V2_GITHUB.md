@@ -42,3 +42,9 @@ GitHub API가 제공되면 변경 브랜치로 PR을 만들 수 있다. API가 �
 clever-endpoint는 agent.yml을 ref=main으로 실행한다. 변경 브랜치를 업로드한 것만으로 텔레그램 처리 코드가 바뀌지는 않는다. 기존 운영 DB RPC와의 호환성을 확인한 후, 사용자 운영 반영 승인 범위에서 main을 fast-forward 갱신한다.
 
 새 웹 등록/콘셉트 관리용 migration은 웹 API 사용 전에 적용해야 하지만, 이번 기존 텔레그램 작업자 경로에는 새 RPC 호출이 없다. 웹 호스팅 고객 화면의 배포 여부는 별도 확인한다. GitHub Actions 실행 성공은 main push 성공과 별개이며 실제 run 결과를 관측한 뒤에만 확인 완료로 표시한다.
+
+### main 반영 완료
+
+2026-11-06 사용자 운영 반영 승인과 텔레그램 실행 경로 확인에 따라, 기존 작업자 호환성을 검사한 후 main을 5c489ae7eb60117dbc3236a2ea579db6ab838534로 fast-forward했다. force push나 기존 webhook 변경은 하지 않았다. 다음 정상 Telegram/예약 실행부터 새 main을 checkout한다. 그 이후 문서 기록 커밋이 main과 변경 브랜치에 추가될 수 있다.
+
+기존 Supabase 읽기 전용 인증 점검 절차는 audit/showroom-preflight-20261103 브랜치의 .github/workflows/showroom-credential-preflight.yml에도 있다. 이 워크플로는 웹 호스팅 배포 기능이 아니다.
