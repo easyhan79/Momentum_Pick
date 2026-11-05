@@ -1,4 +1,5 @@
 import {originAllowed,corsOrigin,validSlug,slugSuggestions} from '../_shared/site.ts';
+import {publicationIssues} from '../_shared/publication.ts';
 import {queuePlan,dispatchPlan} from '../_shared/plan-queue.ts';
 // No client-supplied claims are trusted. Auth is checked against GoTrue on every request.
 // Only explicitly approved snapshots may be published; original properties are never written.
@@ -60,6 +61,13 @@ export function createHandler({url,key,fetcher=fetch,githubTokens=[]}:Config) {
       if(req.method==='GET'&&query.get('action')==='list') {
         const rows=await db('properties?status=neq.merged&select=id,address,status,created_at&order=created_at.desc&limit=100');
         return reply({properties:rows});
+      }
+      if(req.method==='GET'&&query.get('action')==='publish-readiness') {
+        const id=query.get('propertyId')||'';if(!UUID.test(id))throw new ApiError(400,'invalid_property_id');
+        const rooms=await db(`property_showrooms?property_id=eq.${id}&select=revision,showroom_status,draft_content`);if(!rooms.length)throw new ApiError(404,'draft_not_found');
+        const media=await db(`property_assets?property_id=eq.${id}&bucket_id=eq.showroom-private-media&select=id,kind`);
+        const jobs=await db(`property_image_jobs?property_id=eq.${id}&select=state`);
+        return reply({revision:rooms[0].revision,issues:publicationIssues(rooms[0],media,jobs)});
       }
       if(req.method==='GET'&&query.get('action')==='draft') {
         const id=query.get('propertyId')||'';if(!UUID.test(id)) throw new ApiError(400,'invalid_property_id');
