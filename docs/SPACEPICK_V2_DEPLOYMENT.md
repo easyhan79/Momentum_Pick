@@ -34,3 +34,7 @@
 `python scripts/package_v2_release.py`는 현재 빌드와 코드·검증 기록을 `showroom-web/test-results/release/SpacePick-v2-release.zip`으로 묶고 SHA256 manifest를 저장한다. 현재 commit과 작업 디렉터리의 미커밋 여부를 기록하며 `.env`/키/노드 의존성/고객 PDF/텍스트/스크린샷을 포함하지 않는다. ZIP 생성은 서버 게시가 아니다.
 
 미리보기는 `showroom-web/test-results/current-preview/SpacePick-current-preview.html`이다. 다운로드한 단일 HTML로 고객 화면을 확인할 수 있으며 원본 PDF나 실제 모집 매물의 데이터가 아니다.
+
+## 텔레그램 Actions 경로 적용 (후속)
+
+사용자 확인과 소스 대조로, 운영 분석 실행은 텔레그램→Supabase 접수/대기열→agent.yml(main)→AI/DB 저장→비공개 초안/이미지 처리 흐름이다. 따라서 기존 작업자 호환성 확인 후 main을 fast-forward 갱신해 이 부분부터 반영한다. 웹 관리자 신규 RPC/migration과 고객 화면 호스팅 적용은 별도 단계로 남긴다.

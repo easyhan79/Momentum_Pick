@@ -392,3 +392,11 @@
 - 원본 PDF/고객 검토 파일/스크린샷/test-results/dist/키/환경파일 제외 확인 후 업로드했다. 기존 통합 24항목·고객 화면/문의 브라우저 검증 결과는 유지되며 이번 후속 변경은 문서와 배포 manifest의 commit 상태 기록이다.
 - API Forbidden 때문에 GitHub 업로드 자체가 불가능하다는 이전 판단을 정정했다. 향후에는 SPACEPICK_V2_GITHUB.md 절차로 Git 원격 조회→dry run→commit/push→원격 commit 확인을 수행한다.
 - T12의 남은 차단은 기존 호스팅 게시 및 Supabase 운영 적용 연결이다. GitHub 업로드 완료를 운영 사이트 반영 완료라고 표시하지 않는다.
+
+### 2026-11-06 — 텔레그램→GitHub Actions 운영 경로 재확인 / main 반영 준비
+
+- 사용자가 기존 운영은 텔레그램 매물 접수 시 GitHub Actions가 작동하는 구조라고 명확히 설명했다. clever-endpoint와 plan-queue 코드를 확인한 결과 agent.yml workflow_dispatch ref는 main이다. 기존 branch 업로드만으로는 이 작업자의 새 코드가 적용되지 않는다.
+- 기존 사용자 운영 반영 승인을 근거로 main 갱신까지 진행한다. GitHub Actions 작업자 변경과 웹 호스팅의 고객 화면 배포를 구분하며, main 갱신을 웹 화면 게시 완료로 부르지 않는다.
+- 기존 DB와 작업자 호환성을 추가 점검했다. analysis_worker/image_worker의 기존 RPC 이름·인자 계약을 유지하며 신규 web 등록/콘셉트 변경 RPC는 작업자에서 호출하지 않는다. 분석 결과의 추가 값은 기존 JSON 결과에 저장된다. 따라서 새 웹 관리자용 migration 적용과 별개로 기존 텔레그램 분석 작업자의 main 반영이 가능하다.
+- 추가 검사: 텔레그램 접수 API 7개, 분석 복구/이미지/문서 출처/접수 알림 Python 27개 통과. 텔레그램 SQL 검사는 기존 테스트의 고정 패키지 import로 도구를 찾지 못해 처음 실패했으며, 다른 SQL 검사와 동일한 PGLITE_MODULE 선택을 지원하도록 보강 후 재실행했다.
+- main 최신 remote fetch 결과 기존 c0d29a4이며 변경 브랜치의 조상임을 확인했다. force push나 webhook 설정 변경 없이 fast-forward 반영한다. 실제 AI 실행/운영 알림을 만들기 위해 가짜 매물을 접수하지 않는다.

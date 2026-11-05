@@ -36,3 +36,9 @@ GitHub API가 제공되면 변경 브랜치로 PR을 만들 수 있다. API가 �
 - 당시 main은 `c0d29a4de0d95b831178d5947c22b7b281ec855f`로 유지. 원본 PDF/검토 생성물/키/환경파일은 업로드하지 않았다.
 - GitHub 브랜치: https://github.com/easyhan79/Momentum_Pick/tree/codex/spacepick-customer-information
 - GitHub API를 통한 PR 생성은 수행하지 않았다. 운영 호스팅 게시와 DB 적용은 별도 미완료다. 이후 이 문서와 작업상태만 기록하는 추가 커밋이 이어질 수 있다.
+
+## 텔레그램 운영 코드와 main
+
+clever-endpoint는 agent.yml을 ref=main으로 실행한다. 변경 브랜치를 업로드한 것만으로 텔레그램 처리 코드가 바뀌지는 않는다. 기존 운영 DB RPC와의 호환성을 확인한 후, 사용자 운영 반영 승인 범위에서 main을 fast-forward 갱신한다.
+
+새 웹 등록/콘셉트 관리용 migration은 웹 API 사용 전에 적용해야 하지만, 이번 기존 텔레그램 작업자 경로에는 새 RPC 호출이 없다. 웹 호스팅 고객 화면의 배포 여부는 별도 확인한다. GitHub Actions 실행 성공은 main push 성공과 별개이며 실제 run 결과를 관측한 뒤에만 확인 완료로 표시한다.

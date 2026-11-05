@@ -1,4 +1,5 @@
-import {PGlite} from '@electric-sql/pglite';import assert from 'node:assert/strict';import {readFile} from 'node:fs/promises';
+import assert from 'node:assert/strict';import {readFile} from 'node:fs/promises';
+const {PGlite}=await import(process.env.PGLITE_MODULE||'@electric-sql/pglite');
 const db=new PGlite();await db.exec(`CREATE ROLE anon NOLOGIN;CREATE ROLE authenticated NOLOGIN;CREATE ROLE service_role NOLOGIN BYPASSRLS;GRANT USAGE ON SCHEMA public TO anon,authenticated,service_role;CREATE TABLE properties(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),raw_input text,status text,ai_contents jsonb,created_at timestamptz DEFAULT now());GRANT SELECT,INSERT,UPDATE ON properties TO service_role;`);
 for(const file of ['migrations/20261103115337_analysis_recovery_queue.sql','review/telegram_intake_reliability.sql'])await db.exec(await readFile(new URL('../'+file,import.meta.url),'utf8'));
 await db.exec('SET ROLE service_role');
