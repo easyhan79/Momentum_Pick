@@ -52,7 +52,7 @@ jobs:
                   zones = item.get('zone_plan')
                   zones = [v for v in (zones if isinstance(zones,list) else []) if isinstance(v,str) and v.strip()][:5]
                   concepts.append({'id':f'concept-{i+1}','conceptName':text(item.get('concept_name'),100) or '활용 방향 확인 필요','headline':text(item.get('headline'),500),'rationale':text(item.get('cost_benefit')),'feasibility':'not_checked','zones':[{'id':f'zone-{i+1}-{j+1}','label':f'구역 {j+1}','title':text(v,120),'body':text(v),'indoorOutdoor':'unknown'} for j,v in enumerate(zones)]})
-              return {'schema_version':'1.0','id':prop['id'],'category':kind,'title':'매물 검토 초안','subtitle':headline,'summary':text(ai.get('usp_summary')),'address':text(prop.get('address'),300),'addressEvidence':'owner_provided','facts':[],'concepts':concepts,'unknowns':['면적·가격·이용권·인허가와 자료 출처 확인 필요','AI 문구와 활용 방향은 미검증 가설입니다.'],'assets':[]}
+              return {'visualMode':'ai_generated','schema_version':'1.0','id':prop['id'],'category':kind,'title':'매물 검토 초안','subtitle':headline,'summary':text(ai.get('usp_summary')),'address':text(prop.get('address'),300),'addressEvidence':'owner_provided','facts':[],'concepts':concepts,'unknowns':['면적·가격·이용권·인허가와 자료 출처 확인 필요','AI 문구와 활용 방향은 미검증 가설입니다.'],'assets':[]}
           
           class NoRedirect(HTTPRedirectHandler):
               def redirect_request(self, *args, **kwargs):
