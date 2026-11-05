@@ -1,3 +1,5 @@
+import {registrationIssues} from './web-registration.ts';
+import {profilePublicationIssues} from './property-profile.ts';
 type Json=Record<string,any>;
 export type PublicationIssue={code:string;message:string;target:string;assetId?:string};
 const object=(v:any):Json=>v&&typeof v==='object'&&!Array.isArray(v)?v:{};
@@ -23,5 +25,7 @@ export function publicationIssues(room:Json,media:Json[],jobs:Json[]):Publicatio
  if(jobs.some(j=>['queued','running'].includes(j.state)))add('image_generation_pending','이미지 생성이 진행 중입니다. 완료 후 「조건 다시 확인」을 눌러 주세요.','image-studio');
  const selected=array(draft.assets),uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
  if(selected.length>24||selected.some(a=>!uuid.test(a.id||'')||!media.some(m=>m.id===a.id))||draft.heroAsset&&!selected.some(a=>a.id===draft.heroAsset.id))add('invalid_media','연결된 이미지 자료를 확인하고 초안을 다시 저장해 주세요.','property-media');
+ if(draft.propertyProfile){try{issues.push(...profilePublicationIssues(draft.propertyProfile,media.map(a=>({id:String(a.id)})),draft.address));}catch{add('profile_review_required','매물 정보 형식을 확인하고 다시 저장해 주세요.','property-facts-editor');}}
+ issues.push(...registrationIssues(draft));
  return issues;
 }

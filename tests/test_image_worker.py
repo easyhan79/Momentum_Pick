@@ -34,6 +34,35 @@ class Requests:
         raise AssertionError(url)
 
 class ImageWorkerTest(unittest.TestCase):
+    def test_explicit_photo_mode_uses_selected_photo_and_labels_future_image(self):
+        class Photo(Requests):
+            def request(self,method,url,**kwargs):
+                result=super().request(method,url,**kwargs)
+                if '/rest/v1/property_showrooms?' in url:
+                    result.data[0]['draft_content']['imageSettings']={'mode':'photo','sourceAssetId':'3408c9f7-3e76-466a-b5a3-8b020c3043df','rightsApproved':True}
+                if '/rest/v1/property_assets?' in url:
+                    assert 'id=eq.3408c9f7-3e76-466a-b5a3-8b020c3043df' in url
+                    assert 'kind=eq.photo' in url
+                    result.data[0].update(kind='photo',source_type='owner_provided')
+                return result
+        r=Photo();process_image_jobs('https://db',{},'synthetic',r,emit=lambda *a,**k:None)
+        self.assertIsNotNone(r.completed['p_asset']);self.assertEqual(r.completed['p_usage']['image_type'],'photo')
+        asset=next(c[2] for c in r.calls if c[1]=='property_assets')
+        self.assertIn('현장 사진 기반 AI 변환 이미지',asset['caption']);self.assertIn('실제 현황 아님',asset['caption'])
+    def test_explicit_reference_without_usage_rights_stops_before_provider(self):
+        class NoRights(Requests):
+            def request(self,method,url,**kwargs):
+                result=super().request(method,url,**kwargs)
+                if '/rest/v1/property_showrooms?' in url:
+                    result.data[0]['draft_content']['imageSettings']={'mode':'plan','sourceAssetId':'3408c9f7-3e76-466a-b5a3-8b020c3043df','rightsApproved':False}
+                return result
+        r=NoRights();process_image_jobs('https://db',{},'synthetic',r,emit=lambda *a,**k:None)
+        self.assertEqual(r.completed['p_error'],'image_source_required')
+        self.assertFalse(any(c[1].endswith(':generateContent') or c[1].endswith(':countTokens') for c in r.calls))
+    def test_new_profile_prompt_excludes_fields_without_usage_rights(self):
+        draft={'propertyProfile':{'fields':[{'label':'전력','value':300,'useApproved':True,'status':'provided'},{'label':'PRIVATE_NO_USE','value':'SECRET_VALUE','useApproved':False,'status':'provided'}]}}
+        prompt=prompt_for('hero',draft)
+        self.assertIn('300',prompt);self.assertNotIn('PRIVATE_NO_USE',prompt);self.assertNotIn('SECRET_VALUE',prompt)
     def test_bounded_single_generation_and_private_attachment(self):
         r=Requests();process_image_jobs('https://db',{'apikey':'SECRET'},'SECRET',r,emit=lambda *a,**k:None)
         self.assertEqual(sum(c[1].endswith(':generateContent') for c in r.calls),1)

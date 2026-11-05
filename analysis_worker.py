@@ -8,6 +8,7 @@ import re
 from datetime import datetime, timezone
 from ai_providers import Generation, ProviderError, generate_with_fallback
 from content_editorial import EDITORIAL_BRIEF,finalize_copy
+from pdf_evidence import inspect_pdf,citation_checks,document_summaries,PdfInspectionError
 
 MODEL = 'gemini-3.8-flash'
 PROMPT = '''당신은 대한민국 부동산 광고·개발 기획자입니다. 제공 텍스트와 PDF/사진을 바탕으로
@@ -17,11 +18,19 @@ PROMPT = '''당신은 대한민국 부동산 광고·개발 기획자입니다. 
 확인된 사실로 만들지 마세요. 소유자 제공 주장과 검증 사실을 구분하고 확인 불가는 '확인 필요'로 표시하세요.
 면적·건축면적·연면적과 단위를 구분하세요. 활용 컨셉은 가설이며 적법성·인허가 확인 전임을 명시하세요.
 투자 수익이나 실제 이용 가능성을 보장하지 마세요. 원문 수치를 변경하거나 미확인 주소 오기를 임의 교정하지 마세요.
+document_facts에는 첨부 또는 제공 텍스트에서 직접 인용 가능한 항목을 최대 20개 기록하세요.
+key는 land_area, building_area, gross_floor_area, clear_height, lease_period 등 영문 코드입니다.
+source_index는 입력 첨부 순서(1부터), 제공 텍스트는 0입니다. page는 PDF 실제 페이지(1부터), 불명은 0입니다.
+quote는 원문 그대로 300자 이내이며 value와 unit은 원문 의미를 유지하세요. 없는 인용문이나 페이지를 만들지 마세요.
+서로 다른 층수·면적·계약조건은 각각 별도 항목으로 보존하고, 누락된 중요한 조건은 missing=true로 기록하세요.
+추출한 값은 독립 검증된 사실이 아닙니다. 구조화할 자료가 없으면 빈 배열을 반환하세요.
 ''' + EDITORIAL_BRIEF
 
 
 def failure(exc):
     """Classify without copying potentially secret-bearing provider messages."""
+    if isinstance(exc, PdfInspectionError):
+        return exc.code, False
     if isinstance(exc, ProviderError):
         return exc.safe_code, exc.retryable
     code = getattr(exc, 'code', None)
@@ -34,7 +43,7 @@ def failure(exc):
     return 'invalid_input_or_response', False
 
 
-def run(api, generate, attachment, validate, notify, emit=print, limit=3, edit=None):
+def run(api, generate, attachment, validate, notify, emit=print, limit=3, edit=None, document_attachment=None):
     stats = {'analyzed': 0, 'deferred': 0, 'failed': 0}
     for _ in range(limit):
         job = api('analysis_claim', {})
@@ -44,20 +53,40 @@ def run(api, generate, attachment, validate, notify, emit=print, limit=3, edit=N
         try:
             raw = job.get('raw_input') or ''
             tags = re.findall(r'\[FILE_ID:([^\]]+)\]', raw)
-            clean = re.sub(r'\[FILE_ID:[^\]]+\]', '', raw).strip()
-            if not clean and not tags:
+            documents = list(dict.fromkeys(re.findall(r'\[DOCUMENT_ID:([^\]]+)\]', raw)))
+            clean = re.sub(r'\[(?:FILE|DOCUMENT)_ID:[^\]]+\]', '', raw).strip()
+            if not clean and not tags and not documents:
                 raise ValueError('empty_input')
             tags = list(dict.fromkeys(tags))
-            if len(tags) > 12:
+            if len(tags)+len(documents) > 12:
                 raise ValueError('too_many_attachments')
-            parts = [attachment(tag) for tag in tags]
-            if sum(len(part.get('data', b'')) for part in parts if isinstance(part, dict)) > 24 * 1024 * 1024:
-                raise ValueError('attachments_too_large')
+            if documents and document_attachment is None:
+                raise ValueError('document_source_unavailable')
+            parts, reports, total_bytes, total_pages = [], {}, 0, 0
+            sources=[(lambda tag=tag:attachment(tag)) for tag in tags] + [(lambda document=document:document_attachment(document,job['id'])) for document in documents]
+            for source_index,load in enumerate(sources,1):
+                part=load()
+                if isinstance(part,dict):
+                    total_bytes+=len(part.get('data',b''))
+                    if total_bytes>24*1024*1024:
+                        raise ValueError('attachments_too_large')
+                    if part.get('mime_type')=='application/pdf':
+                        report=inspect_pdf(part['data'])
+                        total_pages+=report['page_count']
+                        if total_pages>160:
+                            raise PdfInspectionError('document_pdf_page_limit')
+                        reports[source_index]=report
+                parts.append(part)
             parts.append(PROMPT + '\n[입력 자료]\n' + (clean or '첨부 문서를 기준으로 분석하세요.'))
             generated = generate(parts)
             result = validate(generated.text if isinstance(generated, Generation) else generated)
             if edit is not None:
                 result = edit(result,clean)
+            if reports or result.get('document_facts'):
+                result['_document_checks']=citation_checks(result.get('document_facts',[]),reports)
+                result['_document_inspections']=document_summaries(reports)
+            if documents:
+                result['_document_sources'] = [{'source_index':len(tags)+i+1,'asset_id':document,'property_id':job['id']} for i,document in enumerate(documents)]
             if isinstance(generated, Generation):
                 result['_generation'] = {'provider': generated.provider, 'model': generated.model, 'at': datetime.now(timezone.utc).isoformat()}
         except Exception as exc:
@@ -78,6 +107,8 @@ def run(api, generate, attachment, validate, notify, emit=print, limit=3, edit=N
         stats['analyzed'] += 1
         emit('analysis saved', flush=True)
         notice='✅ 매물 분석·광고 문안 자동 편집 완료.' if result.get('_editorial',{}).get('status')!='needs_revision' else '📝 매물 분석은 저장됐습니다. 광고 문안 자동 편집이 기준을 통과하지 못해 성과물 완료로 표시하지 않습니다.'
+        if any(check.get('status')!='quote_matched' for check in result.get('_document_checks',[])) or any(doc.get('textless_pages') or doc.get('limited_pages') or doc.get('unreadable_pages') for doc in result.get('_document_inspections',[])):
+            notice+=' 문서 원문 대조가 필요한 항목을 관리자에서 확인해 주세요.'
         notify(notice+' 비공개 웹쇼룸 초안을 준비합니다.\n관리자: https://spacepick.kr/admin')
     emit(json.dumps(stats, sort_keys=True), flush=True)
     return stats
@@ -126,7 +157,18 @@ class ShowroomConcept(BaseModel):
     cost_benefit: str = Field(description="제공된 시설을 활용할 범위와 변경 검토 요건. 확인되지 않은 비용 절감·수익·허가 확보를 주장하지 않음")
     zone_plan: List[str] = Field(description="공간/필지 5분할 활용 계획 (실내외 조닝 또는 부지/확장지 5분할 배치)")
 
+class DocumentFact(BaseModel):
+    key: str = Field(pattern=r'^[a-z][a-z0-9_]{0,99}$')
+    label: str = Field(max_length=100)
+    value: str = Field(max_length=500)
+    unit: str = Field(max_length=30)
+    source_index: int = Field(ge=0, le=12)
+    page: int = Field(ge=0, le=10000)
+    quote: str = Field(max_length=300)
+    missing: bool
+
 class UniversalMarketingPackage(BaseModel):
+    document_facts: List[DocumentFact] = Field(default_factory=list, max_length=20, description="원문 대조용 추출 후보. 독립 검증 아님. 값 충돌·누락 보존")
     url_slug_candidates: List[str] = Field(default_factory=list, description="매물별 영문 URL 후보 3개, 소문자·숫자·하이픈, 3~64자")
     property_category: str = Field(description="자동 판별된 매물 유형 (예: 상업용 상가, 토지/임야, 대형 공장/물류부지, 수익형 건물 등)")
     detected_targets: List[str] = Field(description="이 매물에 가장 적합한 핵심 매수/임차 타겟층 2~3개")
@@ -180,9 +222,11 @@ def main():
         count = synchronize_drafts(rest)
         print(f'private drafts created={count}', flush=True)
 
-    token = os.environ['TELEGRAM_TOKEN']
+    token = os.environ.get('TELEGRAM_TOKEN','')
 
     def attachment(file_id):
+        if not token:
+            raise ValueError('attachment_unavailable')
         response = requests.get(f'https://api.telegram.org/bot{token}/getFile', params={'file_id': file_id}, timeout=15, allow_redirects=False)
         if response.status_code != 200:
             raise ValueError('attachment_unavailable')
@@ -212,7 +256,11 @@ def main():
             return False
 
     def notify(message):
-        print('analysis notification ' + ('sent' if send_telegram(os.environ['TELEGRAM_CHAT_ID'],message) else 'failed'),flush=True)
+        chat=os.environ.get('TELEGRAM_CHAT_ID','')
+        if not token or not chat:
+            print('analysis notification skipped=not_configured',flush=True)
+            return
+        print('analysis notification ' + ('sent' if send_telegram(chat,message) else 'failed'),flush=True)
 
     def gemini_generate(parts, model, timeout):
         with genai.Client(api_key=os.environ['GEMINI_API_KEY'], http_options=types.HttpOptions(timeout=int(timeout*1000), retry_options=types.HttpRetryOptions(attempts=1))) as client:
@@ -244,7 +292,7 @@ def main():
     try:
         from telegram_receipts import drain
         drain(api,send_telegram)
-        run(api, generate, attachment, validate, notify, limit=2,edit=lambda result,source:finalize_copy(result,source,revise_copy))
+        run(api, generate, attachment, validate, notify, limit=2,edit=lambda result,source:finalize_copy(result,source,revise_copy),document_attachment=lambda asset,prop:__import__('document_sources').load_private_document(url,headers,prop,asset,requests))
     finally:
         # Successful properties get drafts even if a different item or provider fails.
         sync_drafts()

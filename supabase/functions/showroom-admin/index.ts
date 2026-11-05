@@ -1,3 +1,8 @@
+import {documentCandidates,documentReviewVersion,checkedDocumentCandidates,documentInspectionSummaries,documentAnalysisState,documentIssues,importDocumentCandidates} from '../_shared/document-review.ts';
+import {validateImageSettings,imageSettingsReady,imageSettingSlots,ImageSettingsError} from '../_shared/image-settings.ts';
+import {validateConceptEdits,changedConceptSlots,ConceptError} from '../_shared/concept-edits.ts';
+import {registrationDraft,registrationContact,registrationIssues,webAnalysisInput} from '../_shared/web-registration.ts';
+import {validateProfile,ProfileError,profilePublicationIssues} from '../_shared/property-profile.ts';
 import {originAllowed,corsOrigin,validSlug,slugSuggestions} from '../_shared/site.ts';
 import {publicationIssues} from '../_shared/publication.ts';
 import {queuePlan,dispatchPlan} from '../_shared/plan-queue.ts';
@@ -39,9 +44,13 @@ type Config = {url:string;key:string;fetcher?:typeof fetch;githubTokens?:string[
 export function createHandler({url,key,fetcher=fetch,githubTokens=[]}:Config) {
   async function db(path:string, options:RequestInit={}) {
     const response=await fetcher(`${url}/rest/v1/${path}`,{...options,redirect:'error',headers:{apikey:key,Authorization:`Bearer ${key}`,'Content-Type':'application/json',...options.headers},signal:AbortSignal.timeout(15000)});
-    if(!response.ok){const e=await response.json().catch(()=>({}));const code=e.code==='23505'?'slug_taken':e.message;if(['source_missing','draft_missing','concept_missing','invalid_slot'].includes(code))throw new ApiError(400,code);if(['slug_taken','revision_conflict','invalid_slug','invalid_listing_state'].includes(code))throw new ApiError(code.startsWith('invalid_')?400:409,code);throw new ApiError(502,'database_unavailable');}
+    if(!response.ok){const e=await response.json().catch(()=>({}));const code=e.code==='23505'?'slug_taken':e.message;if(['source_missing','draft_missing','concept_missing','invalid_slot','invalid_registration','web_intake_missing'].includes(code))throw new ApiError(400,code);if(['slug_taken','revision_conflict','invalid_slug','invalid_listing_state','registration_request_conflict','analysis_already_running','concept_image_busy'].includes(code))throw new ApiError(code.startsWith('invalid_')?400:409,code);throw new ApiError(502,'database_unavailable');}
     const responseText=await response.text();
     return responseText.trim()?JSON.parse(responseText):null;
+  }
+  async function generationReady(draft:Json,id:string){if(!draft.imageSettings)return;
+    const sources=await db(`property_assets?property_id=eq.${id}&bucket_id=eq.showroom-private-media&select=id,kind,source_type`);
+    const settings=validateImageSettings(draft.imageSettings,sources);if(!imageSettingsReady(settings))throw new ApiError(400,'image_source_required');
   }
   return async function handler(req:Request):Promise<Response> {
     const headers:Record<string,string>={'Content-Type':'application/json','Cache-Control':'no-store','Vary':'Origin','X-Content-Type-Options':'nosniff'};
@@ -60,6 +69,10 @@ export function createHandler({url,key,fetcher=fetch,githubTokens=[]}:Config) {
       const query=new URL(req.url).searchParams;
       if(req.method==='GET'&&query.get('action')==='list') {
         const rows=await db('properties?status=neq.merged&select=id,address,status,created_at&order=created_at.desc&limit=100');
+        if(query.get('includeWeb')==='1'){
+          try{const ids=rows.map((p:Json)=>p.id).filter((id:string)=>UUID.test(id));const intakes=ids.length?await db(`property_web_intakes?property_id=in.(${ids.join(',')})&select=property_id,state`):[];return reply({properties:rows.map((p:Json)=>({...p,web_state:intakes.find((w:Json)=>w.property_id===p.id)?.state})),registration_available:true});}
+          catch{return reply({properties:rows,registration_available:false});}
+        }
         return reply({properties:rows});
       }
       if(req.method==='GET'&&query.get('action')==='publish-readiness') {
@@ -74,6 +87,13 @@ export function createHandler({url,key,fetcher=fetch,githubTokens=[]}:Config) {
         const rows=await db(`property_showrooms?property_id=eq.${id}&select=id,property_id,slug,showroom_status,listing_state,published_revision,draft_content,revision,updated_at`);
         if(!rows.length) throw new ApiError(404,'draft_not_found');
         return reply({showroom:rows[0]});
+      }
+      if(req.method==='GET'&&query.get('action')==='document-review'){
+        const id=query.get('propertyId')||'';if(!UUID.test(id))throw new ApiError(400,'invalid_property_id');
+        const rows=await db(`properties?id=eq.${id}&select=ai_contents`);if(!rows.length)throw new ApiError(404,'property_not_found');
+        const ai=object(rows[0].ai_contents),candidates=await checkedDocumentCandidates(ai,id);
+        const jobs=await db(`property_analysis_jobs?property_id=eq.${id}&select=state,attempts,last_error_code`);
+        return reply({sourceVersion:await documentReviewVersion(ai),candidates,issues:documentIssues(candidates),documents:documentInspectionSummaries(ai),analysis:documentAnalysisState(jobs[0])});
       }
       if(req.method==='GET'&&query.get('action')==='marketing') {
         const id=query.get('propertyId')||'';if(!UUID.test(id))throw new ApiError(400,'invalid_property_id');
@@ -101,7 +121,65 @@ export function createHandler({url,key,fetcher=fetch,githubTokens=[]}:Config) {
       const raw=await req.text();const bodyBytes=new TextEncoder().encode(raw).length;if(bodyBytes>200000) throw new ApiError(413,'body_too_large');
       let body:Json;try{body=object(JSON.parse(raw));}catch{throw new ApiError(400,'invalid_json');}
       if(body.action!=='save-marketing'&&bodyBytes>65536)throw new ApiError(413,'body_too_large');
+      if(req.method==='POST'&&body.action==='create-property'){
+        if(!UUID.test(body.requestId||''))throw new ApiError(400,'invalid_registration');
+        const content=registrationDraft(body.input,user.id);
+        const created=await db('rpc/web_create_property',{method:'POST',body:JSON.stringify({p_request:body.requestId,p_actor:user.id,p_content:content})});
+        const rooms=await db(`property_showrooms?property_id=eq.${created.property_id}&select=*`);
+        if(!rooms.length)throw new ApiError(503,'database_unavailable');
+        return reply({showroom:rooms[0],duplicate:created.duplicate});
+      }
       const id=body.propertyId;if(typeof id!=='string'||!UUID.test(id)) throw new ApiError(400,'invalid_property_id');
+      if(req.method==='POST'&&body.action==='import-document-facts'){
+        if(!Number.isSafeInteger(body.revision)||body.revision<1)throw new ApiError(400,'invalid_revision');
+        const rows=await db(`property_showrooms?property_id=eq.${id}&select=*`);if(!rows.length)throw new ApiError(404,'draft_not_found');
+        const current=rows[0];if(current.revision!==body.revision)throw new ApiError(409,'revision_conflict');
+        const properties=await db(`properties?id=eq.${id}&select=ai_contents`);
+        const version=await documentReviewVersion(object(properties[0]?.ai_contents));if(body.sourceVersion!==version)throw new ApiError(409,'document_result_changed');
+        if(!current.draft_content.propertyProfile)throw new ApiError(400,'profile_required');
+        const imported=Array.isArray(current.draft_content.documentReview?.imported)?current.draft_content.documentReview.imported:[];
+        const tokens=Array.isArray(body.indices)?body.indices.map((i:unknown)=>`${version}:${i}`):[];
+        if(tokens.some((token:string)=>imported.includes(token)))throw new ApiError(409,'document_already_imported');
+        const sourceRows=await db(`property_assets?property_id=eq.${id}&bucket_id=eq.showroom-private-media&kind=eq.document&source_type=neq.ai_generated&select=id`);
+        const declared=object(properties[0]?.ai_contents)._document_sources;
+        const sources=new Map<number,string>((Array.isArray(declared)?declared:[]).filter((s:Json)=>s.property_id===id&&sourceRows.some((a:Json)=>a.id===s.asset_id)).map((s:Json)=>[s.source_index,s.asset_id]));
+        const candidates=await checkedDocumentCandidates(object(properties[0]?.ai_contents),id);
+        const profile=importDocumentCandidates(current.draft_content.propertyProfile,candidates,body.indices,sources);
+        const added=profile.fields.slice(current.draft_content.propertyProfile.fields.length);
+        const history=Array.isArray(current.draft_content.documentReview?.entries)?current.draft_content.documentReview.entries:[];
+        const now=new Date().toISOString();
+        const entries=body.indices.map((index:number,i:number)=>{const candidate=candidates.find(c=>c.index===index)!;return {fieldId:added[i].id,sourceVersion:version,candidateIndex:index,sourceIndex:candidate.sourceIndex,page:candidate.page,quote:candidate.quote,sourceCheck:candidate.sourceCheck||'not_checked',assetId:sources.get(candidate.sourceIndex)||null,by:user.id,at:now};});
+        const content={...current.draft_content,propertyProfile:profile,documentReview:{imported:[...imported,...tokens].slice(-200),entries:[...history,...entries].slice(-200)}};
+        const saved=await db(`property_showrooms?property_id=eq.${id}&revision=eq.${body.revision}&select=*`,{method:'PATCH',headers:{Prefer:'return=representation'},body:JSON.stringify({draft_content:content,revision:body.revision+1})});
+        if(!saved.length)throw new ApiError(409,'revision_conflict');return reply({showroom:saved[0]});
+      }
+      if(req.method==='POST'&&['queue-web-analysis','apply-web-analysis'].includes(body.action)){
+        if(!Number.isSafeInteger(body.revision)||body.revision<1)throw new ApiError(400,'invalid_revision');
+        const rows=await db(`property_showrooms?property_id=eq.${id}&select=*`);
+        if(!rows.length)throw new ApiError(404,'draft_not_found');
+        const current=rows[0];if(current.revision!==body.revision)throw new ApiError(409,'revision_conflict');
+        if(object(current.draft_content).registration?.channel!=='web')throw new ApiError(400,'web_intake_missing');
+        if(body.action==='queue-web-analysis'){
+          if(current.draft_content.registration.rightsApproved!==true)throw new ApiError(400,'registration_rights_required');
+          const selected=current.draft_content.registration.analysisDocumentIds;
+          if(selected!==undefined&&(!Array.isArray(selected)||selected.length>12||new Set(selected).size!==selected.length||selected.some((s:unknown)=>typeof s!=='string'||!UUID.test(s))))throw new ApiError(400,'invalid_document_selection');
+          const documents=Array.isArray(selected)&&!selected.length?[]:await db(`property_assets?property_id=eq.${id}&bucket_id=eq.showroom-private-media&kind=eq.document&source_type=neq.ai_generated&storage_path=like.*.pdf${Array.isArray(selected)?`&id=in.(${selected.join(',')})`:''}&select=id&order=created_at.asc&limit=13`);
+          if(Array.isArray(selected)&&documents.length!==selected.length)throw new ApiError(400,'profile_source_missing');
+          if(documents.length>12)throw new ApiError(400,'too_many_documents');
+          const raw=webAnalysisInput(current.draft_content)+'\n'+documents.map((d:Json)=>`[DOCUMENT_ID:${d.id}]`).join('\n');
+          const queued=await db('rpc/web_queue_analysis',{method:'POST',body:JSON.stringify({p_property:id,p_revision:body.revision,p_raw:raw})});
+          return reply({...queued,dispatched:queued.queued?await dispatchPlan(githubTokens,fetcher):false});
+        }
+        const properties=await db(`properties?id=eq.${id}&select=id,address,status,ai_contents`);
+        if(properties[0]?.status!=='analyzed')throw new ApiError(409,'analysis_not_ready');
+        const generated=toDraft(properties[0]);
+        if(!generated.concepts.length)throw new ApiError(400,'analysis_concepts_missing');
+        const content={...current.draft_content,concepts:generated.concepts,unknowns:[...new Set([...(current.draft_content.unknowns||[]),...generated.unknowns])]};
+        const slots=changedConceptSlots(current.draft_content.concepts||[],content.concepts);
+        if(slots.length){const room=await db('rpc/showroom_save_concept_draft',{method:'POST',body:JSON.stringify({p_property:id,p_revision:body.revision,p_content:content,p_slots:slots})});return reply({showroom:room});}
+        const saved=await db(`property_showrooms?property_id=eq.${id}&revision=eq.${body.revision}&select=*`,{method:'PATCH',headers:{Prefer:'return=representation'},body:JSON.stringify({draft_content:content,revision:body.revision+1})});
+        if(!saved.length)throw new ApiError(409,'revision_conflict');return reply({showroom:saved[0]});
+      }
       if(req.method==='POST'&&['set-slug','set-listing-state'].includes(body.action)){
         if(!Number.isSafeInteger(body.revision)||body.revision<1)throw new ApiError(400,'invalid_revision');
         if(body.action==='set-slug'){
@@ -121,6 +199,7 @@ export function createHandler({url,key,fetcher=fetch,githubTokens=[]}:Config) {
       }
       if(req.method==='POST'&&body.action==='generate-package'){
         const rooms=await db(`property_showrooms?property_id=eq.${id}&select=draft_content`);if(!rooms.length)throw new ApiError(404,'draft_not_found');
+        await generationReady(rooms[0].draft_content,id);
         const slots=['hero',...(rooms[0].draft_content.concepts||[]).map((c:Json)=>c.id).filter((slot:string)=>['concept-1','concept-2','concept-3'].includes(slot))];
         const jobs=[];for(const slot of [...new Set(slots)])jobs.push(await db('rpc/image_enqueue',{method:'POST',body:JSON.stringify({p_property:id,p_slot:slot,p_retry:false})}));
         await db('rpc/image_sync_assets',{method:'POST',body:JSON.stringify({p_property:id})});
@@ -128,6 +207,7 @@ export function createHandler({url,key,fetcher=fetch,githubTokens=[]}:Config) {
       }
       if(req.method==='POST'&&body.action==='generate-image'){
         if(!['hero','concept-1','concept-2','concept-3'].includes(body.slot)||body.retry!==undefined&&typeof body.retry!=='boolean')throw new ApiError(400,'invalid_image_slot');
+        const rooms=await db(`property_showrooms?property_id=eq.${id}&select=draft_content`);if(!rooms.length)throw new ApiError(404,'draft_not_found');await generationReady(rooms[0].draft_content,id);
         const job=await db('rpc/image_enqueue',{method:'POST',body:JSON.stringify({p_property:id,p_slot:body.slot,p_retry:body.retry===true})});
         await db('rpc/image_sync_assets',{method:'POST',body:JSON.stringify({p_property:id})});
         const dispatched=job.state==='queued'?await dispatchPlan(githubTokens,fetcher):false;return reply({job,dispatched});
@@ -148,6 +228,13 @@ export function createHandler({url,key,fetcher=fetch,githubTokens=[]}:Config) {
           const review=object(body.review);
           if(!['facts','rights','claims','privacy'].every(k=>review[k]===true)||text(review.notes).length<10)throw new ApiError(400,'checklist_required');
           const draft=object(current.draft_content);
+          if(registrationIssues(draft).length)throw new ApiError(400,'registration_contact_required');
+          if(draft.propertyProfile){
+            const sources=await db(`property_assets?property_id=eq.${id}&bucket_id=eq.showroom-private-media&select=id,source_type`);
+            const profile=validateProfile(draft.propertyProfile,{assets:sources,userId:user.id,now:new Date().toISOString(),previous:draft.propertyProfile});
+            if(profilePublicationIssues(profile,sources,draft.address).length)throw new ApiError(400,'profile_review_required');
+            draft.propertyProfile=profile;
+          }
           if(['queued','running','failed'].includes(object(draft.planAnalysis).state))throw new ApiError(409,'plan_analysis_pending');
           if(!text(draft.title)||!text(draft.subtitle)||!text(draft.summary)||draft.subtitle.length>100)throw new ApiError(400,'content_review_required');
           for(const c of (draft.concepts||[])){if(!c.plan)continue;
@@ -161,7 +248,7 @@ export function createHandler({url,key,fetcher=fetch,githubTokens=[]}:Config) {
           if(selected.length>24||selected.some((a:Json)=>!UUID.test(a.id||'')))throw new ApiError(400,'invalid_media');
           if(selected.length){
             const media=await db(`property_assets?property_id=eq.${id}&bucket_id=eq.showroom-private-media&select=id,kind,caption,source_type`);
-            draft.assets=selected.map((item:Json)=>{const a=media.find((a:Json)=>a.id===item.id);if(!a)throw new ApiError(400,'invalid_media');return{id:a.id,url:'',kind:a.kind==='provided_plan'?'provided_plan':a.source_type==='ai_generated'?'concept':'photo',alt:text(a.caption),caption:text(a.caption),generated:a.source_type==='ai_generated',conceptId:text(item.conceptId,100),zoning:Array.isArray(item.zoning)?item.zoning.filter((p:Json)=>typeof p.zoneId==='string'&&Number.isFinite(p.x)&&Number.isFinite(p.y)&&p.x>=0&&p.x<=100&&p.y>=0&&p.y<=100).slice(0,5):[],approved:true};});
+            draft.assets=selected.map((item:Json)=>{const a=media.find((a:Json)=>a.id===item.id);if(!a)throw new ApiError(400,'invalid_media');return{id:a.id,url:'',kind:a.kind==='provided_plan'?'provided_plan':a.source_type==='ai_generated'?'concept':'photo',alt:text(a.caption),caption:text(a.caption),generated:a.source_type==='ai_generated',...(['concept','plan','photo'].includes(item.imageType)?{imageType:item.imageType}:{}),conceptId:text(item.conceptId,100),zoning:Array.isArray(item.zoning)?item.zoning.filter((p:Json)=>typeof p.zoneId==='string'&&Number.isFinite(p.x)&&Number.isFinite(p.y)&&p.x>=0&&p.x<=100&&p.y>=0&&p.y<=100).slice(0,5):[],approved:true};});
             if(draft.heroAsset){const hero=draft.assets.find((a:Json)=>a.id===draft.heroAsset.id);if(!hero)throw new ApiError(400,'invalid_media');draft.heroAsset=hero;}
           }else if(draft.heroAsset)throw new ApiError(400,'invalid_media');
           const now=new Date().toISOString();
@@ -175,7 +262,11 @@ export function createHandler({url,key,fetcher=fetch,githubTokens=[]}:Config) {
       if(req.method==='POST'&&body.action==='create-draft') {
         const rows=await db(`properties?id=eq.${id}&select=id,address,status,ai_contents`);
         if(!rows.length) throw new ApiError(404,'property_not_found');
-        if(rows[0].status!=='analyzed') throw new ApiError(409,'analysis_not_ready');
+        if(rows[0].status!=='analyzed'){
+          const existing=await db(`property_showrooms?property_id=eq.${id}&select=*`);
+          if(existing[0]?.draft_content?.registration?.channel==='web')return reply({showroom:existing[0]});
+          throw new ApiError(409,'analysis_not_ready');
+        }
         await db('property_showrooms?on_conflict=property_id',{method:'POST',headers:{Prefer:'resolution=ignore-duplicates,return=minimal'},body:JSON.stringify({property_id:id,slug:`property-${id}`,draft_content:toDraft(rows[0])})});
         const saved=await db(`property_showrooms?property_id=eq.${id}&select=id,property_id,slug,showroom_status,listing_state,published_revision,draft_content,revision,updated_at`);
         return reply({showroom:saved[0]});
@@ -202,30 +293,49 @@ export function createHandler({url,key,fetcher=fetch,githubTokens=[]}:Config) {
         if(rows[0].revision!==body.revision) throw new ApiError(409,'revision_conflict');
         const prior=object(rows[0].draft_content);
         const previousConcepts=Array.isArray(prior.concepts)?prior.concepts:[];const concepts=edits.concepts===undefined?previousConcepts:edits.concepts;
-        if(!Array.isArray(concepts)||concepts.length!==previousConcepts.length)throw new ApiError(400,'invalid_concepts');
-        const validated=[];
-        for(let i=0;i<concepts.length;i++){
-          const c=object(concepts[i]),original=previousConcepts[i];
-          if(c.id!==original.id||!Array.isArray(c.zones)||c.zones.length!==original.zones.length)throw new ApiError(400,'invalid_concepts');
-          let plan;
-          if(c.plan){const idPlan=object(c.plan).assetId;if(!UUID.test(idPlan||''))throw new ApiError(400,'invalid_plan');
-            const assets=await db(`property_assets?id=eq.${idPlan}&property_id=eq.${id}&bucket_id=eq.showroom-private-media&kind=eq.provided_plan&select=id,caption`);
-            if(!assets.length)throw new ApiError(400,'invalid_plan');plan={assetId:idPlan,caption:text(assets[0].caption)};}
-          const zones=c.zones.map((v:unknown,j:number)=>{const z=object(v),p=object(z.position);if(z.id!==original.zones[j].id||!text(z.label,100)||!text(z.title,120))throw new ApiError(400,'invalid_zone');
-            let position;if(z.position){if(!Number.isFinite(p.x)||!Number.isFinite(p.y)||p.x<0||p.x>100||p.y<0||p.y>100)throw new ApiError(400,'invalid_position');position={x:p.x,y:p.y};}
-            return {...original.zones[j],label:text(z.label,100),title:text(z.title,120),body:text(z.body),evidence:z.evidence==='owner_provided'?'owner_provided':'ai_hypothesis',...(position?{position}:{})};});
-          validated.push({...original,plan,zones});
-        }
+        const validated=await validateConceptEdits(concepts,previousConcepts,async planId=>{
+          const assets=await db(`property_assets?id=eq.${planId}&property_id=eq.${id}&bucket_id=eq.showroom-private-media&kind=eq.provided_plan&source_type=neq.ai_generated&select=id,caption`);
+          return assets[0];
+        });
+        let invalidatedSlots=changedConceptSlots(previousConcepts,validated);
         const manualComplete=validated.some(c=>c.plan)&&validated.every(c=>!c.plan||c.zones.every((z:Json)=>z.position));
         const planAnalysis=manualComplete&&['failed','needs_review'].includes(object(prior.planAnalysis).state)?{...prior.planAnalysis,state:'manual_reviewed'}:prior.planAnalysis;
-        const content={...prior,planAnalysis,concepts:validated,title:edits.title.trim(),subtitle:edits.subtitle.trim(),summary:edits.summary.trim()};
+        const content:Json={...prior,planAnalysis,concepts:validated,title:edits.title.trim(),subtitle:edits.subtitle.trim(),summary:edits.summary.trim()};
+        if(edits.propertyProfile!==undefined){
+          const sources=await db(`property_assets?property_id=eq.${id}&bucket_id=eq.showroom-private-media&select=id,source_type`);
+          content.propertyProfile=validateProfile(edits.propertyProfile,{assets:sources,userId:user.id,now:new Date().toISOString(),previous:prior.propertyProfile});
+          const kind=content.propertyProfile.kind;
+          if(kind!=='unknown')content.category=['factory','logistics'].includes(kind)?'industrial':kind;
+          if(typeof edits.address!=='string'||edits.address.length>300)throw new ApiError(400,'invalid_property_profile');
+          content.address=edits.address.trim();content.addressEvidence='owner_provided';
+          if(prior.registration?.channel==='web'){
+            if(edits.registrationRightsConfirmed!==undefined&&typeof edits.registrationRightsConfirmed!=='boolean')throw new ApiError(400,'invalid_registration');
+            let analysisDocumentIds=prior.registration.analysisDocumentIds;
+            if(Object.hasOwn(edits,'analysisDocumentIds')){
+              const selected=edits.analysisDocumentIds;
+              if(!Array.isArray(selected)||selected.length>12||new Set(selected).size!==selected.length||selected.some((id:unknown)=>typeof id!=='string'||!UUID.test(id)))throw new ApiError(400,'invalid_document_selection');
+              const documents=selected.length?await db(`property_assets?property_id=eq.${id}&bucket_id=eq.showroom-private-media&kind=eq.document&source_type=neq.ai_generated&storage_path=like.*.pdf&id=in.(${selected.join(',')})&select=id`):[];
+              if(documents.length!==selected.length)throw new ApiError(400,'profile_source_missing');analysisDocumentIds=selected;
+            }
+            content.registration={channel:'web',rightsApproved:edits.registrationRightsConfirmed??prior.registration.rightsApproved,contact:registrationContact(edits.registrationContact??prior.registration.contact),...(analysisDocumentIds!==undefined?{analysisDocumentIds}:{})};
+          }
+        }
+        if(edits.imageSettings!==undefined){
+          const sources=await db(`property_assets?property_id=eq.${id}&bucket_id=eq.showroom-private-media&select=id,kind,source_type`);
+          content.imageSettings=validateImageSettings(edits.imageSettings,sources);
+          invalidatedSlots=[...new Set([...invalidatedSlots,...imageSettingSlots(prior.imageSettings,content.imageSettings,[...previousConcepts,...validated])])];
+        }
+        if(invalidatedSlots.length){
+          const room=await db('rpc/showroom_save_concept_draft',{method:'POST',body:JSON.stringify({p_property:id,p_revision:body.revision,p_content:content,p_slots:invalidatedSlots})});
+          return reply({showroom:room});
+        }
         const saved=await db(`property_showrooms?property_id=eq.${id}&revision=eq.${body.revision}&select=id,property_id,slug,showroom_status,listing_state,published_revision,draft_content,revision,updated_at`,{method:'PATCH',headers:{Prefer:'return=representation'},body:JSON.stringify({draft_content:content,revision:body.revision+1})});
         if(!saved.length) throw new ApiError(409,'revision_conflict');
         return reply({showroom:saved[0]});
       }
       throw new ApiError(400,'invalid_action');
     } catch(error) {
-      return reply({error:error instanceof ApiError?error.code:'service_unavailable'},error instanceof ApiError?error.status:503);
+      return reply({error:error instanceof ApiError||error instanceof ProfileError||error instanceof ConceptError||error instanceof ImageSettingsError?error.code:'service_unavailable'},error instanceof ApiError?error.status:error instanceof ProfileError||error instanceof ConceptError||error instanceof ImageSettingsError?400:503);
     }
   };
 }

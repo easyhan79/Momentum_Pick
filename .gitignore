@@ -218,3 +218,6 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Frontend source helpers are not Python build artifacts (lib/ above).
+!showroom-web/src/lib/

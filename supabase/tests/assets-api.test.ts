@@ -5,6 +5,35 @@ function upload(mime='image/png',bytes=png){const form=new FormData();form.set('
 function harness(user:unknown={id,app_metadata:{showroom_admin:true}},rest:(path:string,init:RequestInit)=>Response|Promise<Response>=()=>Response.json([])){
  const calls:string[]=[];return{calls,handler:createAssetsHandler({url:'https://db.test',key:'SECRET',fetcher:(async(url,init)=>{const path=String(url);if(path.endsWith('/auth/v1/user'))return Response.json(user,{status:user?200:401});calls.push(path);return rest(path,init||{});}) as typeof fetch})};
 }
+test('deferred uploads store private media without enqueuing billable images or plan analysis',async()=>{
+ const form=new FormData();form.set('file',new Blob([png],{type:'image/png'}),'synthetic.png');form.set('kind','provided_plan');form.set('source_type','owner_provided');form.set('caption','합성 제공자료');form.set('defer_generation','true');
+ const h=harness(undefined,(path,init)=>{
+  if(path.includes('/properties?'))return Response.json([{id}]);
+  if(path.includes('/bucket/'))return Response.json({public:false});
+  if(path.includes('/object/'))return Response.json({});
+  if(path.endsWith('/property_assets')){assert.equal(JSON.parse(String(init.body)).is_approved,false);return new Response(null,{status:201});}
+  throw Error('Unexpected enqueue/read '+path);
+ });
+ const r=await h.handler(new Request(`https://x.test?action=upload&propertyId=${id}`,{method:'POST',headers:{Authorization:'Bearer user'},body:form}));assert.equal(r.status,201);
+ const result=await r.json();assert.equal(result.analysis,'not_requested');assert.equal(result.dispatched,false);assert.ok(h.calls.every(path=>!path.includes('/rpc/')&&!path.includes('property_showrooms')));
+});
+test('PDF uploads are private documents and can only be downloaded through the authenticated scoped endpoint',async()=>{
+ const bytes=new TextEncoder().encode('%PDF-1.7\nsynthetic');let stored='';
+ const h=harness(undefined,(path,init)=>{
+  if(path.includes('/properties?'))return Response.json([{id}]);
+  if(path.includes('/bucket/'))return Response.json({public:false});
+  if(path.includes('/object/')){if(init.method==='POST'){assert.equal(new Headers(init.headers).get('Content-Type'),'application/pdf');return Response.json({});}return new Response(bytes);}
+  if(path.endsWith('/property_assets')){const a=JSON.parse(String(init.body));assert.equal(a.kind,'document');assert.equal(a.is_approved,false);stored=a.storage_path;assert.match(stored,/\.pdf$/);return new Response(null,{status:201});}
+  if(path.includes('/property_assets?')){assert.match(path,/kind=eq.document/);assert.match(path,new RegExp('property_id=eq.'+id));return Response.json([{storage_path:stored}]);}
+  throw Error('unexpected '+path);
+ });
+ const form=new FormData();form.set('file',new Blob([bytes],{type:'application/pdf'}),'PRIVATE-NAME.pdf');form.set('kind','document');form.set('source_type','owner_provided');form.set('caption','제공 PDF');
+ const uploadRequest=new Request(`https://x.test?action=upload&propertyId=${id}`,{method:'POST',headers:{Authorization:'Bearer user'},body:form});
+ const uploaded=await h.handler(uploadRequest);assert.equal(uploaded.status,201);const result=await uploaded.json();assert.equal(result.dispatched,false);assert.ok(h.calls.every(p=>!p.includes('/rpc/')));
+ const downloaded=await h.handler(new Request(`https://x.test?action=document&propertyId=${id}&assetId=${result.id}`,{headers:{Authorization:'Bearer user'}}));
+ assert.equal(downloaded.status,200);assert.equal(downloaded.headers.get('content-type'),'application/pdf');assert.match(downloaded.headers.get('content-disposition')||'',/attachment/);assert.doesNotMatch(downloaded.headers.get('content-disposition')||'',/PRIVATE-NAME/);assert.deepEqual(new Uint8Array(await downloaded.arrayBuffer()),bytes);
+ const denied=await h.handler(new Request(`https://x.test?action=document&propertyId=${id}&assetId=${result.id}`));assert.equal(denied.status,401);
+});
 test('media endpoints require actual admin and reject spoofed claims, anon and cross-origin',async()=>{
  for(const user of [null,{id,user_metadata:{showroom_admin:true}},{id,app_metadata:{}},{id,is_anonymous:true,app_metadata:{showroom_admin:true}}]){const h=harness(user);assert.ok([401,403].includes((await h.handler(upload())).status));assert.equal(h.calls.length,0);}
  const h=harness();assert.equal((await h.handler(new Request(`https://x.test?propertyId=${id}`,{headers:{Origin:'https://evil.test'}}))).status,403);assert.equal(h.calls.length,0);

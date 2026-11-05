@@ -6,6 +6,10 @@
 - 매물 `/영문이름`: 승인본 쇼룸과 문의 접수
 - 관리자 `/admin`: 초안·자료·주소·검수·상담 관리
 - [가비아 도메인 연결과 운영 안내](docs/SPACEPICK_DOMAIN.md)
+- [SpacePick v2 개발계획·작업상태·재개 안내](docs/SPACEPICK_V2_PLAN.md)
+- [SpacePick v2 검증·적용 순서](docs/SPACEPICK_V2_VALIDATION.md)
+- [실제 구현 기준 아키텍처와 매물 게시/프로그램 배포 구분](docs/SPACEPICK_V2_ARCHITECTURE.md)
+- [GitHub 업데이트 절차](docs/SPACEPICK_V2_GITHUB.md)
 
 웹 앱은 `showroom-web`에서 `pnpm install --frozen-lockfile`, `pnpm run build`로 빌드합니다. Worker가 승인본 공유 메타데이터와 브라우저 앱을 제공합니다. 운영 DB 변경 이력은 `supabase/migrations`에 있습니다.
 

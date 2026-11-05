@@ -1,0 +1,10 @@
+const common=[['land_area','토지면적','㎡'],['building_area','건축면적','㎡'],['gross_floor_area','연면적','㎡'],['building_use','건축물 용도','']];
+const industrial=[...common,['power_capacity','전력 용량','kW'],['clear_height','층고','m'],['floor_load','바닥하중',''],['road_access','도로 접면·진입로',''],['vehicle_access','차량 진출입',''],['land_use_zone','용도지역',''],['factory_registration','공장등록',''],['permits','인허가 조건','']];
+const presets:Record<string,string[][]>={
+ factory:industrial,industrial,
+ commercial:[['exclusive_area','전용면적','㎡'],['contract_area','계약·공급면적','㎡'],['floor','해당 층',''],['building_use','건축물 용도',''],['entrance','출입구·엘리베이터',''],['parking','주차 조건',''],['terrace_rights','테라스 사용권',''],['utilities','급배수·전기·가스',''],['maintenance_fee','관리비','원'],['premium','권리금','원'],['facility_transfer','기존 시설 인수',''],['restricted_uses','제한 업종','']],
+ land:[['land_area','토지면적','㎡'],['lot_number','지번',''],['land_category','지목',''],['land_use_zone','용도지역',''],['current_use','현재 이용상태',''],['road_access','도로 접면',''],['entrance_rights','진입로·통행 권리',''],['terrain','지형·경사',''],['infrastructure','주변 기반시설',''],['permits','인허가 조건',''],['development_constraints','개발 제약사항','']],
+ logistics:[...common,['warehouse_area','창고면적','㎡'],['floor_structure','층별 구조',''],['temperature_type','상온·저온 구분',''],['clear_height','유효 층고','m'],['docks','접안 도크',''],['vehicle_access','차량 진출입',''],['loading_access','상하차 동선',''],['road_access','도로·교통 접근',''],['automation','자동화 설비',''],['refrigeration','저온 설비',''],['floor_load','바닥하중',''],['power_capacity','전력 용량','kW'],['tenant','임차 현황',''],['annual_rent','연간 임대료','원'],['lease_period','계약기간',''],['operating_cost','운영비','원']],
+};
+export function propertyFieldTemplates(kind:string){return presets[kind]||common;}
+export function isNumericFactKey(key:string){return ['land_area','building_area','gross_floor_area','exclusive_area','contract_area','warehouse_area','power_capacity','clear_height','floor_load','maintenance_fee','premium','annual_rent','operating_cost'].includes(key);}

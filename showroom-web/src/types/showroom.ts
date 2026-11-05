@@ -1,8 +1,10 @@
+import type {ImageSettings} from '../../../supabase/functions/_shared/image-settings.ts';
+import type {PropertyProfile} from '../../../supabase/functions/_shared/property-profile.ts';
 export type EvidenceStatus = 'verified' | 'owner_provided' | 'ai_hypothesis' | 'needs_review';
 export type PropertyCategory = 'commercial' | 'industrial' | 'land' | 'income' | 'unknown';
 export type Fact = {
   key: string; label: string; value: string | number | null; unit?: string;
-  evidence: EvidenceStatus; source: string;
+  evidence: EvidenceStatus; source: string; publication?: 'private'|'approved';
 };
 export type Zone = {
   position?: {x:number;y:number}; evidence?: EvidenceStatus;
@@ -16,10 +18,18 @@ export type Concept = {
   feasibility: 'not_checked' | 'reviewed'; zones: Zone[];
 };
 export type Asset = {
+  imageType?: 'concept'|'plan'|'photo';
   id: string; url: string; alt: string; caption: string; generated?:boolean;conceptId?:string;zoning?:{zoneId:string;x:number;y:number}[];
   kind: 'example' | 'photo' | 'concept' | 'provided_plan'; approved: boolean;
 };
 export type Showroom = {
+  rentalScenario?: import('../../../supabase/functions/_shared/rental-scenario.ts').RentalScenario;
+  propertyProfile?: PropertyProfile;
+  imageSettings?: ImageSettings;
+  registration?: {channel:'web';rightsApproved:boolean;analysisDocumentIds?:string[];contact:{name:string;phone:string;publicApproved:boolean}};
+  publicContact?: {name:string;phone:string};
+  highlights?: {title:string;description:string;constraints:string;references:Fact[]}[];
+  propertySummary?: Pick<PropertyProfile,'kind'|'transaction'|'price'>;
   visualMode?: 'ai_generated';
   planAnalysis?: {assetId:string;state:string;attempts:number;errorCode?:string;queuedAt?:string;startedAt?:string};
   schema_version: '1.0'; id: string; category: PropertyCategory;

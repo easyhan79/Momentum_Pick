@@ -18,6 +18,7 @@ export function PlanEditor({content,onChange,onSave,onAnalyze,onRefresh,onGenera
  useEffect(()=>{let active=true,url='';setImage('');if(concept?.plan)mediaRequest(`action=image&propertyId=${content.id}&assetId=${concept.plan.assetId}`).then(r=>r.blob()).then(blob=>{url=URL.createObjectURL(blob);if(active)setImage(url);else URL.revokeObjectURL(url);}).catch(()=>{if(active)setMessage('도면을 불러오지 못했습니다.');});return()=>{active=false;if(url)URL.revokeObjectURL(url);};},[content.id,concept?.plan?.assetId]);
  function update(next:Concept){onChange({...content,concepts:content.concepts.map((c,i)=>i===index?next:c)});}
  function move(x:number,y:number){if(!concept)return;update({...concept,zones:concept.zones.map((z,i)=>i===selected?{...z,position:{x:Math.max(2,Math.min(98,x)),y:Math.max(2,Math.min(98,y))}}:z)});}
+ useEffect(()=>{if(index>=content.concepts.length){setIndex(Math.max(0,content.concepts.length-1));setSelected(0);}},[index,content.concepts.length]);
  if(!concept)return null;
  const zone=concept.zones[selected];
  const pending=['queued','running'].includes(content.planAnalysis?.state||'');

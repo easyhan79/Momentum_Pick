@@ -1,0 +1,12 @@
+{
+  "schema_version":"1.0","id":"logistics-demo","category":"industrial",
+  "title":"물류센터 · 최소 자료 구성 예시","subtitle":"보관 구조와 차량 접근을 먼저 검토합니다.",
+  "summary":"실제 모집 매물이 아닌 합성 예시입니다. 도크·층별 구조·임차 자료가 없는 상태를 보여줍니다.",
+  "propertySummary":{"kind":"logistics","transaction":"lease","price":{"status":"negotiable","saleWon":null,"depositWon":null,"monthlyWon":null}},
+  "facts":[
+    {"key":"warehouse_area","label":"창고면적","value":null,"unit":"㎡","evidence":"needs_review","source":"공적 장부·제공자료 확인 필요"},
+    {"key":"docks","label":"접안 도크","value":null,"evidence":"needs_review","source":"현장자료 확인 필요"},
+    {"key":"temperature_type","label":"상온·저온 구분","value":null,"evidence":"needs_review","source":"실제 보관 조건 확인 필요"}
+  ],
+  "concepts":[],"assets":[],"unknowns":["층별 차량 접근 가능 여부","상온·저온 시설 현황","임차 현황과 계약 조건"]
+}

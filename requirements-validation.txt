@@ -1,0 +1,4 @@
+# Extra local test dependencies; the existing project Python dependencies
+# (including pydantic v2) must also be installed.
+-r requirements-pdf.txt
+reportlab==4.4.9

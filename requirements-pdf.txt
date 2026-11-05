@@ -1,0 +1,2 @@
+# Private PDF preflight and citation occurrence checks. No OCR or AI credentials.
+pypdf==6.10.0

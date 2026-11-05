@@ -24,7 +24,7 @@ export function createAssetsHandler({url,key,fetcher=fetch,githubTokens=[]}:{url
   async function db(path:string,init:RequestInit={}){const r=await upstream(`rest/v1/${path}`,{...init,headers:{'Content-Type':'application/json',...init.headers}});if(!r.ok)throw new MediaError(502,'media_unavailable');const body=await r.text();return body?JSON.parse(body):null;}
   async function privateBucket(){
     let response=await upstream(`storage/v1/bucket/${BUCKET}`);
-    if(response.status===404||response.status===400){const created=await upstream('storage/v1/bucket',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:BUCKET,name:BUCKET,public:false,file_size_limit:MAX_FILE,allowed_mime_types:['image/jpeg','image/png','image/webp']})});if(!created.ok&&created.status!==409)throw new MediaError(502,'media_unavailable');response=await upstream(`storage/v1/bucket/${BUCKET}`);}
+    if(response.status===404||response.status===400){const created=await upstream('storage/v1/bucket',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:BUCKET,name:BUCKET,public:false,file_size_limit:MAX_FILE,allowed_mime_types:['image/jpeg','image/png','image/webp','application/pdf']})});if(!created.ok&&created.status!==409)throw new MediaError(502,'media_unavailable');response=await upstream(`storage/v1/bucket/${BUCKET}`);}
     if(!response.ok||(await response.json()).public!==false)throw new MediaError(503,'private_bucket_required');
   }
   return async(req:Request)=>{
@@ -40,7 +40,19 @@ export function createAssetsHandler({url,key,fetcher=fetch,githubTokens=[]}:{url
       const user=await auth.json();if(!user.id||user.is_anonymous||user.app_metadata?.showroom_admin!==true)throw new MediaError(403,'admin_required');
       const query=new URL(req.url).searchParams,id=query.get('propertyId')||'',action=query.get('action');if(!UUID.test(id))throw new MediaError(400,'invalid_property_id');
       const properties=await db(`properties?id=eq.${id}&select=id`);if(!properties.length)throw new MediaError(404,'property_not_found');
+      if(req.method==='GET'&&action==='documents'){
+        const assets=await db(`property_assets?property_id=eq.${id}&bucket_id=eq.${BUCKET}&kind=eq.document&source_type=neq.ai_generated&storage_path=like.*.pdf&select=id,caption&order=created_at.asc&limit=100`);
+        return reply({assets});
+      }
       if(req.method==='GET'&&action==='list'){const assets=await db(`property_assets?property_id=eq.${id}&bucket_id=eq.${BUCKET}&select=id,kind,source_type,caption,is_approved,created_at&order=created_at.desc&limit=100`);return reply({assets});}
+      if(req.method==='GET'&&action==='document'){
+        const assetId=query.get('assetId')||'';if(!UUID.test(assetId))throw new MediaError(400,'invalid_asset_id');
+        const assets=await db(`property_assets?id=eq.${assetId}&property_id=eq.${id}&bucket_id=eq.${BUCKET}&kind=eq.document&source_type=neq.ai_generated&select=storage_path`);
+        const path=assets[0]?.storage_path;if(typeof path!=='string'||!new RegExp(`^${id}/[0-9a-f-]+\\.pdf$`,'i').test(path))throw new MediaError(404,'asset_not_found');
+        const response=await upstream(`storage/v1/object/${BUCKET}/${path}`);if(!response.ok)throw new MediaError(404,'asset_not_found');
+        const bytes=new Uint8Array(await response.arrayBuffer());if(bytes.length>MAX_FILE||new TextDecoder().decode(bytes.slice(0,5))!=='%PDF-')throw new MediaError(415,'invalid_document');
+        return new Response(bytes,{headers:{...headers,'Content-Type':'application/pdf','Content-Disposition':'attachment; filename="property-document.pdf"','Content-Security-Policy':"default-src 'none'; sandbox"}});
+      }
       if(req.method==='GET'&&action==='image'){
         const assetId=query.get('assetId')||'';if(!UUID.test(assetId))throw new MediaError(400,'invalid_asset_id');
         const assets=await db(`property_assets?id=eq.${assetId}&property_id=eq.${id}&bucket_id=eq.${BUCKET}&select=storage_path`);if(!assets.length)throw new MediaError(404,'asset_not_found');
@@ -59,17 +71,18 @@ export function createAssetsHandler({url,key,fetcher=fetch,githubTokens=[]}:{url
       if(req.method!=='POST'||action!=='upload')throw new MediaError(400,'invalid_action');
       if(!req.headers.get('content-type')?.startsWith('multipart/form-data;'))throw new MediaError(400,'invalid_upload');
       const bytes=await boundedBody(req);let form:FormData;try{form=await new Response(bytes,{headers:{'Content-Type':req.headers.get('content-type')!}}).formData();}catch{throw new MediaError(400,'invalid_upload');}
-      const file=form.get('file'),kind=form.get('kind'),source=form.get('source_type'),caption=form.get('caption');
+      const file=form.get('file'),kind=form.get('kind'),source=form.get('source_type'),caption=form.get('caption'),defer=form.get('defer_generation');
+      if(defer!==null&&!['true','false'].includes(String(defer)))throw new MediaError(400,'invalid_metadata');
       if(!(file instanceof Blob)||file.size===0||file.size>MAX_FILE)throw new MediaError(413,'file_too_large');
-      if(!['photo','provided_plan'].includes(String(kind))||!['owner_provided','photographed'].includes(String(source))||typeof caption!=='string'||!caption.trim()||caption.length>2000)throw new MediaError(400,'invalid_metadata');
-      const fileBytes=new Uint8Array(await file.arrayBuffer()),type=imageType(fileBytes);if(!type||type.mime!==file.type)throw new MediaError(415,'invalid_image');
+      if(!['photo','provided_plan','document'].includes(String(kind))||!['owner_provided','photographed'].includes(String(source))||typeof caption!=='string'||!caption.trim()||caption.length>2000)throw new MediaError(400,'invalid_metadata');
+      const fileBytes=new Uint8Array(await file.arrayBuffer()),pdf=kind==='document'&&new TextDecoder().decode(fileBytes.slice(0,5))==='%PDF-',type=pdf?{mime:'application/pdf',ext:'pdf'}:kind==='document'?null:imageType(fileBytes);if(!type||type.mime!==file.type)throw new MediaError(415,'invalid_image');
       await privateBucket();const assetId=crypto.randomUUID(),path=`${id}/${assetId}.${type.ext}`;
       const uploaded=await upstream(`storage/v1/object/${BUCKET}/${path}`,{method:'POST',headers:{'Content-Type':type.mime,'x-upsert':'false','Cache-Control':'max-age=0'},body:fileBytes});if(!uploaded.ok)throw new MediaError(502,'upload_failed');
       try{await db('property_assets',{method:'POST',body:JSON.stringify({id:assetId,property_id:id,kind,source_type:source,caption:caption.trim(),bucket_id:BUCKET,storage_path:path,is_approved:false})});}
       catch{try{await upstream(`storage/v1/object/${BUCKET}`,{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({prefixes:[path]})});}catch{/* Orphan contains only a newly generated private path. */}throw new MediaError(502,'metadata_save_failed');}
       let analysis='not_requested',imageStatus='queue_failed';let dispatchNeeded=false;
-      if(kind==='provided_plan'){try{await queuePlan(db,id,assetId);analysis='queued_scheduled';dispatchNeeded=true;}catch{analysis='queue_failed';}}
-      try{const job=await db('rpc/image_enqueue',{method:'POST',body:JSON.stringify({p_property:id,p_slot:'hero'})});imageStatus=job.state;dispatchNeeded=dispatchNeeded||job.state==='queued';await db('rpc/image_sync_assets',{method:'POST',body:JSON.stringify({p_property:id})});}catch{/* Source remains stored; administrator can request generation again. */}
+      if(defer!=='true'&&kind==='provided_plan'){try{await queuePlan(db,id,assetId);analysis='queued_scheduled';dispatchNeeded=true;}catch{analysis='queue_failed';}}
+      if(defer!=='true'&&kind!=='document')try{const job=await db('rpc/image_enqueue',{method:'POST',body:JSON.stringify({p_property:id,p_slot:'hero'})});imageStatus=job.state;dispatchNeeded=dispatchNeeded||job.state==='queued';await db('rpc/image_sync_assets',{method:'POST',body:JSON.stringify({p_property:id})});}catch{/* Source remains stored; administrator can request generation again. */}
       const dispatched=dispatchNeeded?await dispatchPlan(githubTokens,fetcher):false;
       if(analysis==='queued_scheduled'&&dispatched)analysis='queued_immediate';
       return reply({id:assetId,status:'private_review_pending',analysis,imageStatus,dispatched},201);
