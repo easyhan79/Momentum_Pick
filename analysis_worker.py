@@ -46,7 +46,12 @@ def run(api, generate, attachment, validate, notify, emit=print, limit=3):
             clean = re.sub(r'\[FILE_ID:[^\]]+\]', '', raw).strip()
             if not clean and not tags:
                 raise ValueError('empty_input')
-            parts = [attachment(tags[0])] if tags else []
+            tags = list(dict.fromkeys(tags))
+            if len(tags) > 12:
+                raise ValueError('too_many_attachments')
+            parts = [attachment(tag) for tag in tags]
+            if sum(len(part.get('data', b'')) for part in parts if isinstance(part, dict)) > 24 * 1024 * 1024:
+                raise ValueError('attachments_too_large')
             parts.append(PROMPT + '\n[입력 자료]\n' + (clean or '첨부 문서를 기준으로 분석하세요.'))
             generated = generate(parts)
             result = validate(generated.text if isinstance(generated, Generation) else generated)
@@ -69,7 +74,7 @@ def run(api, generate, attachment, validate, notify, emit=print, limit=3):
             raise RuntimeError('analysis_claim_lost')
         stats['analyzed'] += 1
         emit('analysis saved', flush=True)
-        notify('✅ 매물 AI 분석·광고 문안 저장 완료. 비공개 웹쇼룸 초안을 준비합니다.\n관리자: https://momentum-pick-showroom-20261102.ljc3534.chatgpt.site/?admin=1')
+        notify('✅ 매물 AI 분석·광고 문안 저장 완료. 비공개 웹쇼룸 초안을 준비합니다.\n관리자: https://spacepick.kr/admin')
     emit(json.dumps(stats, sort_keys=True), flush=True)
     return stats
 
@@ -190,12 +195,15 @@ def main():
             raise ValueError('attachment_unsupported')
         return {'data': data, 'mime_type': mime}
 
-    def notify(message):
+    def send_telegram(chat_id,message):
         try:
-            r = requests.post(f'https://api.telegram.org/bot{token}/sendMessage', json={'chat_id': os.environ['TELEGRAM_CHAT_ID'], 'text': message}, timeout=15, allow_redirects=False)
-            print('analysis notification ' + ('sent' if r.status_code == 200 and r.json().get('ok') else 'failed'), flush=True)
+            r = requests.post(f'https://api.telegram.org/bot{token}/sendMessage', json={'chat_id': chat_id, 'text': message}, timeout=15, allow_redirects=False)
+            return r.status_code == 200 and r.json().get('ok') is True
         except Exception:
-            print('analysis notification failed', flush=True)
+            return False
+
+    def notify(message):
+        print('analysis notification ' + ('sent' if send_telegram(os.environ['TELEGRAM_CHAT_ID'],message) else 'failed'),flush=True)
 
     def gemini_generate(parts, model, timeout):
         with genai.Client(api_key=os.environ['GEMINI_API_KEY'], http_options=types.HttpOptions(timeout=int(timeout*1000), retry_options=types.HttpRetryOptions(attempts=1))) as client:
@@ -219,6 +227,8 @@ def main():
         return generate_with_fallback(parts, UniversalMarketingPackage.model_json_schema(), validate, os.environ, requests.post, gemini_generate)
 
     try:
+        from telegram_receipts import drain
+        drain(api,send_telegram)
         run(api, generate, attachment, validate, notify, limit=2)
     finally:
         # Successful properties get drafts even if a different item or provider fails.
