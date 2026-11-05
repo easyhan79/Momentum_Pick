@@ -27,3 +27,12 @@
 공개 매물의 일반 등록/수정·검수 후 게시는 Supabase 데이터 변경이므로 매번 GitHub 업데이트를 할 필요가 없다. GitHub 업데이트는 프로그램 기능·디자인·서버 코드가 바뀔 때 수행한다.
 
 GitHub API가 제공되면 변경 브랜치로 PR을 만들 수 있다. API가 차단되어도 Git push가 정상이라면 브랜치 업로드는 가능하다. 기존 호스팅의 게시 연결은 별도로 확인해야 한다.
+
+## 실제 업로드 완료 기록
+
+- 브랜치: `codex/spacepick-customer-information`.
+- 코드 커밋: `77390f12997129dab63d6790b27ff37af753eb9b` — 고객 정보 보강과 관련 관리자/PDF/계산/서버·migration·검증/문서 105개 파일.
+- `git push -u origin codex/spacepick-customer-information` 성공. 원격 브랜치의 commit을 `git ls-remote`로 재조회해 로컬 commit과 일치함을 확인했다.
+- 당시 main은 `c0d29a4de0d95b831178d5947c22b7b281ec855f`로 유지. 원본 PDF/검토 생성물/키/환경파일은 업로드하지 않았다.
+- GitHub 브랜치: https://github.com/easyhan79/Momentum_Pick/tree/codex/spacepick-customer-information
+- GitHub API를 통한 PR 생성은 수행하지 않았다. 운영 호스팅 게시와 DB 적용은 별도 미완료다. 이후 이 문서와 작업상태만 기록하는 추가 커밋이 이어질 수 있다.
