@@ -7,6 +7,7 @@
 - 관리자 `/admin`: 초안·자료·주소·검수·상담 관리
 - [가비아 도메인 연결과 운영 안내](docs/SPACEPICK_DOMAIN.md)
 - [SpacePick v2 개발계획·작업상태·재개 안내](docs/SPACEPICK_V2_PLAN.md)
+- [현재 개발 완료·미완료 항목과 다음 작업 순서](docs/SPACEPICK_CURRENT_DEVELOPMENT_STATUS.md)
 - [SpacePick v2 검증·적용 순서](docs/SPACEPICK_V2_VALIDATION.md)
 - [실제 구현 기준 아키텍처와 매물 게시/프로그램 배포 구분](docs/SPACEPICK_V2_ARCHITECTURE.md)
 - [GitHub 업데이트 절차](docs/SPACEPICK_V2_GITHUB.md)

@@ -81,7 +81,7 @@ PDF_REVIEW_QA=1 NODE_PATH=/opt/codex/runtimes/codex-primary-runtime/dependencies
 
 ## 중단 후 재개
 
-먼저 [개발계획·작업상태](SPACEPICK_V2_PLAN.md)의 현재 위치와 마지막 기록을 읽고 실제 `git status --short`/diff를 대조한다. 로컬 변경은 commit/push/환경 재게시되지 않았으며, 다른 컴퓨터의 체크아웃에 자동 반영되는 상태는 아니다. 이미 끝난 단계를 다시 적용하지 말고, 미완료 항목부터 이어간다.
+먼저 [최신 완료·미완료 계획서](SPACEPICK_CURRENT_DEVELOPMENT_STATUS.md)와 [개발계획·작업상태](SPACEPICK_V2_PLAN.md)의 현재 위치·마지막 기록을 읽고 실제 `git status --short`/diff를 대조한다. 2026-11-07 기준 소스 commit/push와 main 반영은 완료했으나, 최신 프런트/관리 함수/관련 DB 변경의 운영 반영은 미완료다. 다른 컴퓨터에서는 원격 최신 코드를 가져오고 배포 버전을 별도로 확인한다. 이미 끝난 단계를 다시 적용하지 말고, 미완료 항목부터 이어간다.
 
 ## T11 고객 정보 보강 검증 (2026-11-06)
 
