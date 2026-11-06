@@ -5,7 +5,7 @@
 ## 현재 위치
 
 - 전체 상태: T11 고객 정보 보강 구현·검증 완료. 텔레그램 분석 작업자가 사용하는 운영 main 갱신 완료. 웹 호스팅과 Supabase 신규 함수/migration의 실제 적용은 미완료.
-- 현재 긴급 확인: 사용자 Telegram 무응답. 개인 대화 11/6 17:34 발송 화면을 확인했고 해당 시간 범위에 pending 매물 한 건과 대기 알림/분석을 조회했다. 즉시 실행 결과 missing_token 확인. 정상 main 분석 #39를 단회 재개했으며 처리 결과와 운영 연결 영구 복구는 확인 중. 상세: `docs/TELEGRAM_INTAKE_DIAGNOSTIC_20261106.md`, `audit/telegram-intake-20261106` 브랜치.
+- 현재 Telegram 복구: 개인 대화 11/6 17:34 발송 시각 범위의 단일 기록을 확인하고 정상 main 분석 #39를 단회 재개했다. 진단 `42213804255`에서 analyzed / job done / receipt sent 확인. 이번 대기 건의 분석·접수 알림은 처리됐으며, Edge 즉시 실행 결과 missing_token의 영구 설정 복구는 미완료. 상세: `docs/TELEGRAM_INTAKE_DIAGNOSTIC_20261106.md`, `audit/telegram-intake-20261106` 브랜치.
 - 현재 위치: 코드 커밋 5c489ae7eb60117dbc3236a2ea579db6ab838534를 원격 main에 반영했고 원격 조회로 확인했다. Telegram intake는 agent.yml을 main 기준으로 실행한다. 새 버전의 실제 분석 실행 성공을 아직 관측하지 않았다.
 - 다음 작업: 다음 정상 Actions 실행이 새 main을 사용하는지 확인하고, 고객 웹앱 및 신규 웹 관리 API/DB 변경을 기존 호스팅·Supabase에 적용한다. GitHub 코드 반영, Actions 실행 성공, 고객 화면 배포를 구분해 기록한다.
 - 재개 방법: 이 문서의 작업표와 마지막 작업 기록을 읽고 `git status --short`로 실제 변경을 확인한다. 진행 중인 작업부터 이어간다.
