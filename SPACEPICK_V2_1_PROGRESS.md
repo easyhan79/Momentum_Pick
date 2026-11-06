@@ -368,3 +368,9 @@
 - 검증: 신규 순수 규칙6개, 통합38항목(Python65 Node152 SQL7 build/Edge타입), 브라우저14그룹(개발4+빌드4+기존 관리자6) 통과. clipboard/UTF-8 다운로드 문안 일치·원본/권한 전환·모바일375/768/1440·저장본/승인본 보호·추가 이미지/API mutation 없음.
 - 캡처/결과: showroom-web/test-results/image-prompts/ 및 image-prompts-built/. 실제 이미지/AI/운영 DB·함수·사이트 배포 없음.
 - 다음: 검증 코드·문서/기록을 기존 개발 브랜치에 commit/push, release 파일 포함 확인. 운영 반영·Gemini 웹 결과 품질/구조 대조는 별도 미완료.
+
+## 2026-11-07T08:29:42.008966+09:00 — IMAGE_PROMPTS / GitHub·배포 준비 확인
+
+- 소스 54e38a5c21283d1946be087e6654d1111661a8fb를 feature/spacepick-v2-1에 push 성공. main/운영 함수·DB·사이트 변경 없음.
+- 깨끗한 소스에서 249파일 배포 준비 생성, 프롬프트 helper/패널/사용법/작업 계획과 Worker 포함·모든 파일 SHA256·PDF/첨부/환경파일 제외 검사 통과. 상태 prepared_not_deployed. 최종 기록 저장 후 패키지만 재생성.
+- 다음: 기존 전체 배포 의존 순서 확인 후 프런트 운영 적용/사용자 실제 Gemini 결과 대조. 완료한 코드·검증을 반복 개발하지 않음.
