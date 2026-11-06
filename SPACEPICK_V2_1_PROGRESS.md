@@ -22,3 +22,31 @@
 - 검증: PGLITE_MODULE=/workspace/spacepick-test-tools/node_modules/@electric-sql/pglite/dist/index.js python scripts/check_v2_readiness.py (25/25 passed)
 - Git: feature/spacepick-v2-1 / a35493c90447879d811a1b298b4fe83e8817a1d9; v2.1 운영 배포 없음.
 - 다음: S1 목적 선택 및 유형별 우선 슬롯 구현
+
+## 2026-11-07T00:41:19.095708+09:00 — S1 / in_progress
+
+- 변경/완료 상태: S0 로컬 커밋 완료; 기존 유형/프로필/검토 영역 재사용
+- 검증: 이 체크포인트에서 새 검증 없음
+- Git: feature/spacepick-v2-1 / d88cf11a8575b36d45c7acba90709ea4ab2bfd14; v2.1 운영 배포 없음.
+- 다음: 유형별 목적 카탈로그·URL 상태·우선 슬롯 구현 및 S1 검증
+
+## 2026-11-07T00:42:57.066950+09:00 — S1 / in_progress
+
+- 변경/완료 상태: 공유 목적/공개 슬롯 카탈로그, URL 목적 지속, 목적별 핵심정보·리스크·검토순서 구현; 기존 income을 건물 전체로 최소 확장
+- 검증: 이 체크포인트에서 새 검증 없음
+- Git: feature/spacepick-v2-1 / d88cf11a8575b36d45c7acba90709ea4ab2bfd14; v2.1 운영 배포 없음.
+- 다음: S1 빌드/단위·모바일 목적 전환 검사; 건물 슬롯 보강
+
+## 2026-11-07T00:44:14.480566+09:00 — S1 / in_progress
+
+- 변경/완료 상태: 건물 전체 income 편집·슬롯 보강; 목적별 순서·0/누락·유형 분리 단위 검사 4개 및 프런트 타입 통과
+- 검증: node supabase/tests/customer-purpose.test.ts; pnpm --dir showroom-web run typecheck
+- Git: feature/spacepick-v2-1 / d88cf11a8575b36d45c7acba90709ea4ab2bfd14; v2.1 운영 배포 없음.
+- 다음: S1 5유형 목적/URL/375·768·1440 브라우저 검증 후 완료
+
+## 2026-11-07T00:45:59.139436+09:00 — S1 / local_complete
+
+- 변경/완료 상태: 목적·URL 지속·핵심 슬롯/리스크/검토 순서와 income 건물 지원 완료; 목적 4개·프로필 7개·등록 4개 회귀, 빌드, 5유형 브라우저/375·768·1440 통과
+- 검증: node supabase/tests/customer-purpose.test.ts; node supabase/tests/property-profile.test.ts; node supabase/tests/web-registration-api.test.ts; pnpm --dir showroom-web run build; scripts/v21-customer-qa.cjs (5 groups passed)
+- Git: feature/spacepick-v2-1 / d88cf11a8575b36d45c7acba90709ea4ab2bfd14; v2.1 운영 배포 없음.
+- 다음: S1 로컬 커밋 후 S2 4단 판단 카드·공개 계약 구현

@@ -3,7 +3,7 @@ import {validateRentalScenario,rentalScenarioIssues} from './rental-scenario.ts'
 import type {RentalScenario} from './rental-scenario.ts';
 export type ProfileStatus='verified'|'provided'|'inferred'|'generated'|'unknown';
 export type ProfileField={id:string;key:string;label:string;value:string|number|null;unit:string;status:ProfileStatus;sourceText:string;sourceIds:string[];useApproved:boolean;publication:'private'|'approved';verification?:{method:string;by?:string;at?:string;confirmed?:boolean}};
-export type PropertyProfile={version:1;kind:'factory'|'logistics'|'commercial'|'land'|'unknown';transaction:'sale'|'lease'|'unknown';price:{status:'fixed'|'negotiable'|'unknown';saleWon:number|null;depositWon:number|null;monthlyWon:number|null};fields:ProfileField[];sourcePermissions:{assetId:string;useApproved:boolean;allowDerivedPublication:boolean}[];highlights:{id:string;title:string;description:string;fieldIds:string[];constraints:string}[];modules?:{rentalScenario?:RentalScenario}};
+export type PropertyProfile={version:1;kind:'factory'|'logistics'|'commercial'|'land'|'income'|'unknown';transaction:'sale'|'lease'|'unknown';price:{status:'fixed'|'negotiable'|'unknown';saleWon:number|null;depositWon:number|null;monthlyWon:number|null};fields:ProfileField[];sourcePermissions:{assetId:string;useApproved:boolean;allowDerivedPublication:boolean}[];highlights:{id:string;title:string;description:string;fieldIds:string[];constraints:string}[];modules?:{rentalScenario?:RentalScenario}};
 type ObjectValue=Record<string,any>;
 const obj=(v:unknown):ObjectValue=>v!==null&&typeof v==='object'&&!Array.isArray(v)?v:{};
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -21,7 +21,7 @@ export function validateProfile(input:unknown,context:ValidationContext):Propert
   const p=obj(input);if(p.version!==1)fail();
   const price=obj(p.price);
   const money=(v:unknown):number|null=>{if(v===null)return null;if(typeof v!=='number'||!Number.isSafeInteger(v)||v<0)fail('invalid_profile_price');return v as number;};
-  const result:PropertyProfile={version:1,kind:one(p.kind,['factory','logistics','commercial','land','unknown']),transaction:one(p.transaction,['sale','lease','unknown']),price:{status:one(price.status,['fixed','negotiable','unknown']),saleWon:money(price.saleWon),depositWon:money(price.depositWon),monthlyWon:money(price.monthlyWon)},fields:[],sourcePermissions:[],highlights:[]};
+  const result:PropertyProfile={version:1,kind:one(p.kind,['factory','logistics','commercial','land','income','unknown']),transaction:one(p.transaction,['sale','lease','unknown']),price:{status:one(price.status,['fixed','negotiable','unknown']),saleWon:money(price.saleWon),depositWon:money(price.depositWon),monthlyWon:money(price.monthlyWon)},fields:[],sourcePermissions:[],highlights:[]};
   const assets=new Map(context.assets.map(a=>[a.id,a]));
   const permissions=list(p.sourcePermissions,60).map(value=>{
     const s=obj(value),assetId=text(s.assetId,100,true);

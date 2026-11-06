@@ -9,6 +9,7 @@ const common=[
  question('terms','실제 거래조건은 어떻게 되나요?','희망 조건과 체결 조건을 구분하고, 금액·포함 비용·입주 시점을 확인하세요.','매매·임대 조건표와 입주 가능일',['sale_price','rent','deposit','monthly_rent','available_date']),
 ];
 const perKind:Partial<Record<ReviewKind,ReviewQuestion[]>>={
+ income:[question('leases','층별 임대 운영은 어떻게 구성되나요?','기재된 임대료와 실제 운영수지는 다릅니다. 실제 제공된 층·임대차 자료만 대조하세요.','층별 임대 현황·계약 만기·운영비 자료',['rent_roll','tenant','occupancy','lease_period','annual_rent','operating_cost']),question('building','구조·보수와 변경 조건은 무엇인가요?','증축·용도변경 및 공사비는 자료 없이 확정할 수 없습니다.','구조·설비·보수 및 규제 자료',['floor_structure','building_use','maintenance','permits'])],
  commercial:[
   question('use','하려는 업종을 운영할 수 있나요?','건축물 용도, 제한 업종과 영업에 필요한 시설을 함께 확인해야 합니다.','건축물 용도·업종 제한·급배수·환기 자료',['building_use','restricted_uses','utilities']),
   question('access','고객의 출입과 주차는 편리한가요?','주차 배정, 출입구·승강기 사용 범위는 실제 운영에 영향을 줍니다.','출입구·승강기·주차 배정 안내',['entrance','parking']),
@@ -41,7 +42,7 @@ export function customerQuestions(kind:ReviewKind,facts:Fact[],unknowns:string[]
 }
 export function briefGroups(kind:ReviewKind){
  const area={title:'규모와 면적',keys:['land_area','building_area','gross_floor_area','exclusive_area','indoor_area','contract_area','warehouse_area','terrace_area']};
- const facilities=kind==='commercial'?{title:'공간과 영업 시설',keys:['floor','building_use','entrance','parking','utilities','terrace_rights']}:kind==='land'?{title:'토지 이용과 규제',keys:['land_category','land_use_zone','zoning','current_use','terrain']}:kind==='logistics'?{title:'보관과 접안 조건',keys:['temperature_type','floor_structure','docks','refrigeration','clear_height']}:{title:'시설과 가동 조건',keys:['building_use','power_capacity','power','clear_height','ceiling_height','floor_load','water_supply']};
+ const facilities=kind==='income'?{title:'층별 용도와 임대 구성',keys:['floor_structure','building_use','rent_roll','tenant','lease_period','annual_rent','operating_cost']}:kind==='commercial'?{title:'공간과 영업 시설',keys:['floor','building_use','entrance','parking','utilities','terrace_rights']}:kind==='land'?{title:'토지 이용과 규제',keys:['land_category','land_use_zone','zoning','current_use','terrain']}:kind==='logistics'?{title:'보관과 접안 조건',keys:['temperature_type','floor_structure','docks','refrigeration','clear_height']}:{title:'시설과 가동 조건',keys:['building_use','power_capacity','power','clear_height','ceiling_height','floor_load','water_supply']};
  return [area,facilities,{title:kind==='commercial'?'현재 운영·인수 조건':'현재 이용·운영 현황',keys:['current_use','occupancy','tenant','available_date','facility_transfer','premium']},{title:'도로와 접근',keys:['road_access','road','vehicle_access','truck_access','entrance_rights','loading_access','infrastructure']}];
 }
 export function operationalFacts(facts:Fact[]){

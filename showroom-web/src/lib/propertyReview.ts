@@ -4,6 +4,7 @@ export type ReviewKind='factory'|'industrial'|'logistics'|'commercial'|'land'|'i
 type Group={id:string;title:string;description:string;fields:{label:string;keys:string[]}[];optional?:boolean};
 const field=(key:string,label:string,aliases:string[]=[])=>({label,keys:[key,...aliases]});
 const modules:Partial<Record<ReviewKind,Group[]>>={
+ income:[{id:'income-leases',title:'층별 제공 임대정보',description:'제공된 층과 계약만 표시하며 빈 층을 채우거나 임대료 합계를 추정하지 않습니다.',fields:[field('rent_roll','층별 임대 현황'),field('tenant','임차 현황'),field('occupancy','공실·입주 현황'),field('lease_period','임대차 기간'),field('annual_rent','연간 임대료'),field('operating_cost','운영비')]},{id:'income-building',title:'건물 구조와 관리 조건',description:'보수·용도변경·증축은 실제 자료와 추가 검토가 필요합니다.',fields:[field('building_use','건축물 용도'),field('floor_structure','층별 구조'),field('maintenance','보수·관리 상태'),field('parking','주차 조건'),field('permits','인허가 조건')]}],
  commercial:[
   {id:'commercial-space',title:'층수와 공간 조건',description:'실제 공간과 계약 면적을 구분해 확인합니다.',fields:[field('floor','해당 층'),field('exclusive_area','전용면적',['indoor_area']),field('contract_area','계약·공급면적'),field('building_use','건축물 용도')]},
   {id:'commercial-facilities',title:'출입과 영업 시설',description:'업종에 필요한 시설과 사용 범위는 별도 확인이 필요합니다.',fields:[field('entrance','출입구·엘리베이터'),field('parking','주차 조건'),field('terrace_rights','테라스 사용권'),field('utilities','급배수·전기·가스')]},
@@ -21,7 +22,7 @@ const modules:Partial<Record<ReviewKind,Group[]>>={
   {id:'logistics-lease',title:'제공된 임차·운영 정보',description:'기재 임대료는 순수익이 아닙니다. 계약서와 운영비를 별도로 확인하세요.',optional:true,fields:[field('tenant','임차 현황'),field('annual_rent','연간 임대료'),field('lease_period','계약기간'),field('operating_cost','운영비')]},
  ],
 };
-export const reviewTitles:Partial<Record<ReviewKind,string>>={commercial:'공간 조건과 영업 준비사항',land:'토지 현황과 개발 검토사항',logistics:'보관 구조와 물류 운영 조건'};
+export const reviewTitles:Partial<Record<ReviewKind,string>>={income:'건물의 임대 구성과 관리 조건',commercial:'공간 조건과 영업 준비사항',land:'토지 현황과 개발 검토사항',logistics:'보관 구조와 물류 운영 조건'};
 export function propertyReview(facts:Fact[],kind:ReviewKind){
  if(kind==='factory'||kind==='industrial')return industrialReview(facts);
  return (modules[kind]||[]).filter(group=>!group.optional||facts.some(f=>group.fields.some(field=>field.keys.includes(f.key))&&hasFactValue(f.value))).map(group=>({id:group.id,title:group.title,description:group.description,rows:group.fields.map(field=>{const entries=facts.filter(f=>field.keys.includes(f.key));return {label:field.label,entries,missing:!entries.some(f=>hasFactValue(f.value))};})}));

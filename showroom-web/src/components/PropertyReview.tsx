@@ -1,9 +1,10 @@
+import {rankByKeys} from '../../../supabase/functions/_shared/customer-purpose.ts';
 import {hasFactValue} from '../lib/industrialReview';
 import {propertyReview,reviewTitles,type ReviewKind} from '../lib/propertyReview';
 import { evidenceLabels, type Fact } from '../types/showroom';
 
-export function PropertyReview({facts,kind}:{facts:Fact[];kind:ReviewKind}) {
-  const groups=propertyReview(facts,kind);if(!groups.length)return null;
+export function PropertyReview({facts,kind,priorityKeys=[]}:{facts:Fact[];kind:ReviewKind;priorityKeys?:string[]}) {
+  const groups=rankByKeys(propertyReview(facts,kind),priorityKeys,g=>g.rows.flatMap(row=>row.entries.map(f=>f.key)));if(!groups.length)return null;
   const industrial=kind==='factory'||kind==='industrial';
   const id=industrial?'industrial-review':'property-review';
   return <section id={id} className="section-shell industrial-review" aria-labelledby={`${id}-title`}>

@@ -1,9 +1,10 @@
+import {rankByKeys} from '../../../supabase/functions/_shared/customer-purpose.ts';
 import {ClipboardCheck,FileSearch} from 'lucide-react';
 import {customerQuestions} from '../lib/customerReview';
 import type {ReviewKind} from '../lib/propertyReview';
 import type {Fact} from '../types/showroom';
-export function Evidence({unknowns,facts=[],kind='unknown',selected=[],onSelect}:{unknowns:string[];facts?:Fact[];kind?:ReviewKind;selected?:string[];onSelect?:(document:string,checked:boolean)=>void}){
- const questions=customerQuestions(kind,facts,unknowns);
+export function Evidence({unknowns,facts=[],kind='unknown',priorityKeys=[],selected=[],onSelect}:{unknowns:string[];facts?:Fact[];kind?:ReviewKind;priorityKeys?:string[];selected?:string[];onSelect?:(document:string,checked:boolean)=>void}){
+ const questions=rankByKeys(customerQuestions(kind,facts,unknowns),priorityKeys,q=>q.keys);
  return <section className="section-shell customer-evidence" id="evidence" aria-labelledby="evidence-title">
   <div className="section-top"><div><p className="eyebrow">CHECK BEFORE YOUR DECISION</p><h2 id="evidence-title">결정 전에, 이 자료를 확인하세요.</h2><p className="section-description">궁금한 항목을 고르면 문의할 때 함께 전달됩니다. 공개되지 않은 원본 자료는 담당자에게 요청해 주세요.</p></div><span className="evidence-tag">유형별 검토 가이드</span></div>
   <div className="customer-question-grid">{questions.map(q=><article key={q.id} className="glass customer-question"><div className="question-heading"><span className="small-label">{q.provided.length?'제공정보 있음 · 원문 대조':'자료 요청으로 확인'}</span><h3>{q.title}</h3></div><p>{q.why}</p>

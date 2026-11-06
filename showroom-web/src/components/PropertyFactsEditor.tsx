@@ -20,13 +20,13 @@ export function PropertyFactsEditor({propertyId,content,busy,onChange}:{property
   function start(){
     const fields:ProfileField[]=content.facts.map(f=>({...emptyField(f.key,f.label,f.unit||''),value:f.value,status:f.evidence==='owner_provided'?'provided':f.evidence==='ai_hypothesis'?'inferred':'unknown',sourceText:f.source}));
     for(const [key,label,unit] of templates)if(!fields.some(f=>f.key===key))fields.push(emptyField(key,label,unit));
-    update({version:1,kind:content.category==='commercial'?'commercial':content.category==='land'?'land':'unknown',transaction:'unknown',price:{status:'unknown',saleWon:null,depositWon:null,monthlyWon:null},fields,sourcePermissions:[],highlights:[]});
+    update({version:1,kind:content.category==='commercial'?'commercial':content.category==='land'?'land':content.category==='income'?'income':'unknown',transaction:'unknown',price:{status:'unknown',saleWon:null,depositWon:null,monthlyWon:null},fields,sourcePermissions:[],highlights:[]});
   }
   return <section id="property-facts-editor" className="glass admin-editor"><h2>매물 사실정보와 출처</h2>
     {!profile?<><p>기본정보와 공장·산업용 조건을 편집합니다. 기존 정보를 가져오되 공개 권한과 검증 상태는 다시 확인합니다. 기존 승인본은 재승인 전까지 유지됩니다.</p><button type="button" className="button button-outline" disabled={busy} onClick={start}>사실정보 편집 시작</button></>:<>
       <p>공개할 값은 출처와 사용 권한을 확인하세요. 비공개 정보도 초안에는 보관할 수 있습니다. 수정 후 상단 「초안 저장」을 눌러 주세요.</p>
       <fieldset disabled={busy}><legend>매물 구분과 거래조건</legend>
-        <label>세부 유형<select aria-label="세부 유형" value={profile.kind} onChange={e=>update({...profile,kind:e.target.value as PropertyProfile['kind']})}><option value="unknown">확인 필요</option><option value="factory">공장</option><option value="logistics">물류센터</option><option value="commercial">상가</option><option value="land">토지</option></select></label>
+        <label>세부 유형<select aria-label="세부 유형" value={profile.kind} onChange={e=>update({...profile,kind:e.target.value as PropertyProfile['kind']})}><option value="unknown">확인 필요</option><option value="factory">공장</option><option value="logistics">물류센터</option><option value="commercial">상가</option><option value="land">토지</option><option value="income">건물 전체</option></select></label>
         <label>거래방식<select aria-label="거래방식" value={profile.transaction} onChange={e=>update({...profile,transaction:e.target.value as PropertyProfile['transaction']})}><option value="unknown">확인 필요</option><option value="sale">매매</option><option value="lease">임대</option></select></label>
         <label>소재지<input maxLength={300} value={content.address||''} onChange={e=>onChange({...content,address:e.target.value})}/></label>
         <label>가격 상태<select aria-label="가격 상태" value={profile.price.status} onChange={e=>update({...profile,price:{...profile.price,status:e.target.value as PropertyProfile['price']['status']}})}><option value="unknown">확인 필요</option><option value="negotiable">가격 협의</option><option value="fixed">금액 입력</option></select></label>

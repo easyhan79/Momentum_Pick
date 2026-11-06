@@ -13,7 +13,7 @@ export function NewPropertyForm({onCreated}:{onCreated:(draft:Draft)=>void}){
  return <section className="glass admin-editor" id="new-property"><h2>새 매물 등록</h2><p>자료가 부족해도 비공개로 임시 저장할 수 있습니다. 사진·도면은 저장 후 선택적으로 첨부하세요.</p>
   <button type="button" className="button button-outline" disabled={busy} onClick={()=>setOpen(!open)}>{open?'등록 양식 닫기':'새 매물 입력'}</button>
   {open&&<form onSubmit={e=>{e.preventDefault();void submit(e.currentTarget);}}><fieldset disabled={busy}>
-    <label>매물 유형<select name="kind" aria-label="매물 유형"><option value="unknown">확인 필요</option><option value="factory">공장</option><option value="commercial">상가</option><option value="logistics">물류센터</option><option value="land">토지</option></select></label>
+    <label>매물 유형<select name="kind" aria-label="매물 유형"><option value="unknown">확인 필요</option><option value="factory">공장</option><option value="commercial">상가</option><option value="logistics">물류센터</option><option value="land">토지</option><option value="income">건물 전체</option></select></label>
     <label>거래방식<select name="transaction" aria-label="등록 거래방식"><option value="unknown">확인 필요</option><option value="sale">매매</option><option value="lease">임대</option></select></label>
     <label>매물명<input name="title" maxLength={200}/></label><label>소재지<input name="address" maxLength={300}/></label>
     <label>면적 종류<select name="areaKey" aria-label="면적 종류"><option value="land_area">토지면적</option><option value="building_area">건축면적</option><option value="gross_floor_area">연면적</option><option value="exclusive_area">전용면적</option><option value="contract_area">계약·공급면적</option><option value="warehouse_area">창고면적</option></select></label><label>확인 가능한 면적 · ㎡<input type="number" min="0.01" step="any" name="area"/></label>
