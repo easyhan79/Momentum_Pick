@@ -35,6 +35,14 @@
 
 ## 코드와 재현
 
+### 기존 토큰 연결 재확인
+
+- 사용자 요청으로 원격 main과 실행 기록을 재확인했다. main은 `0df962c579d538ecf01cb1f9ebcd124c53e67be0`이며, 수동 재개한 #39(`42213575091`)는 최종 success다.
+- `agent.yml`은 repository_dispatch(new_property), 5분 간격 schedule, workflow_dispatch를 정의한다. Edge Function은 GitHub의 agent.yml workflow_dispatch를 main으로 호출한다. 호출 파일과 이벤트 종류는 호환된다.
+- main의 `clever-endpoint` 소스는 `SPACEPICK_GITHUB_TOKEN`, `GITHUB_TOKEN`, `GH_PAT` 세 이름을 모두 읽는다. 그 중 유효한 기존 credential이 함수에 연결되어 있으면 새 credential 발급이 필수는 아니다. GitHub Actions의 자동 GITHUB_TOKEN과 Supabase 함수 환경의 같은 이름은 자동 공유되지 않는다.
+- 당시 DB 기록 `dispatch_code=missing_token`은 해당 호출에서 토큰을 사용하지 못했다는 근거다. 현재 Supabase Secret 목록을 열람했다는 뜻이 아니며, 다른 이름의 기존 Secret 존재 여부나 운영 함수 소스가 저장소와 같은 버전인지까지 증명하지 않는다.
+- 현재 연결된 관리 도구/credential로는 Supabase 프로젝트 Secret 목록을 직접 조회할 수 없다. 진단 health GET도 401이므로 현재 함수의 dispatch_configured 값을 확인하지 못했다. 따라서 'Supabase에 토큰이 전혀 없다'는 단정은 하지 않는다. 다음 확인은 프로젝트 Edge Functions Secrets에서 위 세 이름의 존재 여부이며 비밀값을 채팅으로 받지 않는다.
+
 - `.github/workflows/telegram-intake-diagnostic.yml`: 해당 점검 브랜치 push/수동 실행에만 반응. 운영 분석을 호출하지 않음. 권한은 contents:read.
 - `scripts/diagnose_telegram_intake.py`: getMe/getWebhookInfo, 동일 프로젝트 health GET/DB HEAD와 제한된 테스트 상태 GET만 수행.
 - `python -m unittest tests.test_intake_diagnostics`: 5개 통과. 부가옵션/다른 호스트/예상치 못한 health 응답/비밀값과 고객 식별자 미출력 검증.
