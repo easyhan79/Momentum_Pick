@@ -30,6 +30,16 @@ class IntakeDiagnosticsTest(unittest.TestCase):
         result=diagnose(dict(TELEGRAM_TOKEN='123:PRIVATE_TOKEN',SUPABASE_URL=BASE,SUPABASE_KEY='PRIVATE'),reader)
         self.assertEqual(result['webhook'],'HOOK_TARGET_OTHER');self.assertEqual(result['webhook_last_error'],'REPORTED')
         self.assertNotIn('PRIVATE',json.dumps(result))
+    def test_function_target_is_classified_without_publishing_query_or_other_hosts(self):
+        def reader(url,headers=None,method='GET'):
+            if url.endswith('/getMe'):return 200,{'ok':True}
+            if url.endswith('/getWebhookInfo'):return 200,{'ok':True,'result':{'url':BASE+'/functions/v1/telegram-webhook?secret=PRIVATE','pending_update_count':0}}
+            if method=='HEAD':return 200,{}
+            return 200,{'unexpected':'PRIVATE'}
+        result=diagnose(dict(TELEGRAM_TOKEN='123:PRIVATE_TOKEN',SUPABASE_URL=BASE,SUPABASE_KEY='sb_secret_PRIVATE'),reader)
+        self.assertEqual(result['webhook_function'],'telegram-webhook');self.assertTrue(result['webhook_query_present'])
+        self.assertEqual(result['intake'],'EDGE_UNKNOWN_RESPONSE');self.assertNotIn('telegram_configured',result)
+        self.assertNotIn('PRIVATE',json.dumps(result));self.assertNotIn('secret=',json.dumps(result))
 
 
 if __name__=='__main__':unittest.main()
