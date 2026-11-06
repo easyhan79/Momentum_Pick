@@ -1,6 +1,6 @@
 import json
 import unittest
-from scripts.diagnose_telegram_intake import diagnose,write_report,BASE
+from scripts.diagnose_telegram_intake import diagnose,write_report,test_message_state,BASE
 
 
 class IntakeDiagnosticsTest(unittest.TestCase):
@@ -40,6 +40,17 @@ class IntakeDiagnosticsTest(unittest.TestCase):
         self.assertEqual(result['webhook_function'],'telegram-webhook');self.assertTrue(result['webhook_query_present'])
         self.assertEqual(result['intake'],'EDGE_UNKNOWN_RESPONSE');self.assertNotIn('telegram_configured',result)
         self.assertNotIn('PRIVATE',json.dumps(result));self.assertNotIn('secret=',json.dumps(result))
+    def test_recent_test_lookup_reports_only_states_not_property_identity_or_content(self):
+        identifier='10000000-0000-4000-8000-000000000001'
+        def reader(url,headers=None,method='GET'):
+            if '/properties?' in url:return 200,[{'id':identifier,'status':'pending','created_at':'PRIVATE_TIME'}]
+            if '/property_analysis_jobs?' in url:return 200,[{'state':'waiting','attempts':0}]
+            if '/telegram_intake_batches?' in url:return 200,[{'receipt_state':'failed','dispatch_code':'http_401'}]
+            raise AssertionError('unexpected request')
+        result=test_message_state(reader,{'apikey':'PRIVATE'})
+        self.assertEqual(result['test_record'],'TEST_FOUND');self.assertEqual(result['analysis_state'],'waiting')
+        self.assertEqual(result['dispatch_result'],'http_401')
+        self.assertNotIn(identifier,json.dumps(result));self.assertNotIn('PRIVATE',json.dumps(result))
 
 
 if __name__=='__main__':unittest.main()

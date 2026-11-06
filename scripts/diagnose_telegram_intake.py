@@ -9,7 +9,8 @@ import os
 import re
 from urllib.error import HTTPError
 from urllib.request import Request,HTTPRedirectHandler,build_opener
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit,urlencode
+from datetime import datetime,timedelta,timezone
 
 PROJECT='aklcylhqslgntkgloqpi'
 BASE=f'https://{PROJECT}.supabase.co'
@@ -38,6 +39,7 @@ def read(url,headers=None,method='GET',opener=None):
 
 def diagnose(environment,reader=read):
     result={}
+    actual_url=''
     token=environment.get('TELEGRAM_TOKEN','')
     if not token or not re.fullmatch(r'[0-9]+:[A-Za-z0-9_-]+',token):
         result['bot']='BOT_UNCONFIGURED'
@@ -58,7 +60,10 @@ def diagnose(environment,reader=read):
             function=re.fullmatch(r'/functions/v1/([A-Za-z0-9_-]{1,80})/?',parsed.path)
             if result['webhook_same_project'] and function:
                 result['webhook_function']=function.group(1)
+                actual_url=url
             result['webhook_expected_path']=parsed.path.rstrip('/')=='/functions/v1/clever-endpoint'
+            if result['webhook_same_project'] and result['webhook_expected_path'] and (parsed.query or parsed.fragment):
+                result['webhook']='HOOK_URL_OPTIONS'
             result['pending_updates']=isinstance(info.get('pending_update_count'),int) and info['pending_update_count']>0
             error=info.get('last_error_message','')
             match=re.search(r'\b([45][0-9]{2})\b',error)
@@ -83,25 +88,62 @@ def diagnose(environment,reader=read):
                 result[name]=body.get(name) is True
         status,_=reader(BASE+'/rest/v1/properties?select=id&limit=0',headers,method='HEAD')
         result['database']='DB_ACCESS_OK' if status in (200,206) else f'DB_HTTP_{status}'
-        if result.get('webhook_same_project') and result.get('webhook_function') and result.get('webhook_function')!='clever-endpoint':
-            status,body=reader(BASE+'/functions/v1/'+result['webhook_function'],{**headers,'Authorization':'Bearer '+key})
+        if actual_url and actual_url!=BASE+'/functions/v1/clever-endpoint':
+            status,body=reader(actual_url,{**headers,'Authorization':'Bearer '+key})
             result['actual_hook_health']='HEALTH_PROTOCOL_OK' if status==200 and all(isinstance(body.get(name),bool) for name in fields) else 'UNKNOWN_RESPONSE' if status==200 else f'HTTP_{status}'
             result['actual_hook_error_class']=body.get('_error_class','NONE')
+        if result['database']=='DB_ACCESS_OK':
+            result.update(test_message_state(reader,headers))
+    return result
+
+
+def test_message_state(reader,headers):
+    since=(datetime.now(timezone.utc)-timedelta(hours=24)).isoformat()
+    query=urlencode({'select':'id,status,created_at','raw_input':'ilike.*테스트*','created_at':'gte.'+since,'order':'created_at.desc','limit':'2'})
+    status,rows=reader(BASE+'/rest/v1/properties?'+query,headers)
+    if status!=200 or not isinstance(rows,list):
+        return {'test_record':'TEST_LOOKUP_UNAVAILABLE'}
+    if not rows:
+        return {'test_record':'TEST_NOT_FOUND_24H'}
+    result={'test_record':'TEST_FOUND' if len(rows)==1 else 'TEST_MULTIPLE_MATCHES'}
+    latest=rows[0]
+    result['test_property_state']=latest.get('status') if latest.get('status') in ('pending','analyzed','failed') else 'OTHER'
+    identifier=latest.get('id','')
+    if not isinstance(identifier,str) or not re.fullmatch(r'[0-9a-f-]{36}',identifier):
+        return result
+    for table,fields,key,allowed in [('property_analysis_jobs','state,attempts','analysis_state',('waiting','running','done','failed')),('telegram_intake_batches','receipt_state,dispatch_code','receipt_state',('waiting','sending','sent','failed'))]:
+        query=urlencode({'property_id':'eq.'+identifier,'select':fields,'limit':'1'})
+        status,entries=reader(BASE+'/rest/v1/'+table+'?'+query,headers)
+        field='state' if key=='analysis_state' else 'receipt_state'
+        result[key]=entries[0].get(field) if status==200 and isinstance(entries,list) and entries and entries[0].get(field) in allowed else 'ABSENT' if status==200 and isinstance(entries,list) and not entries else 'UNAVAILABLE'
+        if key=='receipt_state' and isinstance(entries,list) and entries:
+            code=entries[0].get('dispatch_code','')
+            result['dispatch_result']=code if code in ('accepted','waiting','missing_token','network_error') or re.fullmatch(r'http_[1-5][0-9]{2}',code) else 'OTHER'
     return result
 
 
 def write_report(result,environment):
     parts=[result['bot'],result['webhook'],result.get('webhook_last_error','NONE'),result['intake'],result['database']]
     if result.get('webhook_function'):
-        parts.append('FN_'+result['webhook_function'].upper().replace('-','_'))
+        parts.append('FN_'+result['webhook_function'][:32].upper().replace('-','_'))
     parts.append(result['server_key_kind'])
     if result.get('intake_error_class') not in (None,'NONE'):
         parts.append(result['intake_error_class'])
     parts.append('MANAGEMENT_PRESENT' if result.get('management_binding_present') else 'NO_MANAGEMENT_BINDING')
+    if result.get('actual_hook_health'):
+        parts.append('URL_'+result['actual_hook_health'])
+    if result.get('test_record'):
+        parts.append(result['test_record'])
+    if result.get('test_property_state'):
+        parts.append('STATE_'+result['test_property_state'].upper())
+    if result.get('analysis_state'):
+        parts.append('JOB_'+result['analysis_state'].upper())
+    if result.get('receipt_state'):
+        parts.append('RECEIPT_'+result['receipt_state'].upper())
     if 'telegram_configured' in result and not result['telegram_configured']:
         parts.append('EDGE_BOT_UNCONFIGURED')
     verdict='__'.join(parts)
-    if not re.fullmatch(r'[A-Z0-9_]{1,250}',verdict):
+    if not re.fullmatch(r'[A-Z0-9_]{1,420}',verdict):
         raise ValueError('invalid_diagnostic_verdict')
     print(json.dumps(result,sort_keys=True))
     if environment.get('GITHUB_OUTPUT'):
