@@ -183,3 +183,52 @@
 - 검증: customer-inquiry 5; inquiry-api 7; public 7; browser 6 groups; customer-inquiry SQL; build/Edge typecheck
 - Git: feature/spacepick-v2-1 / 0f8d975f67188643f90059f26d347c8c913edd0a; v2.1 운영 배포 없음.
 - 다음: S4 커밋 후 S5 제공자료 분석 품질 규칙과 건물 제공 렌트롤 구현
+
+## 2026-11-07T01:10:33.986917+09:00 — S5 / in_progress
+
+- 변경/완료 상태: S0~S4 체크포인트를 feature/spacepick-v2-1에 업로드 확인; 운영 main/서비스 변경 없음. S5 규칙 기반 제공자료 분석 시작
+- 검증: 이 체크포인트에서 새 검증 없음
+- Git: feature/spacepick-v2-1 / 11fb94525f22748d3ed9a98e811a318c2c63ee50; v2.1 운영 배포 없음.
+- 다음: 5유형 조건별 판단·중요 누락/충돌·렌트롤·수익/법정 한계 품질 규칙 구현
+
+## 2026-11-07T01:14:23.281616+09:00 — S5 / in_progress
+
+- 변경/완료 상태: 유형/항목별 의미·필요자료·0/충돌·인허가/수익 한계 규칙 추가. 판단문은 자료 기반 해석으로 분리하고 승인 시 보고서 동결; 실제 제공 렌트롤만 표시
+- 검증: customer-decision tests; frontend typecheck
+- Git: feature/spacepick-v2-1 / 11fb94525f22748d3ed9a98e811a318c2c63ee50; v2.1 운영 배포 없음.
+- 다음: 5유형 누락/충돌/민감정보·승인 보고서 불변·실제 원문/PDF 연결 품질 검증
+
+## 2026-11-07T01:16:41.233389+09:00 — S5 / blocked_test
+
+- 변경/완료 상태: 품질 검사에서 경고문 확정 수익률이 아님을 긍정 주장으로 오인한 정규식 실패. 실제 결론의 단정 여부와 부정형 한계 고지를 분리해 검사하도록 수정
+- 검증: 이 체크포인트에서 새 검증 없음
+- Git: feature/spacepick-v2-1 / 11fb94525f22748d3ed9a98e811a318c2c63ee50; v2.1 운영 배포 없음.
+- 다음: 품질 6개 재검사 및 실제 JSONB 왕복·동결 snapshot 보존 검사
+
+## 2026-11-07T01:16:46.609056+09:00 — S5 / in_progress
+
+- 변경/완료 상태: 품질 6개·판단 계약 6개·실제 JSONB 왕복과 승인 snapshot 불변 검사 통과; 한계 경고문과 긍정 주장을 분리 검사
+- 검증: analysis-quality 6; customer-decision 6; frontend typecheck; analysis-snapshot-db
+- Git: feature/spacepick-v2-1 / 11fb94525f22748d3ed9a98e811a318c2c63ee50; v2.1 운영 배포 없음.
+- 다음: 관리자 입력/근거 대조→분석 확인/승인→고객→CRM E2E 후 S5 완료
+
+## 2026-11-07T01:20:34.797834+09:00 — S5 / in_progress
+
+- 변경/완료 상태: 실제 관리자 handler의 검토→게시 보고서 동결 및 이후 초안 변경/검토 무효화 검증 통과. 공개 GET은 새로 분석하지 않고 승인 보고서만 허용; 가정 계산은 기존 모듈 링크로 분리
+- 검증: analysis-quality 7; frontend typecheck
+- Git: feature/spacepick-v2-1 / 11fb94525f22748d3ed9a98e811a318c2c63ee50; v2.1 운영 배포 없음.
+- 다음: S5 전체 관련 회귀·타입·빌드 후 완료; S6 20조합·관리자 등록→CRM E2E와 운영 준비
+
+## 2026-11-07T01:21:52.196891+09:00 — S5 / in_progress
+
+- 변경/완료 상태: 5유형 모두 입력/누락/충돌/비공개를 검증했고 관리자 publish 이후 분석 보고서와 공개본 보존을 확인. 기존 사실정보/문서/문의 회귀와 빌드 통과
+- 검증: analysis-quality 7 (five-kind matrix); profile 7; admin 21; document 7; customer-inquiry 5; build
+- Git: feature/spacepick-v2-1 / 11fb94525f22748d3ed9a98e811a318c2c63ee50; v2.1 운영 배포 없음.
+- 다음: S5 체크포인트 완료 후 S6 전체 QA/재개 안정성/운영 적용 준비
+
+## 2026-11-07T01:23:13.692054+09:00 — S5 / local_complete
+
+- 변경/완료 상태: 유형별 의미/제약/필요자료·5상태/조건 판단·부분 렌트롤·가정 계산 분리 완료. 실제 JSONB 및 관리자 승인/초안변경 불변 검증 통과; 유료 AI 호출 없음
+- 검증: analysis-quality 7; customer-decision 6; analysis-snapshot-db; related 40 regressions; build/typecheck
+- Git: feature/spacepick-v2-1 / 11fb94525f22748d3ed9a98e811a318c2c63ee50; v2.1 운영 배포 없음.
+- 다음: S5 커밋 후 S6 전체 회귀·20자료 조합·신규 등록부터 CRM E2E·운영 준비 문서화

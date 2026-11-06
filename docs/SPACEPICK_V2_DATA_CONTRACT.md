@@ -110,3 +110,11 @@ T04는 공장형 필드 편집→저장→승인→공개 DTO 연결을 작은 �
 - 문의 request_context는 선택적 {version:1,propertyId,purposeId,conceptId,checkIds}. 서버는 해당 slug의 현재 승인 snapshot을 공유 공개 DTO로 투영한 뒤 매물·목적·콘셉트·공개 체크 ID를 검증하고 라벨은 직접 재구성한다. 기존 CRM memo에 정규화한 문맥+고객 메모를 합쳐 저장하며 전체 2000자 제한을 지킨다. 개인정보 보관기간이 끝나면 기존 memo 삭제 정책으로 문맥도 지워진다.
 - 새 crm_register_context_inquiry RPC는 공개 매물과 승인 revision을 FOR SHARE로 고정한 뒤 기존 crm_register_inquiry를 호출한다. 기존 요청/알림/보관/속도/중복 제한을 유지한다. 다른 매물·stale revision·중복 fingerprint 변경·비공개 ID 요청은 거절한다. 신규 테이블·컬럼은 없고 추가 함수 migration 20261107010000_customer_inquiry_context.sql만 로컬 작성했다. 기존 request_context 없는 클라이언트는 기존 RPC 경로를 그대로 쓴다.
 - 실제 운영 적용 순서: 기존 migration 상태 확인 → 새 RPC → 관련 공유 모듈/문의·공개·관리 함수 → 프런트. 새 함수 없이 새 UI를 먼저 배포하거나 실패시 안전 검증을 건너뛰는 fallback을 하지 않는다.
+
+### v2.1 S5 분석 품질·승인 보고서 동결
+
+- 분석 엔진은 provided-rules-v1 규칙 기반이다. 신규 유료 AI/API를 호출하지 않는다. 제공 사실/자료 대조 상태(status)와 판단 문장의 analysisStatus=inferred를 분리하고, 조건 상태 checked/review/unknown을 점수 없이 표시한다.
+- 조건별 의미·필요자료는 실제 유형·목적·슬롯에 연결한다. 0/음수값은 누락으로 바꾸지 않고 단위/적용 범위를 확인하도록 한다. 서로 다른 값은 선택·합산하지 않는다. 임대 현황의 여러 제공 기록은 가짜 층이나 합계로 만들지 않는다.
+- 승인 시점의 공개 가능한 근거만 사용해 최상위 customerDecision 보고서를 published_content에 저장한다. 공개 GET은 새로 분석하지 않고 이 동결 보고서를 허용 목록으로 투영한다. 보고서의 참조 값·출처·기준일은 같은 승인 profile의 공개 가능한 필드와 일치해야 하며 private/타 자료 참조가 있는 카드는 제외한다. 승인 보고서가 없으면 모듈 설정만으로 분석을 자동 공개하지 않는다.
+- JSONB 객체 키 순서와 무관하게 입력/검토 동일성 및 참조를 비교한다. 근거를 바꾼 초안은 재검토가 필요하지만 이전 승인 snapshot의 보고서·수치는 유지된다.
+- 건물 층별 임대 현황은 공개 허용된 provided/verified rent_roll 기록만 표시한다. 미제공 층·공실률·계약금액을 보충하거나 합산하지 않는다. 실제 수익과 입력 가정 계산은 구분하고 기존 rentalScenario를 별도 링크/모듈로 유지한다.

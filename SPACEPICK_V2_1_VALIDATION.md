@@ -39,3 +39,11 @@
 - 격리 SQL customer-inquiry-db 통과: 정확한 CRM 매물/메모, 동일 요청 재전송 1건 유지, 변경 fingerprint 거절, 다른 매물/승인 revision 거절, closed 차단, 기존 rate limit, 90일 보관 삭제, anon/authenticated RPC 실행 차단.
 - 초기 타입 검사 실패는 배열 거절을 casting 이전으로 옮겨 수정. SQL fixture의 빈 승인 snapshot은 기존 CHECK에 의해 거절됐으며, CHECK를 변경하지 않고 유효한 합성 승인본으로 fixture를 고쳐 재검증했다.
 - 추가 함수 migration은 저장시점의 승인 버전 경쟁을 막기 위해 필요하다. 기존 CRM memo 구조·보관/동의·알림·중복·속도 제한은 유지한다. 운영 DB/migration 적용 없음.
+
+## S5 — 제공자료 기반 분석 품질
+
+- analysis-quality 7개: 5유형별 입력/누락/충돌/비공개 매트릭스, 0의 의미, 부분 렌트롤, 법정 한도를 개발 가능 면적으로 바꾸지 않음, 동결 보고서/누출 보호, JSONB 순서 독립, 실제 관리자 save/publish→초안 변경 후 공개본 보존.
+- customer-decision 6 및 기존 profile 7/admin 21/document 7/문의 문맥 5 회귀 통과. 프런트 build/typecheck 통과.
+- analysis-snapshot-db: 실제 격리 PostgreSQL JSONB 저장·조회로 검토 기록 및 참조 일치와 draft UPDATE 후 published 보고서 불변 검증 통과.
+- 초기 품질 검사는 부정형 경고문 '확정 수익률이 아님'을 긍정 주장으로 오인했다. 결론의 단정 검사와 한계 고지 존재 검사를 분리해 재검증했다.
+- 보고서는 승인 시 동결하며 GET에서 재생성하지 않는다. 판단 문장은 inferred이고 근거 상태를 자동 verified로 올리지 않는다. 실제 AI/외부 데이터 호출 없이 수행한 제공자료 기반 1차 검토이며 운영/실자료 정확도 검증과 구분한다.

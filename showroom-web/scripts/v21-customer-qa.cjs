@@ -5,8 +5,8 @@ const {chromium}=require('playwright'),assert=require('node:assert/strict'),fs=r
  const {createCrmHandler}=await import('../../supabase/functions/showroom-crm/index.ts');
  const {POLICY}=await import('../../supabase/functions/_shared/inquiries.ts');
  const {publicDto}=await import('../../supabase/functions/public-showroom/index.ts');
- const {defaultDecisionSettings}=await import('../../supabase/functions/_shared/customer-decision.ts');
- const {validateProfile}=await import('../../supabase/functions/_shared/property-profile.ts');
+ const {defaultDecisionSettings,publicDecision}=await import('../../supabase/functions/_shared/customer-decision.ts');
+ const {validateProfile,visibleField}=await import('../../supabase/functions/_shared/property-profile.ts');
  const {purposesFor}=await import('../../supabase/functions/_shared/customer-purpose.ts');
  const base=process.env.SHOWROOM_QA_URL||'http://127.0.0.1:5173';assert.ok(['localhost','127.0.0.1'].includes(new URL(base).hostname));
  const directory=path.resolve(__dirname,'../test-results/v21-customer');await fs.mkdir(directory,{recursive:true});
@@ -24,7 +24,7 @@ const {chromium}=require('playwright'),assert=require('node:assert/strict'),fs=r
    profile.fields.push({...profile.fields[0],id:'private-ref',value:'PRIVATE_SECRET',publication:'private'});
    profile.modules={customerDecision:{...defaultDecisionSettings(kind),publication:'approved',reviewConfirmed:true}};
    const validated=validateProfile(profile,{assets:[],userId:'synthetic-admin',now:'2026-11-07T00:00:00Z'});
-   snapshot={schema_version:'1.0',id:'10000000-0000-4000-8000-000000000001',category:['factory','logistics'].includes(kind)?'industrial':kind,title:'합성 '+kind,subtitle:'제공자료로 검토하는 예시',summary:'합성 자료이며 실제 매물이 아닙니다.',propertyProfile:validated,facts:[],concepts:[],unknowns:[],assets:[]};data=publicDto(snapshot);
+   snapshot={schema_version:'1.0',id:'10000000-0000-4000-8000-000000000001',category:['factory','logistics'].includes(kind)?'industrial':kind,title:'합성 '+kind,subtitle:'제공자료로 검토하는 예시',summary:'합성 자료이며 실제 매물이 아닙니다.',propertyProfile:validated,facts:[],concepts:[],unknowns:[],assets:[]};snapshot.customerDecision=publicDecision(validated,validated.fields.filter(f=>visibleField(f,validated)));data=publicDto(snapshot);
    const opts=purposesFor(kind);
    data.concepts=[{id:'concept-2',conceptName:'두 번째 목적 활용',headline:'가설 2',rationale:'조건 확인 필요',purposeIds:[opts[1].id],zones:[]},{id:'concept-1',conceptName:'첫 번째 목적 활용',headline:'가설 1',rationale:'조건 확인 필요',purposeIds:[opts[0].id],zones:[]}];
    const asset=(id,kind,generated=false,conceptId='')=>({id,kind,generated,conceptId,url:'https://synthetic-media.invalid/'+id+'.png',caption:'합성 제공자료',alt:'합성',approved:true,imageType:generated?(materials==='plan'?'plan':materials==='photo'||materials==='both'?'photo':'concept'):undefined});

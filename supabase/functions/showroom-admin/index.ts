@@ -1,8 +1,9 @@
+import {publicDecision} from '../_shared/customer-decision.ts';
 import {documentCandidates,documentReviewVersion,checkedDocumentCandidates,documentInspectionSummaries,documentAnalysisState,documentIssues,importDocumentCandidates} from '../_shared/document-review.ts';
 import {validateImageSettings,imageSettingsReady,imageSettingSlots,ImageSettingsError} from '../_shared/image-settings.ts';
 import {validateConceptEdits,changedConceptSlots,ConceptError} from '../_shared/concept-edits.ts';
 import {registrationDraft,registrationContact,registrationIssues,webAnalysisInput} from '../_shared/web-registration.ts';
-import {validateProfile,ProfileError,profilePublicationIssues} from '../_shared/property-profile.ts';
+import {validateProfile,ProfileError,profilePublicationIssues,visibleField} from '../_shared/property-profile.ts';
 import {originAllowed,corsOrigin,validSlug,slugSuggestions} from '../_shared/site.ts';
 import {publicationIssues} from '../_shared/publication.ts';
 import {queuePlan,dispatchPlan} from '../_shared/plan-queue.ts';
@@ -252,6 +253,8 @@ export function createHandler({url,key,fetcher=fetch,githubTokens=[]}:Config) {
             draft.assets=selected.map((item:Json)=>{const a=media.find((a:Json)=>a.id===item.id);if(!a)throw new ApiError(400,'invalid_media');return{id:a.id,url:'',kind:a.kind==='provided_plan'?'provided_plan':a.source_type==='ai_generated'?'concept':'photo',alt:text(a.caption),caption:text(a.caption),generated:a.source_type==='ai_generated',...(['concept','plan','photo'].includes(item.imageType)?{imageType:item.imageType}:{}),conceptId:text(item.conceptId,100),zoning:Array.isArray(item.zoning)?item.zoning.filter((p:Json)=>typeof p.zoneId==='string'&&Number.isFinite(p.x)&&Number.isFinite(p.y)&&p.x>=0&&p.x<=100&&p.y>=0&&p.y<=100).slice(0,5):[],approved:true};});
             if(draft.heroAsset){const hero=draft.assets.find((a:Json)=>a.id===draft.heroAsset.id);if(!hero)throw new ApiError(400,'invalid_media');draft.heroAsset=hero;}
           }else if(draft.heroAsset)throw new ApiError(400,'invalid_media');
+          const decision=draft.propertyProfile?publicDecision(draft.propertyProfile,draft.propertyProfile.fields.filter((f:any)=>visibleField(f,draft.propertyProfile))):undefined;
+          if(decision)draft.customerDecision=decision;else delete draft.customerDecision;
           const now=new Date().toISOString();
           const record={notes:text(review.notes),checks:{facts:true,rights:true,claims:true,privacy:true},by:user.id,at:now,revision:body.revision+1};
           const prior=object(current.published_content)._reviewHistory;
