@@ -18,7 +18,7 @@
     "command": "readiness35 (Python59 Node141 SQL6); browser64; preflight; clean release232 hashes/inputs",
     "at": "2026-11-07T01:49:23.669428+09:00"
   },
-  "lastCommit": "296687a984eb4a1f11a4fa8b56eaaf8104fdbcb9",
+  "lastCommit": "1315058adf8b0c9cc92cb4e61a463167907d349e",
   "branch": "feature/spacepick-v2-1",
   "pushStatus": "feature_branch_pushed",
   "blockers": [],
@@ -26,8 +26,8 @@
     "운영 배포 연결 미제공",
     "실제 AI/실매물/외부 데이터 검증 미수행"
   ],
-  "nextAction": "S0~S6 재개발 없음. 관리 연결·운영 버전 확인 후 DEPLOYMENT의 적용/복구 절차와 실매물·실제 AI 검증; T10b 별도",
-  "updatedAt": "2026-11-07T01:49:23.669428+09:00",
+  "nextAction": "본인 전용 배포 P0: 기존 호스팅 게시/관리 도구와 Supabase 관리 연결 확인 → 제공자 비공개 기능/본인 계정/격리 대상 확정. S0~S6 반복 개발 없음.",
+  "updatedAt": "2026-11-07T07:43:22.190336+09:00",
   "stages": {
     "S0": {
       "status": "local_complete",
@@ -67,5 +67,18 @@
   },
   "lastPushedCommit": "296687a984eb4a1f11a4fa8b56eaaf8104fdbcb9",
   "remoteBranch": "feature/spacepick-v2-1",
-  "workingTreeChanges": []
+  "workingTreeChanges": [],
+  "followUp": {
+    "id": "PRIVATE_PREVIEW",
+    "plan": "SPACEPICK_PRIVATE_PREVIEW_PLAN.md",
+    "status": "blocked_external",
+    "currentUnit": "P0",
+    "localCompleted": "실제 호스팅·기존 관리자 미리보기·운영 API 고정/분리 필요 확인, P0~P6 계획 저장",
+    "blockers": [
+      "기존 호스팅 게시/관리 도구 미연결",
+      "Supabase DB/함수 배포 관리 연결 미제공"
+    ],
+    "deployed": false,
+    "updatedAt": "2026-11-07T07:43:22.190336+09:00"
+  }
 }

@@ -11,6 +11,7 @@
 - [SpacePick v2 검증·적용 순서](docs/SPACEPICK_V2_VALIDATION.md)
 - [실제 구현 기준 아키텍처와 매물 게시/프로그램 배포 구분](docs/SPACEPICK_V2_ARCHITECTURE.md)
 - [v2.1 완료 보고서·남은 운영 작업](SPACEPICK_V2_1_REPORT.md)
+- [본인 전용 배포·개발 검증 계획](SPACEPICK_PRIVATE_PREVIEW_PLAN.md)
 - [v2.1 재개 상태](SPACEPICK_V2_1_RUN_STATE.json) / [작업 기록](SPACEPICK_V2_1_PROGRESS.md)
 - [GitHub 업데이트 절차](docs/SPACEPICK_V2_GITHUB.md)
 

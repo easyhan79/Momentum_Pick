@@ -314,3 +314,11 @@
 - 변경 파일: 없음
 - Git: feature/spacepick-v2-1 / 296687a984eb4a1f11a4fa8b56eaaf8104fdbcb9; v2.1 운영 배포 없음.
 - 다음: S0~S6 재개발 없음. 관리 연결·운영 버전 확인 후 DEPLOYMENT의 적용/복구 절차와 실매물·실제 AI 검증; T10b 별도
+
+## 2026-11-07T07:43:22.190336+09:00 — 후속 PRIVATE_PREVIEW / P0 blocked_external
+
+- 사용자 지시: 개발 중 본인만 볼 수 있는 배포 환경을 연결하여 실제 화면도 확인.
+- 완료: 기존 hosting 프로젝트/Worker·관리자 로그인/비공개 미리보기 재확인. adminApi/router의 운영 Supabase 고정 확인. 본인 제한·테스트 데이터/API 분리와 P0~P6 계획 저장.
+- 검증: runtime running/current; restricted network enforced; 배포 secret/identity binding 없음. 도구 검색에서 hosting/Supabase 관리 기능 없음. 코드·문서 읽기 및 diff 검토만 수행; 이번 변경은 문서/상태이며 기능 테스트·운영 요청 없음.
+- Git 기록 시점: 1315058adf8b0c9cc92cb4e61a463167907d349e; 개발 브랜치에 문서/상태 저장 예정. 실제 코드 변경·운영 main 병합·DB/함수/사이트 배포 없음.
+- 다음: 기존 사이트 게시/관리 기능이 연결된 작업 화면과 Supabase 관리 연결 확보 후 P0부터 확인. S0~S6 all_local_complete 유지; 새 비공개 배포는 미완료.
