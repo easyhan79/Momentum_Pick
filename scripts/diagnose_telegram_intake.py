@@ -163,6 +163,8 @@ def write_report(result,environment):
         parts.append('JOB_'+result['analysis_state'].upper())
     if result.get('receipt_state'):
         parts.append('RECEIPT_'+result['receipt_state'].upper())
+    if result.get('dispatch_result'):
+        parts.append('DISPATCH_'+result['dispatch_result'].upper())
     if 'telegram_configured' in result and not result['telegram_configured']:
         parts.append('EDGE_BOT_UNCONFIGURED')
     verdict='__'.join(parts)

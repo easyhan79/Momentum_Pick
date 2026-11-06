@@ -1,0 +1,27 @@
+name: Resume existing Telegram analysis
+on:
+  push:
+    branches: [audit/telegram-intake-20261106]
+    paths:
+      - .github/workflows/telegram-intake-recovery.yml
+permissions:
+  contents: read
+jobs:
+  resume:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: Dispatch the normal main analysis workflow
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'agent.yml',
+              ref: 'main'
+            });
+            await core.summary.addRaw('Requested the existing main analysis workflow. It will process its normal queue and send existing receipt/completion notifications. No webhook, credential or publishing setting was changed.').write();
