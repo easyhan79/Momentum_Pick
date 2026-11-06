@@ -47,3 +47,37 @@
 - analysis-snapshot-db: 실제 격리 PostgreSQL JSONB 저장·조회로 검토 기록 및 참조 일치와 draft UPDATE 후 published 보고서 불변 검증 통과.
 - 초기 품질 검사는 부정형 경고문 '확정 수익률이 아님'을 긍정 주장으로 오인했다. 결론의 단정 검사와 한계 고지 존재 검사를 분리해 재검증했다.
 - 보고서는 승인 시 동결하며 GET에서 재생성하지 않는다. 판단 문장은 inferred이고 근거 상태를 자동 verified로 올리지 않는다. 실제 AI/외부 데이터 호출 없이 수행한 제공자료 기반 1차 검토이며 운영/실자료 정확도 검증과 구분한다.
+
+## S6 — 최종 통합·운영 준비 (2026-11-07)
+
+- 최종 명령: `PGLITE_MODULE=/workspace/spacepick-test-tools/node_modules/@electric-sql/pglite/dist/index.js python scripts/check_v2_readiness.py` → **35항목 모두 통과**, skipped/unrun/실패 0. Python **59개**, Node **141개**, 격리 SQL **6종**, Worker 빌드/Edge 타입 포함. 실행 콘솔 `/tmp/v21-s6-readiness-final.log`, 상세 `showroom-web/test-results/v2-readiness.json`.
+- SQL 6종: 신규 매물 등록, 콘셉트 이미지 무효화/비용 보호, 비공개 PDF 버킷, 문의 문맥·승인 버전, 분석 JSONB/승인본 보존, Telegram 접수. 이후 문의 SQL에 읽기 전용 preflight 실행/권한 반환 검사를 추가했고 `PGLITE_MODULE=... node supabase/tests/customer-inquiry-db.test.mjs`로 해당 파일을 재검증해 통과했다.
+- checkpoint Python 4개: 원자적 교체, 실패시 기존 기록 보존, 명시적 중단/재개·잘못된 단계 거절, Git 파일/원격 상태 보존. 상태를 실제 사용량 제한 없이 paused_limit로 바꾸지 않는다.
+
+### 브라우저 명령과 최종 결과
+
+다음 명령은 repo 루트 기준이며 공통 환경은 `NODE_PATH=/opt/codex/runtimes/codex-primary-runtime/dependencies/node/node_modules CHROME_PATH=/usr/bin/chromium`이다. 설치된 Chromium과 허용된 로컬 실행 환경에서 사용한다. 모든 결과는 합성 자료/모의 API이고 운영 변경 요청을 차단한다.
+
+| 명령 | 통과 그룹 | 결과 경로(test-results 하위) |
+| --- | --- | --- |
+| `V21_MATERIAL_QA=1 V21_INQUIRY_QA=1 node showroom-web/scripts/v21-customer-qa.cjs` | 21 | v21-customer/result.json |
+| `V21_DOCUMENT_QA=1 node showroom-web/scripts/v21-customer-qa.cjs` | 5 | v21-professional/result.json |
+| `V21_ADMIN_QA=1 node showroom-web/scripts/property-facts-qa.cjs` | 6 | v21-admin-journey/result.json |
+| `SHOWROOM_QA_URL=http://127.0.0.1:5176 V21_ADMIN_QA=1 node showroom-web/scripts/property-facts-qa.cjs` | 6 | v21-admin-built/result.json |
+| `node showroom-web/scripts/industrial-review-qa.cjs` | 8 | v2-industrial/result.json |
+| `PDF_REVIEW_QA=1 node showroom-web/scripts/property-facts-qa.cjs` | 7 | v2-pdf/result.json |
+| `RENTAL_SCENARIO_QA=1 node showroom-web/scripts/property-facts-qa.cjs` | 6 | v2-rental/result.json |
+| `COPY_REVIEW_QA=1 node showroom-web/scripts/property-facts-qa.cjs` | 5 | v2-copy-review/result.json |
+
+최종 **64그룹 통과**, 각 result의 failures와(있는 경우) errors/unexpected 빈 배열. 자료 조합은 최소/도면/사진/둘다 20사례에 전문자료 5사례를 추가했다. 전문자료 원문 경로/asset ID/권한 메타데이터는 공개 DTO에서 제외한다. 부분 렌트롤은 제공 1층/3층만 표시하고 누락 2층·비공개 계약은 만들거나 공개하지 않는다.
+
+빌드 검증 서버: showroom-web에서 `SPACEPICK_QA_PORT=5176 node scripts/serve-built.mjs`. 생성 Worker를 제공하되 서버의 메타데이터 조회도 합성 응답으로 고정한다. 일반 개발 서버와 빌드 서버를 구분해 결과를 보존했다. 주요 캡처 `v21-admin-built/public-1440.png`와 각 유형/자료 폴더, 375/768/1440px 주요 동작 통과.
+
+### 발견·수정 및 재검증
+
+- 실제 중복 React key(목적 컴포넌트와 임대 계산기가 같은 data.id 사용)를 발견해 목적 key에 구분 접두사를 추가했다. 고객 QA에서 duplicate key 콘솔도 실패로 수집하며 최종 전체 조합은 오류 없이 통과했다.
+- 관리자 공개 범위·목적 preview select에 명시적 접근성 이름과 fieldset legend를 추가했다. 검사 selector만 우회하지 않고 최종 관리자/빌드 여정을 다시 통과했다.
+- 빌드 QA 첫 실행은 잘못된 작업 경로와 CHROME_PATH 누락으로 시작에 실패했다. 올바른 cwd/설치된 Chromium 경로를 사용한 재실행 6그룹이 통과했고 별도 v21-admin-built 결과에 보존했다.
+- 기존 패키지 도구가 `.sql`을 선택하지 않아 migration을 누락하는 문제를 발견했다. SQL/검토/서버 테스트·루트 작업지시/상태·보고서를 포함하도록 고쳤다. 압축 생성 후 manifest 해시와 필수 경로/원본 제외를 확인한다.
+
+운영 preflight는 로컬 격리 DB에서만 실행했다. 실제 DB migration·함수/사이트 배포·실매물·유료 AI 호출·외부 시장 데이터 정확도 검증은 미수행이다. 적용 순서/복구는 `SPACEPICK_V2_1_DEPLOYMENT.md`, 남은 범위는 `SPACEPICK_V2_1_REPORT.md`에 분리했다.

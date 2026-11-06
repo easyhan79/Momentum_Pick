@@ -22,5 +22,8 @@ try{
  await db.query("UPDATE property_inquiries SET lead_stage='lost',closed_at=now()-interval '91 days'");await db.query('SELECT crm_retention_cleanup()');assert.ok((await db.query('SELECT memo,redacted_at FROM property_inquiries')).rows.every(r=>r.memo===''&&r.redacted_at));
  await db.exec('RESET ROLE');
  for(const role of ['anon','authenticated']){await db.exec('SET ROLE '+role);await assert.rejects(register(),e=>e.code==='42501');await db.exec('RESET ROLE');}
- console.log('PASS contextual inquiry SQL: correct CRM property/memo, duplicate/conflict, property/revision pin, closed listing, rate limit, retention and restricted roles');
+ const preflight=await db.exec(await readFile(new URL('../review/v21_preflight.sql',import.meta.url),'utf8'));
+ assert.ok(preflight[0].rows[0].routes);assert.ok(preflight[2].rows[0].legacy_register);assert.ok(preflight[2].rows[0].contextual_register);assert.ok(preflight[2].rows[0].retention_cleanup);
+ assert.deepEqual(preflight[3].rows[0],{anon_must_be_false:false,authenticated_must_be_false:false});
+ console.log('PASS contextual inquiry SQL: correct CRM property/memo, duplicate/conflict, property/revision pin, closed listing, rate limit, retention, restricted roles and read-only deployment preflight');
 }catch(error){console.error({name:error.name,message:error.message,code:error.code});process.exitCode=1;}finally{await db.close();}

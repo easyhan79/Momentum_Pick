@@ -8,13 +8,17 @@ const path=require('node:path');
  const {createHandler}=await import('../../supabase/functions/showroom-admin/index.ts');
  const {createPublicHandler}=await import('../../supabase/functions/public-showroom/index.ts');
  const {publicDto}=await import('../../supabase/functions/public-showroom/index.ts');
+ const {createInquiryHandler}=await import('../../supabase/functions/showroom-inquiries/index.ts');
+ const {createCrmHandler}=await import('../../supabase/functions/showroom-crm/index.ts');
+ const {POLICY}=await import('../../supabase/functions/_shared/inquiries.ts');
+ const v21Admin=process.env.V21_ADMIN_QA==='1';let inquiryStored;
  const property='10000000-0000-4000-8000-000000000001';
  const pdfMode=process.env.PDF_REVIEW_QA==='1';
  const rentalMode=process.env.RENTAL_SCENARIO_QA==='1';
  const copyReviewMode=process.env.COPY_REVIEW_QA==='1';
  const customerRequestMode=process.env.CUSTOMER_REQUEST_QA==='1',inquiryInputs=[];
  const pdfFixture=pdfMode?JSON.parse(await fs.readFile(path.resolve(__dirname,'../test-results/v2-pdf/fixture.json'),'utf8')):null;
- const registrationMode=process.env.WEB_REGISTRATION_QA==='1'||pdfMode;let created=!registrationMode,queued=false;
+ const registrationMode=process.env.WEB_REGISTRATION_QA==='1'||pdfMode||v21Admin;let created=!registrationMode,queued=false;
  const queueInputs=[];
  const pdfDocuments=pdfMode?[{id:pdfFixture.assetId,caption:'합성 매각제안서',kind:'document',source_type:'owner_provided'},{id:pdfFixture.encryptedId,caption:'암호화된 합성 문서',kind:'document',source_type:'owner_provided'}]:[];
  let documentMode='normal';
@@ -25,6 +29,10 @@ const path=require('node:path');
  const mockFetch=async(url,init={})=>{
    const pathname=String(url);
    if(pathname.endsWith('/auth/v1/user'))return Response.json({id:property,app_metadata:{showroom_admin:true}});
+   if(pathname.endsWith('/rpc/crm_register_context_inquiry')){const args=JSON.parse(init.body);inquiryStored={id:'20000000-0000-4000-8000-000000000002',property_id:args.p_expected_property,...args.p_data};return Response.json({id:inquiryStored.id});}
+   if(pathname.includes('/property_inquiries?'))return Response.json(inquiryStored?[inquiryStored]:[]);
+   if(pathname.includes('/inquiry_activity?'))return Response.json([]);
+
    if(pathname.endsWith('/rpc/showroom_save_concept_draft')){const args=JSON.parse(init.body);room={...room,draft_content:args.p_content,revision:room.revision+1};return Response.json(room);}
    if(pathname.endsWith('/rpc/web_create_property')){const args=JSON.parse(init.body);room={...room,draft_content:{...args.p_content,id:property}};created=true;return Response.json({property_id:property,duplicate:false});}
    if(pathname.endsWith('/rpc/web_queue_analysis')){queueInputs.push(JSON.parse(init.body).p_raw);queued=true;return Response.json({queued:true,state:'waiting'});}
@@ -45,9 +53,11 @@ const path=require('node:path');
  };
  const admin=createHandler({url:'https://mock-db',key:'synthetic-server-key',fetcher:mockFetch});
  const publicHandler=createPublicHandler('https://mock-db','synthetic-server-key',mockFetch);
+ const inquiryHandler=createInquiryHandler({url:'https://mock-db',key:'synthetic-server-key',fetcher:mockFetch});
+ const crmHandler=createCrmHandler({url:'https://mock-db',key:'synthetic-server-key',fetcher:mockFetch});
  const base=process.env.SHOWROOM_QA_URL||'http://127.0.0.1:5173';
  assert.ok(['127.0.0.1','localhost'].includes(new URL(base).hostname));
- const directory=path.resolve(__dirname,pdfMode?(process.env.SHOWROOM_QA_URL?'../test-results/v2-pdf-built':'../test-results/v2-pdf'):copyReviewMode?'../test-results/v2-copy-review':customerRequestMode?'../test-results/v2-customer-inquiry':rentalMode?'../test-results/v2-rental':registrationMode?'../test-results/v2-registration':'../test-results/v2-facts');await fs.mkdir(directory,{recursive:true});
+ const directory=path.resolve(__dirname,pdfMode?(process.env.SHOWROOM_QA_URL?'../test-results/v2-pdf-built':'../test-results/v2-pdf'):v21Admin?(process.env.SHOWROOM_QA_URL?'../test-results/v21-admin-built':'../test-results/v21-admin-journey'):copyReviewMode?'../test-results/v2-copy-review':customerRequestMode?'../test-results/v2-customer-inquiry':rentalMode?'../test-results/v2-rental':registrationMode?'../test-results/v2-registration':'../test-results/v2-facts');await fs.mkdir(directory,{recursive:true});
  const result={passed:[],failures:[]},errors=[],unexpected=[];
  const browser=await chromium.launch({headless:true,...(process.env.CHROME_PATH?{executablePath:process.env.CHROME_PATH}:{})});
  let page;
@@ -63,8 +73,8 @@ const path=require('node:path');
      }
      if(request.method()==='OPTIONS')return route.fulfill({status:204,headers:{'access-control-allow-origin':'*','access-control-allow-methods':'GET, POST, PATCH, OPTIONS','access-control-allow-headers':'*'}});
      if(url.pathname==='/auth/v1/token')return route.fulfill({json:{access_token:'synthetic-user',refresh_token:'synthetic-refresh',expires_in:3600}});
-     if(url.pathname==='/functions/v1/showroom-inquiries'&&request.method()==='GET'&&url.searchParams.get('action')==='policy')return route.fulfill({json:{policy:{version:'qa',operator:'합성 담당자',contact:'qa@example.invalid',retentionDays:90}}});
-     if(url.pathname==='/functions/v1/showroom-inquiries'&&request.method()==='POST'){inquiryInputs.push(JSON.parse(request.postData()));return route.fulfill({status:202,json:{accepted:true}});}
+     if(url.pathname==='/functions/v1/showroom-inquiries'&&request.method()==='GET'&&url.searchParams.get('action')==='policy')return route.fulfill({json:{policy:POLICY}});
+     if(url.pathname==='/functions/v1/showroom-inquiries'&&request.method()==='POST'){inquiryInputs.push(JSON.parse(request.postData()));if(v21Admin){const response=await inquiryHandler(new Request(request.url(),{method:'POST',headers:{'content-type':'application/json'},body:request.postData()}));return route.fulfill({status:response.status,body:await response.text(),headers:{'content-type':'application/json','access-control-allow-origin':'*'}});}return route.fulfill({status:202,json:{accepted:true}});}
      if(url.pathname==='/functions/v1/showroom-assets'){
        if(pdfMode&&url.searchParams.get('action')==='document'){
          if(documentMode==='denied')return route.fulfill({status:403,json:{error:'admin_required'}});
@@ -222,7 +232,7 @@ const path=require('node:path');
      result.passed.push('saved edits survive reload; original AI review remains separate and no repeated formatting is offered');
      assert.deepEqual(errors,[]);assert.deepEqual(unexpected,[]);return;
    }
-   if(registrationMode){
+   if(registrationMode&&!v21Admin){
      await page.getByRole('button',{name:'완료된 AI 활용 콘셉트 가져오기',exact:true}).click();
      await page.waitForFunction(()=>document.querySelector('.admin-message')?.textContent?.includes('콘셉트를 비공개'));
      assert.equal(room.draft_content.concepts.length,1);assert.equal(room.draft_content.propertyProfile.fields[0].value,100);
@@ -256,7 +266,11 @@ const path=require('node:path');
      assert.deepEqual(errors,[]);assert.deepEqual(unexpected,[]);
      return;
    }
-   await page.getByRole('button',{name:'사실정보 편집 시작',exact:true}).click();
+   if(v21Admin){
+     await page.getByRole('button',{name:'완료된 AI 활용 콘셉트 가져오기',exact:true}).click();
+     await page.waitForFunction(()=>document.querySelector('.admin-message')?.textContent?.includes('콘셉트를 비공개'));
+     for(const key of ['power_capacity','clear_height']){await page.locator('#property-facts-editor').getByLabel('추가할 정보 항목',{exact:true}).selectOption(key);await page.getByRole('button',{name:'정보 항목 추가',exact:true}).click();}
+   }else await page.getByRole('button',{name:'사실정보 편집 시작',exact:true}).click();
    assert.equal(await page.locator('#property-facts-editor').count(),1);
    const editor=page.locator('#property-facts-editor');
    await editor.getByLabel('세부 유형',{exact:true}).selectOption('factory');
@@ -271,7 +285,20 @@ const path=require('node:path');
    const power=editor.locator('.fact-editor-field').filter({has:page.locator('legend',{hasText:'전력 용량'})});
    await power.getByLabel('값',{exact:true}).fill('0');
    await power.getByLabel('정보 상태',{exact:true}).selectOption('provided');
-   await power.getByLabel('공개할 출처 설명 · 개인정보 제외',{exact:true}).fill('PRIVATE_SOURCE');
+   await power.getByLabel('공개할 출처 설명 · 개인정보 제외',{exact:true}).fill(v21Admin?'합성 수전 제공자료':'PRIVATE_SOURCE');
+   if(v21Admin){
+     await power.getByLabel('정보 기준일 · 선택',{exact:true}).fill('2026-11-01');
+     await power.getByLabel('이 정보와 근거자료를 사용할 권한을 확인했습니다.').check();
+     await power.getByLabel('값 공개 범위',{exact:true}).selectOption('approved');
+     const height=editor.locator('.fact-editor-field').filter({has:page.locator('legend',{hasText:'층고'})});
+     await height.getByLabel('값',{exact:true}).fill('10');await height.getByLabel('정보 상태',{exact:true}).selectOption('provided');await height.getByLabel('공개할 출처 설명 · 개인정보 제외',{exact:true}).fill('PRIVATE_SOURCE');
+     const decision=page.locator('#decision-settings-editor');await decision.getByRole('button',{name:'판단 카드 초안 준비',exact:true}).click();
+     await decision.getByLabel('목적 표시 이름 · 제조 운영',{exact:true}).fill('합성 제조 운영 검토');
+     await decision.getByLabel('판단 카드 공개 범위',{exact:true}).selectOption('approved');
+     await decision.getByLabel('근거·기준일·제약·확인사항을 검토했습니다. 이 확인은 사실 검증이나 허가 확정이 아닙니다.',{exact:true}).check();
+     const concepts=page.locator('#concepts-editor');await concepts.getByLabel('제조 운영',{exact:true}).check();
+     assert.equal(room.published_content,undefined);
+   }
    await editor.getByRole('button',{name:'검토 이유 추가',exact:true}).click();
    const highlight=editor.locator('.property-highlights-editor fieldset').first();
    await highlight.getByLabel('검토 이유 제목',{exact:true}).fill('제공 면적 검토');
@@ -317,7 +344,8 @@ const path=require('node:path');
    await page.locator('#review-notes').fill('합성자료의 출처와 공개 범위를 확인했습니다.');
    await page.getByRole('button',{name:'승인하고 게시하기',exact:true}).click();
    await page.waitForFunction(()=>document.querySelector('.admin-message')?.textContent?.includes('게시했습니다'));
-   assert.equal(room.published_content.propertyProfile.fields.length,12);
+   assert.equal(room.published_content.propertyProfile.fields.length,v21Admin?3:12);
+   if(v21Admin){assert.ok(room.published_content.customerDecision);assert.equal(room.published_content.customerDecision.engineVersion,'provided-rules-v1');}
    result.passed.push('review and publication via real handler with in-memory data');
    for(const width of [375,768,1440]){
      await page.setViewportSize({width,height:1000});
@@ -332,6 +360,19 @@ const path=require('node:path');
    assert.match(await page.locator('#property-overview').innerText(),/실측 및 공부 대조 필요/);
    assert.match(await page.locator('#property-overview').innerText(),/가격 협의/);
    assert.match(await page.locator('#property-location').innerText(),/합성 소재지/);
+   if(v21Admin){
+     await page.getByLabel('고객 목적 선택',{exact:true}).selectOption('factory-manufacturing');
+     await page.locator('#customer-purpose').getByLabel('전력 용량 확인 요청',{exact:true}).check();
+     assert.match(await page.locator('#decision-cards').innerText(),/2026-11-01/);assert.match(await page.locator('#decision-cards').innerText(),/0 또는 음수/);
+     await page.getByLabel('성함',{exact:true}).fill('합성 확인 요청자');await page.getByLabel('연락처',{exact:true}).fill('01000000000');await page.getByLabel('관심 활용·상담 주제',{exact:true}).fill('전력 조건 확인');await page.getByLabel('문의 내용 · 선택',{exact:true}).fill('합성 추가 메모');await page.getByLabel('개인정보 수집·이용에 동의합니다. (필수)',{exact:true}).check();
+     await page.getByRole('button',{name:'문의 접수',exact:true}).click();await page.getByRole('heading',{name:'문의가 접수되었습니다.',exact:true}).waitFor();
+     assert.equal(inquiryInputs.length,1);assert.equal(inquiryStored.property_id,property);assert.match(inquiryStored.memo,/합성 제조 운영 검토/);assert.match(inquiryStored.memo,/need-power_capacity/);assert.doesNotMatch(inquiryStored.memo,/PRIVATE_SOURCE/);
+     const crmResponse=await crmHandler(new Request('https://x.test?action=detail&id='+inquiryStored.id,{headers:{Authorization:'Bearer synthetic-admin'}}));assert.equal(crmResponse.status,200);assert.equal((await crmResponse.json()).inquiry.memo,inquiryStored.memo);
+     const frozen=structuredClone(room.published_content),edits=structuredClone(room.draft_content);edits.propertyProfile.fields.find(f=>f.key==='power_capacity').value=200;
+     const saved=await admin(new Request('https://x.test',{method:'PATCH',headers:{Authorization:'Bearer synthetic-admin'},body:JSON.stringify({action:'save-draft',propertyId:property,revision:room.revision,edits})}));assert.equal(saved.status,200);assert.deepEqual(room.published_content,frozen);assert.equal(room.draft_content.propertyProfile.modules.customerDecision.reviewedBy,undefined);
+     assert.equal(publicDto(room.published_content).customerDecision.cards.find(c=>c.slotKey==='power_capacity').references[0].value,0);
+     result.passed.push('new web registration -> analysis queue -> edited sourced facts/concept purpose -> private analysis review -> approved frozen report -> customer power request -> real inquiry/CRM handlers; later draft edit preserves approval');
+   }
    if(customerRequestMode){
      await page.locator('#evidence input[type="checkbox"]').nth(0).check();
      await page.locator('#evidence input[type="checkbox"]').nth(1).check();

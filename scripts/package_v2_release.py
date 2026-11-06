@@ -14,11 +14,13 @@ readiness=json.loads((ROOT/'showroom-web/test-results/v2-readiness.json').read_t
 if not worker.is_file() or not readiness.get('complete'):
     raise SystemExit('A completed local readiness check and built Worker are required')
 paths=set()
-for directory in ['showroom-web/src','showroom-web/server','showroom-web/scripts','supabase/functions','supabase/migrations','.github/workflows','scripts','tests','docs']:
-    paths.update(p for p in (ROOT/directory).rglob('*') if p.is_file() and p.suffix in {'.ts','.tsx','.js','.mjs','.cjs','.json','.css','.py','.md','.yml','.txt'})
+for directory in ['showroom-web/src','showroom-web/server','showroom-web/scripts','supabase/functions','supabase/migrations','supabase/review','supabase/tests','.github/workflows','scripts','tests','docs']:
+    paths.update(p for p in (ROOT/directory).rglob('*') if p.is_file() and p.suffix in {'.ts','.tsx','.js','.mjs','.cjs','.json','.css','.py','.md','.yml','.yaml','.txt','.sql'})
 paths.update(ROOT.glob('*.py'))
 paths.update(ROOT.glob('requirements*.txt'))
-for filename in ['README.md','showroom-web/package.json','showroom-web/pnpm-lock.yaml','showroom-web/tsconfig.json','showroom-web/vite.config.ts']:
+paths.update(ROOT.glob('SPACEPICK_V2_1_*.md'))
+paths.update(ROOT.glob('SPACEPICK_V2_1_RUN_STATE.json'))
+for filename in ['README.md','showroom-web/package.json','showroom-web/pnpm-lock.yaml','showroom-web/tsconfig.json','showroom-web/vite.config.ts','showroom-web/index.html','showroom-web/.openai/hosting.json','showroom-web/public/favicon.svg','showroom-web/public/spacepick-share.png','showroom-web/public/supabase-public.json']:
     paths.add(ROOT/filename)
 files={f'source/{p.relative_to(ROOT).as_posix()}':p for p in paths}
 files['frontend/server/index.js']=worker

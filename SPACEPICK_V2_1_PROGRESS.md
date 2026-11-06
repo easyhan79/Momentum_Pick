@@ -232,3 +232,77 @@
 - 검증: analysis-quality 7; customer-decision 6; analysis-snapshot-db; related 40 regressions; build/typecheck
 - Git: feature/spacepick-v2-1 / 11fb94525f22748d3ed9a98e811a318c2c63ee50; v2.1 운영 배포 없음.
 - 다음: S5 커밋 후 S6 전체 회귀·20자료 조합·신규 등록부터 CRM E2E·운영 준비 문서화
+
+## 2026-11-07T01:23:48.980038+09:00 — S6 / in_progress
+
+- 변경/완료 상태: S0~S5 로컬 완료. S6 전체 회귀/재개 파일 안정성/20자료 조합/등록부터CRM E2E·운영 적용 준비 시작
+- 검증: 이 체크포인트에서 새 검증 없음
+- Git: feature/spacepick-v2-1 / 1c5df69bf163f987fa94d6b73703f930839db436; v2.1 운영 배포 없음.
+- 다음: 검사 도구에 v2.1 전체 스위트 등록, 관리자 여정 브라우저, 배포/복구/외부 미검증 문서화
+
+## 2026-11-07T01:25:05.771902+09:00 — S6 / in_progress
+
+- 변경/완료 상태: 회귀 도구에 v2.1 및 기존 문의/접수/SQL 보호 검사를 추가. 원자 저장·명시적 한도 중단/재개·실패 시 이전 상태 보존 테스트 4개 통과
+- 검증: python -m unittest tests.test_v21_checkpoint (4 passed)
+- Git: feature/spacepick-v2-1 / 1c5df69bf163f987fa94d6b73703f930839db436; v2.1 운영 배포 없음.
+- 다음: 전체 readiness 및 관리자 신규 등록→분석 검토/승인→고객 확인요청→CRM E2E
+
+## 2026-11-07T01:29:03.562142+09:00 — S6 / blocked_test
+
+- 변경/완료 상태: 전체 readiness 35/35 통과. 관리자 E2E는 새 판단 카드 공개 범위 select의 정확한 라벨 탐색에서 중단; 실제 HTML/접근성 점검 중
+- 검증: 이 체크포인트에서 새 검증 없음
+- Git: feature/spacepick-v2-1 / 1c5df69bf163f987fa94d6b73703f930839db436; v2.1 운영 배포 없음.
+- 다음: 명시적 select 라벨 보완 후 관리자 등록→승인→CRM 여정 재검사
+
+## 2026-11-07T01:29:40.563143+09:00 — S6 / in_progress
+
+- 변경/완료 상태: 실제 HTML에 select는 있었으나 implicit label에 option 텍스트가 섞여 exact label 탐색 실패. 명시적 aria-label·fieldset legend를 추가했고 타입 검사 통과
+- 검증: frontend typecheck
+- Git: feature/spacepick-v2-1 / 1c5df69bf163f987fa94d6b73703f930839db436; v2.1 운영 배포 없음.
+- 다음: 수정된 관리자 E2E 재실행; 전체 20조합·기존 PDF/가정·문구/권한 브라우저 회귀
+
+## 2026-11-07T01:33:31.677210+09:00 — S6 / blocked_test
+
+- 변경/완료 상태: 등록→검토/승인→공개 요청→CRM 기능 시나리오는 통과했으나 콘솔에서 실제 중복 React key 발견. CustomerPurpose와 기존 ScenarioCalculator가 main의 형제로 data.id 키를 공유
+- 검증: 이 체크포인트에서 새 검증 없음
+- Git: feature/spacepick-v2-1 / 1c5df69bf163f987fa94d6b73703f930839db436; v2.1 운영 배포 없음.
+- 다음: 목적 컴포넌트 키를 구분하고 v21 모든 유형에도 콘솔 중복 키 검사를 추가하여 재검사
+
+## 2026-11-07T01:33:38.511571+09:00 — S6 / in_progress
+
+- 변경/완료 상태: 목적 UI 키를 purpose-{propertyId}로 구분하고 콘솔 중복 경고를 모든 유형 브라우저에서 감지. 수정 후 빌드 통과
+- 검증: frontend build after unique-key/accessibility fixes
+- Git: feature/spacepick-v2-1 / 1c5df69bf163f987fa94d6b73703f930839db436; v2.1 운영 배포 없음.
+- 다음: 관리자 전체 여정과 20자료 조합 재검사; 기존 PDF/임대 가정/문구 회귀
+
+## 2026-11-07T01:35:34.990875+09:00 — S6 / in_progress
+
+- 변경/완료 상태: 체크포인트마다 실제 수정 파일 목록을 JSON/PROGRESS에 자동 기록하도록 보강; 원자 저장/복구 4개 재검증 통과. 최종 브라우저·기존 기능 회귀 진행 중
+- 검증: python -m unittest tests.test_v21_checkpoint (4 passed)
+- 변경 파일: SPACEPICK_V2_1_PROGRESS.md, SPACEPICK_V2_1_RUN_STATE.json, scripts/check_v2_readiness.py, scripts/package_v2_release.py, scripts/v21_checkpoint.py, showroom-web/scripts/property-facts-qa.cjs, showroom-web/scripts/v21-customer-qa.cjs, showroom-web/src/components/DecisionSettingsEditor.tsx, showroom-web/src/pages/ShowroomPage.tsx, SPACEPICK_V2_1_DEPLOYMENT.md, supabase/review/v21_preflight.sql, tests/test_v21_checkpoint.py
+- Git: feature/spacepick-v2-1 / 1c5df69bf163f987fa94d6b73703f930839db436; v2.1 운영 배포 없음.
+- 다음: 관리자/20조합 결과 확인, PDF·임대 가정·문구/기존 7예시 브라우저 확인
+
+## 2026-11-07T01:39:34.283118+09:00 — S6 / in_progress
+
+- 변경/완료 상태: 관리자 전체 여정 6그룹, 20자료 조합+문의 21그룹, PDF 7그룹, 임대 가정 6그룹 통과. 5유형 전문자료·원문 비공개 사례를 추가하여 마지막 검증 중
+- 검증: V21_ADMIN_QA 6 groups; V21_MATERIAL_QA+V21_INQUIRY_QA 21 groups; PDF 7; rental 6
+- 변경 파일: SPACEPICK_V2_1_PROGRESS.md, SPACEPICK_V2_1_RUN_STATE.json, scripts/check_v2_readiness.py, scripts/package_v2_release.py, scripts/v21_checkpoint.py, showroom-web/scripts/property-facts-qa.cjs, showroom-web/scripts/v21-customer-qa.cjs, showroom-web/src/components/DecisionSettingsEditor.tsx, showroom-web/src/pages/ShowroomPage.tsx, SPACEPICK_V2_1_DEPLOYMENT.md, supabase/review/v21_preflight.sql, tests/test_v21_checkpoint.py
+- Git: feature/spacepick-v2-1 / 1c5df69bf163f987fa94d6b73703f930839db436; v2.1 운영 배포 없음.
+- 다음: 전문자료 5유형/기존 예시7종/문구 편집 회귀, 최종 상태·배포 패키지 저장
+
+## 2026-11-07T01:44:28.888475+09:00 — S6 / in_progress
+
+- 변경/완료 상태: 전문자료 5유형 5그룹·기존 예시 8그룹·문구 편집 5그룹 통과; 최종 통합 35항목 통과. 배포 패키지의 기존 SQL 누락을 발견해 포함 범위를 수정
+- 검증: 35 readiness passed; professional 5; existing showroom 8; copy 5
+- 변경 파일: SPACEPICK_V2_1_PROGRESS.md, SPACEPICK_V2_1_RUN_STATE.json, scripts/check_v2_readiness.py, scripts/package_v2_release.py, scripts/v21_checkpoint.py, showroom-web/scripts/property-facts-qa.cjs, showroom-web/scripts/v21-customer-qa.cjs, showroom-web/src/components/DecisionSettingsEditor.tsx, showroom-web/src/pages/ShowroomPage.tsx, SPACEPICK_V2_1_DEPLOYMENT.md, supabase/review/v21_preflight.sql, tests/test_v21_checkpoint.py
+- Git: feature/spacepick-v2-1 / 1c5df69bf163f987fa94d6b73703f930839db436; v2.1 운영 배포 없음.
+- 다음: 빌드 전체여정·읽기 전용 preflight 확인 후 최종 계획/보고서·패키지·원격 체크포인트 확정
+
+## 2026-11-07T01:48:28.070102+09:00 — S6 / local_complete
+
+- 변경/완료 상태: S6 통합35/Python59/Node141/SQL6와 브라우저64그룹 통과; preflight SQL 격리검사·패키지 SQL/문서/해시 확인, 완료/외부 대기 계획 갱신
+- 검증: readiness35 + browser64 + read-only preflight + release hashes passed
+- 변경 파일: README.md, SPACEPICK_V2_1_GAP_AND_MAPPING.md, SPACEPICK_V2_1_PROGRESS.md, SPACEPICK_V2_1_RUN_STATE.json, SPACEPICK_V2_1_VALIDATION.md, docs/SPACEPICK_CURRENT_DEVELOPMENT_STATUS.md, docs/SPACEPICK_V2_EXTERNAL_DATA.md, docs/SPACEPICK_V2_PLAN.md, scripts/check_v2_readiness.py, scripts/package_v2_release.py, scripts/v21_checkpoint.py, showroom-web/scripts/property-facts-qa.cjs, showroom-web/scripts/v21-customer-qa.cjs, showroom-web/src/components/DecisionSettingsEditor.tsx, showroom-web/src/pages/ShowroomPage.tsx, supabase/tests/customer-inquiry-db.test.mjs, SPACEPICK_V2_1_DEPLOYMENT.md, SPACEPICK_V2_1_REPORT.md, supabase/review/v21_preflight.sql, tests/test_v21_checkpoint.py
+- Git: feature/spacepick-v2-1 / 1c5df69bf163f987fa94d6b73703f930839db436; v2.1 운영 배포 없음.
+- 다음: S6 소스 체크포인트 commit/push, all_local_complete 기록 후 깨끗한 배포 준비 zip 재생성

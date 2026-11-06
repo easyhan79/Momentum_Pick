@@ -9,7 +9,7 @@ const {chromium}=require('playwright'),assert=require('node:assert/strict'),fs=r
  const {validateProfile,visibleField}=await import('../../supabase/functions/_shared/property-profile.ts');
  const {purposesFor}=await import('../../supabase/functions/_shared/customer-purpose.ts');
  const base=process.env.SHOWROOM_QA_URL||'http://127.0.0.1:5173';assert.ok(['localhost','127.0.0.1'].includes(new URL(base).hostname));
- const directory=path.resolve(__dirname,'../test-results/v21-customer');await fs.mkdir(directory,{recursive:true});
+ const directory=path.resolve(__dirname,process.env.V21_DOCUMENT_QA==='1'?'../test-results/v21-professional':'../test-results/v21-customer');await fs.mkdir(directory,{recursive:true});
  const result={passed:[],failures:[]},errors=[],unexpected=[];let data,snapshot,stored;const inquiryInputs=[];
  const propertyId='10000000-0000-4000-8000-000000000001',inquiryId='20000000-0000-4000-8000-000000000002';
  const backend=async(url,init={})=>{const name=String(url);if(name.endsWith('/auth/v1/user'))return Response.json({id:propertyId,app_metadata:{showroom_admin:true}});if(name.includes('/property_showrooms?'))return Response.json([{property_id:propertyId,published_content:snapshot,published_revision:1,approved_by:propertyId,approved_at:'now',published_at:'now',listing_state:'active'}]);if(name.endsWith('/rpc/crm_register_context_inquiry')){const args=JSON.parse(init.body);stored={id:inquiryId,property_id:args.p_expected_property,...args.p_data};return Response.json({id:inquiryId,existing:false});}if(name.includes('/property_inquiries?'))return Response.json(stored?[stored]:[]);if(name.includes('/inquiry_activity?'))return Response.json([]);throw Error('unexpected mock backend');};
@@ -17,13 +17,22 @@ const {chromium}=require('playwright'),assert=require('node:assert/strict'),fs=r
  const crmHandler=createCrmHandler({url:'https://synthetic-db.invalid',key:'synthetic',fetcher:backend});
  const browser=await chromium.launch({headless:true,executablePath:process.env.CHROME_PATH||'/usr/bin/chromium'});
  try{
-  const page=await browser.newPage({viewport:{width:1440,height:1000}});page.on('pageerror',e=>errors.push(e.message));
+  const page=await browser.newPage({viewport:{width:1440,height:1000}});page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error'&&m.text().includes('same key'))errors.push(m.text());});
   await page.route('**/*',route=>{const u=new URL(route.request().url());if(u.origin===new URL(base).origin){if(u.pathname==='/supabase-public.json')return route.fulfill({json:{publishableKey:'synthetic'}});return route.continue();}if(u.hostname==='synthetic-media.invalid')return route.fulfill({contentType:'image/png',body:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aTdcAAAAASUVORK5CYII=','base64')});if(u.pathname.endsWith('/public-showroom'))return route.fulfill({json:{showroom:data,canonical_slug:'v21-qa'},headers:{'access-control-allow-origin':'*'}});if(u.pathname.endsWith('/showroom-inquiries')&&u.searchParams.get('action')==='policy')return route.fulfill({json:{policy:POLICY},headers:{'access-control-allow-origin':'*'}});if(u.pathname.endsWith('/showroom-inquiries')&&route.request().method()==='POST'){const body=route.request().postData();inquiryInputs.push(JSON.parse(body));return inquiryHandler(new Request(route.request().url(),{method:'POST',headers:{'content-type':'application/json'},body})).then(async response=>route.fulfill({status:response.status,body:await response.text(),headers:{'content-type':'application/json','access-control-allow-origin':'*'}}));}if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers:{'access-control-allow-origin':'*','access-control-allow-headers':'*'}});unexpected.push(u.pathname);return route.abort();});
-  for(const kind of ['commercial','land','factory','logistics','income'])for(const materials of (process.env.V21_MATERIAL_QA==='1'?['minimal','plan','photo','both']:['minimal'])){
+  for(const kind of ['commercial','land','factory','logistics','income'])for(const materials of (process.env.V21_DOCUMENT_QA==='1'?['document']:process.env.V21_MATERIAL_QA==='1'?['minimal','plan','photo','both']:['minimal'])){
    const profile={version:1,kind,transaction:'sale',price:{status:'negotiable',saleWon:null,depositWon:null,monthlyWon:null},fields:[{id:'provided-zero',key:'power_capacity',label:'전력 용량',value:0,unit:'kW',status:'provided',asOf:'2026-11-01',sourceText:'합성 제공자료',sourceIds:[],publication:'approved',useApproved:true}],sourcePermissions:[],highlights:[]};
    profile.fields.push({...profile.fields[0],id:'private-ref',value:'PRIVATE_SECRET',publication:'private'});
+   if(kind==='income')profile.fields.push({...profile.fields[0],id:'floor-one',key:'rent_roll',label:'1층 공개 임대 현황',value:'1층 임대 중',unit:''},{...profile.fields[0],id:'floor-three',key:'rent_roll',label:'3층 공개 임대 현황',value:'3층 계약조건 확인 중',unit:''},{...profile.fields[0],id:'private-lease',key:'rent_roll',label:'비공개 계약',value:'PRIVATE_LEASE',publication:'private'});
+
+   const documentId='30000000-0000-4000-8000-000000000003',sourceAssets=[];
+   if(materials==='document'){
+    const key=kind==='income'?'lease_period':purposesFor(kind)[0].keys[0];
+    const entry={...profile.fields[0],id:'document-condition',key,label:'전문자료 조건',value:kind==='factory'?100:'제공 조건 · 원문 대조 필요',unit:kind==='factory'?'kW':'',sourceText:'합성 전문자료 2쪽 · 제공정보',sourceIds:[documentId]};
+    profile.fields=profile.fields.filter(f=>!(f.key===key&&f.publication==='approved'));profile.fields.push(entry);
+    profile.sourcePermissions=[{assetId:documentId,useApproved:true,allowDerivedPublication:true}];sourceAssets.push({id:documentId,source_type:'owner_provided'});
+   }
    profile.modules={customerDecision:{...defaultDecisionSettings(kind),publication:'approved',reviewConfirmed:true}};
-   const validated=validateProfile(profile,{assets:[],userId:'synthetic-admin',now:'2026-11-07T00:00:00Z'});
+   const validated=validateProfile(profile,{assets:sourceAssets,userId:'synthetic-admin',now:'2026-11-07T00:00:00Z'});
    snapshot={schema_version:'1.0',id:'10000000-0000-4000-8000-000000000001',category:['factory','logistics'].includes(kind)?'industrial':kind,title:'합성 '+kind,subtitle:'제공자료로 검토하는 예시',summary:'합성 자료이며 실제 매물이 아닙니다.',propertyProfile:validated,facts:[],concepts:[],unknowns:[],assets:[]};snapshot.customerDecision=publicDecision(validated,validated.fields.filter(f=>visibleField(f,validated)));data=publicDto(snapshot);
    const opts=purposesFor(kind);
    data.concepts=[{id:'concept-2',conceptName:'두 번째 목적 활용',headline:'가설 2',rationale:'조건 확인 필요',purposeIds:[opts[1].id],zones:[]},{id:'concept-1',conceptName:'첫 번째 목적 활용',headline:'가설 1',rationale:'조건 확인 필요',purposeIds:[opts[0].id],zones:[]}];
@@ -32,6 +41,8 @@ const {chromium}=require('playwright'),assert=require('node:assert/strict'),fs=r
    if(['photo','both'].includes(materials))data.assets.push(asset('provided-photo','photo'));
    if(['plan','both'].includes(materials))data.assets.push(asset('provided-plan','provided_plan'));
    snapshot.concepts=structuredClone(data.concepts);snapshot.assets=structuredClone(data.assets);
+   if(materials==='document'){snapshot.documentReview={internalPath:'PRIVATE_DOCUMENT_PATH'};data=Object.assign(publicDto(snapshot),{concepts:data.concepts,assets:data.assets});assert.doesNotMatch(JSON.stringify(data),new RegExp(documentId+'|PRIVATE_DOCUMENT_PATH|sourcePermissions|sourceIds'));}
+
    await page.goto(base+'/v21-qa?source=blog');const select=page.getByLabel('고객 목적 선택',{exact:true});await select.waitFor();assert.equal(await select.inputValue(),'');
    const purposes=purposesFor(kind);await select.selectOption(purposes[0].id);const first=await page.locator('.purpose-slot').first().getAttribute('data-slot-key');assert.equal(first,purposes[0].keys[0]);await page.locator('#tab-concept-1').waitFor();assert.equal(await page.locator('#tab-concept-1').getAttribute('aria-selected'),'true');assert.match(await page.locator('#concept-panel .plan-surface img').getAttribute('src'),/ai-first/);
    assert.match(await page.locator('.purpose-risk').innerText(),new RegExp(purposes[0].risk.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')));
@@ -52,6 +63,7 @@ const {chromium}=require('playwright'),assert=require('node:assert/strict'),fs=r
     result.passed.push('public purpose/check selection -> validated inquiry -> authenticated existing CRM with canonical context; anonymous CRM denied');
    }
    await select.selectOption('');assert.equal(new URL(page.url()).searchParams.has('purpose'),false);
+   if(kind==='income'){const roll=page.locator('#building-rent-roll');assert.equal(await roll.locator('article').count(),2);assert.match(await roll.innerText(),/1층/);assert.match(await roll.innerText(),/3층/);assert.doesNotMatch(await roll.innerText(),/2층|PRIVATE_LEASE/);}
    const visual=page.locator('#visual-evidence');assert.equal(await visual.getByRole('heading',{name:'제공 현장사진',exact:true}).count(),['photo','both'].includes(materials)?1:0);assert.equal(await visual.getByRole('heading',{name:'제공 도면 · 실측 확인 필요',exact:true}).count(),['plan','both'].includes(materials)?1:0);
    result.passed.push(kind+'/'+materials+': selection changes slots/risk, preserves source query and reload, 375/768/1440');
   }

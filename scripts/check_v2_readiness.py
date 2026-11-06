@@ -20,7 +20,7 @@ node=shutil.which('node') or 'node'
 pnpm=shutil.which('pnpm') or 'pnpm'
 cases=[
  ('web-build',[pnpm,'run','build'],ROOT/'showroom-web'),
- ('api-typecheck',[pnpm,'exec','tsc','--ignoreConfig','--noEmit','--allowImportingTsExtensions','--moduleResolution','bundler','--module','esnext','--target','es2022','--lib','es2022,dom','--skipLibCheck','../supabase/functions/showroom-admin/index.ts','../supabase/functions/showroom-assets/index.ts','../supabase/functions/public-showroom/index.ts'],ROOT/'showroom-web'),
+ ('api-typecheck',[pnpm,'exec','tsc','--ignoreConfig','--noEmit','--allowImportingTsExtensions','--moduleResolution','bundler','--module','esnext','--target','es2022','--lib','es2022,dom','--skipLibCheck','../supabase/functions/showroom-admin/index.ts','../supabase/functions/showroom-assets/index.ts','../supabase/functions/public-showroom/index.ts','../supabase/functions/showroom-inquiries/index.ts','../supabase/functions/showroom-crm/index.ts','../supabase/functions/clever-endpoint/index.ts'],ROOT/'showroom-web'),
  ('python-tests',[sys.executable,'-m','unittest','discover','-s','tests','-p','test_*.py'],ROOT),
 ]
 for filename in ['supabase/tests/admin-api.test.ts','supabase/tests/public-showroom.test.ts','supabase/tests/publication.test.ts','supabase/tests/assets-api.test.ts','supabase/tests/image-package-api.test.ts','supabase/tests/plan-flow.test.ts','supabase/tests/property-profile.test.ts','supabase/tests/web-registration-api.test.ts','supabase/tests/concept-edits.test.ts','supabase/tests/image-settings.test.ts','supabase/tests/document-review.test.ts','tests/industrial-review.test.ts','tests/property-review.test.ts','showroom-web/server/router.test.mjs']:
@@ -29,6 +29,8 @@ cases.append(('supabase/tests/rental-scenario.test.ts',[node,'supabase/tests/ren
 cases.append(('tests/private-pdf.test.ts',[node,'tests/private-pdf.test.ts'],ROOT))
 cases.append(('tests/customer-review.test.ts',[node,'tests/customer-review.test.ts'],ROOT))
 cases.append(('supabase/tests/customer-copy.test.ts',[node,'supabase/tests/customer-copy.test.ts'],ROOT))
+for filename in ['supabase/tests/customer-purpose.test.ts','supabase/tests/customer-decision.test.ts','supabase/tests/customer-inquiry.test.ts','supabase/tests/analysis-quality.test.ts','supabase/tests/inquiry-api.test.ts','supabase/tests/intake-api.test.ts','tests/visual-evidence.test.ts']:
+ cases.append((filename,[node,filename],ROOT))
 cases.append(('showroom-web/scripts/built-assets.test.mjs',[node,'showroom-web/scripts/built-assets.test.mjs'],ROOT))
 report={'started_at':datetime.now(ZoneInfo('Asia/Seoul')).isoformat(),'scope':'local build, typecheck, mock tests, bounded PDF inspection and isolated SQL; production/browser/provider accuracy excluded','checks':[],'complete':False,'current_check':None}
 destination=ROOT/'showroom-web/test-results/v2-readiness.json'
@@ -49,7 +51,7 @@ for name,command,directory in cases:
  check['seconds']=round(time.monotonic()-start,2);report['checks'].append(check)
  report['current_check']=None;checkpoint()
  print(check['status'].upper(),name,flush=True)
-for filename in ['web-registration-db.test.mjs','concept-images-db.test.mjs','private-pdf-bucket-db.test.mjs']:
+for filename in ['web-registration-db.test.mjs','concept-images-db.test.mjs','private-pdf-bucket-db.test.mjs','customer-inquiry-db.test.mjs','analysis-snapshot-db.test.mjs','telegram-intake.test.mjs']:
  report['current_check']=filename;checkpoint()
  if not os.environ.get('PGLITE_MODULE'):
   check={'name':filename,'status':'unrun','reason':'Set PGLITE_MODULE to the installed @electric-sql/pglite ESM entry'}

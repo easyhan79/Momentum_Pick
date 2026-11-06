@@ -10,6 +10,8 @@
 - [현재 개발 완료·미완료 항목과 다음 작업 순서](docs/SPACEPICK_CURRENT_DEVELOPMENT_STATUS.md)
 - [SpacePick v2 검증·적용 순서](docs/SPACEPICK_V2_VALIDATION.md)
 - [실제 구현 기준 아키텍처와 매물 게시/프로그램 배포 구분](docs/SPACEPICK_V2_ARCHITECTURE.md)
+- [v2.1 완료 보고서·남은 운영 작업](SPACEPICK_V2_1_REPORT.md)
+- [v2.1 재개 상태](SPACEPICK_V2_1_RUN_STATE.json) / [작업 기록](SPACEPICK_V2_1_PROGRESS.md)
 - [GitHub 업데이트 절차](docs/SPACEPICK_V2_GITHUB.md)
 
 웹 앱은 `showroom-web`에서 `pnpm install --frozen-lockfile`, `pnpm run build`로 빌드합니다. Worker가 승인본 공유 메타데이터와 브라우저 앱을 제공합니다. 운영 DB 변경 이력은 `supabase/migrations`에 있습니다.
