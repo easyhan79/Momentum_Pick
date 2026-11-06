@@ -12,13 +12,13 @@
     "S6"
   ],
   "currentStage": "S6",
-  "status": "local_complete",
+  "status": "all_local_complete",
   "lastCompletedStage": "S6",
   "lastSuccessfulCheck": {
-    "command": "readiness35 + browser64 + read-only preflight + release hashes passed",
-    "at": "2026-11-07T01:48:28.070102+09:00"
+    "command": "readiness35 (Python59 Node141 SQL6); browser64; preflight; clean release232 hashes/inputs",
+    "at": "2026-11-07T01:49:23.669428+09:00"
   },
-  "lastCommit": "1c5df69bf163f987fa94d6b73703f930839db436",
+  "lastCommit": "296687a984eb4a1f11a4fa8b56eaaf8104fdbcb9",
   "branch": "feature/spacepick-v2-1",
   "pushStatus": "feature_branch_pushed",
   "blockers": [],
@@ -26,8 +26,8 @@
     "운영 배포 연결 미제공",
     "실제 AI/실매물/외부 데이터 검증 미수행"
   ],
-  "nextAction": "S6 소스 체크포인트 commit/push, all_local_complete 기록 후 깨끗한 배포 준비 zip 재생성",
-  "updatedAt": "2026-11-07T01:48:28.070102+09:00",
+  "nextAction": "S0~S6 재개발 없음. 관리 연결·운영 버전 확인 후 DEPLOYMENT의 적용/복구 절차와 실매물·실제 AI 검증; T10b 별도",
+  "updatedAt": "2026-11-07T01:49:23.669428+09:00",
   "stages": {
     "S0": {
       "status": "local_complete",
@@ -61,32 +61,11 @@
     },
     "S6": {
       "status": "local_complete",
-      "updatedAt": "2026-11-07T01:48:28.070102+09:00",
-      "lastUnit": "S6 통합35/Python59/Node141/SQL6와 브라우저64그룹 통과; preflight SQL 격리검사·패키지 SQL/문서/해시 확인, 완료/외부 대기 계획 갱신"
+      "updatedAt": "2026-11-07T01:49:23.669428+09:00",
+      "lastUnit": "S0~S6 구현/회귀/문서화 완료. S6 소스 296687a 개발 브랜치 push 성공; 통합35·브라우저64·preflight·깨끗한 소스 패키지232파일/해시/공개입력 검사 통과. 운영 main/DB/함수/호스팅 미변경"
     }
   },
-  "lastPushedCommit": "11fb94525f22748d3ed9a98e811a318c2c63ee50",
+  "lastPushedCommit": "296687a984eb4a1f11a4fa8b56eaaf8104fdbcb9",
   "remoteBranch": "feature/spacepick-v2-1",
-  "workingTreeChanges": [
-    "README.md",
-    "SPACEPICK_V2_1_GAP_AND_MAPPING.md",
-    "SPACEPICK_V2_1_PROGRESS.md",
-    "SPACEPICK_V2_1_RUN_STATE.json",
-    "SPACEPICK_V2_1_VALIDATION.md",
-    "docs/SPACEPICK_CURRENT_DEVELOPMENT_STATUS.md",
-    "docs/SPACEPICK_V2_EXTERNAL_DATA.md",
-    "docs/SPACEPICK_V2_PLAN.md",
-    "scripts/check_v2_readiness.py",
-    "scripts/package_v2_release.py",
-    "scripts/v21_checkpoint.py",
-    "showroom-web/scripts/property-facts-qa.cjs",
-    "showroom-web/scripts/v21-customer-qa.cjs",
-    "showroom-web/src/components/DecisionSettingsEditor.tsx",
-    "showroom-web/src/pages/ShowroomPage.tsx",
-    "supabase/tests/customer-inquiry-db.test.mjs",
-    "SPACEPICK_V2_1_DEPLOYMENT.md",
-    "SPACEPICK_V2_1_REPORT.md",
-    "supabase/review/v21_preflight.sql",
-    "tests/test_v21_checkpoint.py"
-  ]
+  "workingTreeChanges": []
 }
