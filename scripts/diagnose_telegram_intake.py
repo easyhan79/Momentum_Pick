@@ -7,6 +7,7 @@ Does not send messages, modify webhooks, claim work or change project data.
 import json
 import os
 import re
+import hashlib
 from urllib.error import HTTPError
 from urllib.request import Request,HTTPRedirectHandler,build_opener
 from urllib.parse import urlsplit,urlencode
@@ -47,6 +48,12 @@ def diagnose(environment,reader=read):
     else:
         status,body=reader(f'https://api.telegram.org/bot{token}/getMe')
         result['bot']='BOT_OK' if status==200 and body.get('ok') is True else f'BOT_HTTP_{status}'
+        identity=body.get('result',{})
+        if isinstance(identity,dict):
+            username=identity.get('username','')
+            if isinstance(username,str) and re.fullmatch(r'[A-Za-z0-9_]{1,64}',username):
+                result['bot_name_fingerprint']=hashlib.sha256(username.lower().encode()).hexdigest()[:12]
+            result['group_privacy_enabled']=identity.get('can_read_all_group_messages') is not True
         status,body=reader(f'https://api.telegram.org/bot{token}/getWebhookInfo')
         info=body.get('result') if body.get('ok') is True else None
         if status!=200 or not isinstance(info,dict):
@@ -65,6 +72,8 @@ def diagnose(environment,reader=read):
             if result['webhook_same_project'] and result['webhook_expected_path'] and (parsed.query or parsed.fragment):
                 result['webhook']='HOOK_URL_OPTIONS'
             result['pending_updates']=isinstance(info.get('pending_update_count'),int) and info['pending_update_count']>0
+            allowed=info.get('allowed_updates',[])
+            result['message_updates_enabled']=not allowed or isinstance(allowed,list) and 'message' in allowed
             error=info.get('last_error_message','')
             match=re.search(r'\b([45][0-9]{2})\b',error)
             result['webhook_last_error']='NONE' if not error else 'HTTP_'+match.group(1) if match else 'REPORTED'
@@ -149,6 +158,8 @@ def write_report(result,environment):
     if environment.get('GITHUB_OUTPUT'):
         with open(environment['GITHUB_OUTPUT'],'a') as output:
             output.write('verdict='+verdict+'\n')
+            delivery=['BOT_ID_'+result.get('bot_name_fingerprint','UNKNOWN').upper(),'MESSAGES_ENABLED' if result.get('message_updates_enabled') else 'MESSAGES_EXCLUDED','GROUP_PRIVACY_ON' if result.get('group_privacy_enabled') else 'GROUP_PRIVACY_OFF','PENDING_UPDATES' if result.get('pending_updates') else 'NO_PENDING_UPDATES']
+            output.write('delivery='+'__'.join(delivery)+'\n')
     if environment.get('GITHUB_STEP_SUMMARY'):
         with open(environment['GITHUB_STEP_SUMMARY'],'a') as output:
             output.write('## Read-only intake diagnostics\n\n```json\n'+json.dumps(result,indent=2,sort_keys=True)+'\n```\n\nNo messages sent; no webhook, queue or customer data changed.\n')

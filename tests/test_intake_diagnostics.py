@@ -14,6 +14,7 @@ class IntakeDiagnosticsTest(unittest.TestCase):
             return 200,dict(telegram_configured=False,dispatch_configured=True,webhook_secret_configured=True)
         env=dict(TELEGRAM_TOKEN='123:PRIVATE_TOKEN',SUPABASE_URL=BASE,SUPABASE_KEY='PRIVATE_SERVER_KEY')
         result=diagnose(env,reader)
+        self.assertRegex(result['bot_name_fingerprint'],r'^[0-9a-f]{12}$')
         self.assertEqual(result['webhook_last_error'],'HTTP_401');self.assertTrue(result['pending_updates'])
         self.assertEqual(result['intake'],'EDGE_OK');self.assertFalse(result['telegram_configured'])
         self.assertNotIn('PRIVATE',json.dumps(result));self.assertNotIn(BASE,json.dumps(result))

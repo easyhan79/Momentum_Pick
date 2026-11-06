@@ -14,6 +14,7 @@ jobs:
     timeout-minutes: 3
     outputs:
       verdict: ${{ steps.health.outputs.verdict }}
+      delivery: ${{ steps.health.outputs.delivery }}
     steps:
       - uses: actions/checkout@v4
       - name: Check existing intake bindings without changing data
@@ -32,3 +33,11 @@ jobs:
     steps:
       - name: Read-only checks complete
         run: python3 -c "print('No messages sent; no webhook, queue or customer data changed.')"
+  delivery:
+    needs: diagnose
+    name: "Delivery options — ${{ needs.diagnose.outputs.delivery }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - name: Read-only delivery checks complete
+        run: python3 -c "print('Bot names are compared by fingerprint; no username or token is published.')"
