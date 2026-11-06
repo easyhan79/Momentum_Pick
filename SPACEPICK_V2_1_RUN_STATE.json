@@ -15,10 +15,10 @@
   "status": "all_local_complete",
   "lastCompletedStage": "S6",
   "lastSuccessfulCheck": {
-    "command": "readiness37 (Python65 Node146 SQL7); copy rewrite dev5 + built5 + copy-review5 + admin6 browser groups",
-    "at": "2026-11-07T08:10:45.559952+09:00"
+    "command": "readiness38 (Python65 Node152 SQL7); image prompts dev4+built4+admin6 browser groups",
+    "at": "2026-11-07T08:28:31.122763+09:00"
   },
-  "lastCommit": "9b455002b51152684919c17b6ddc5f9e83c374c3",
+  "lastCommit": "13494af1d8aee74c796ae0c98dd72dd008fa99d4",
   "branch": "feature/spacepick-v2-1",
   "pushStatus": "feature_branch_pushed",
   "blockers": [],
@@ -26,8 +26,8 @@
     "운영 배포 연결 미제공",
     "실제 AI/실매물/외부 데이터 검증 미수행"
   ],
-  "nextAction": "다시 글작성 R0~R3 로컬 완료. docs/COPY_REWRITE.md 순서로 운영 반영/활성화·실제 AI 검증; 기존 본인 전용 배포 연결은 별도 대기.",
-  "updatedAt": "2026-11-07T08:12:20.130139+09:00",
+  "nextAction": "이미지 프롬프트 IP0~IP3 로컬 완료. GitHub 체크포인트/배포 준비 파일 갱신 후 기존 배포 순서와 실제 Gemini 결과 검증. 기존 운영 미완료 유지.",
+  "updatedAt": "2026-11-07T08:28:31.122763+09:00",
   "stages": {
     "S0": {
       "status": "local_complete",
@@ -67,7 +67,22 @@
   },
   "lastPushedCommit": "9b455002b51152684919c17b6ddc5f9e83c374c3",
   "remoteBranch": "feature/spacepick-v2-1",
-  "workingTreeChanges": [],
+  "workingTreeChanges": [
+    "README.md",
+    "SPACEPICK_V2_1_PROGRESS.md",
+    "SPACEPICK_V2_1_RUN_STATE.json",
+    "docs/SPACEPICK_CURRENT_DEVELOPMENT_STATUS.md",
+    "docs/SPACEPICK_V2_PLAN.md",
+    "scripts/check_v2_readiness.py",
+    "showroom-web/scripts/property-facts-qa.cjs",
+    "showroom-web/src/components/ImageSettingsEditor.tsx",
+    "showroom-web/src/styles.css",
+    "SPACEPICK_IMAGE_PROMPT_PLAN.md",
+    "docs/IMAGE_PROMPTS.md",
+    "showroom-web/src/components/ImagePromptPanel.tsx",
+    "supabase/functions/_shared/image-prompts.ts",
+    "supabase/tests/image-prompts.test.ts"
+  ],
   "followUp": {
     "id": "PRIVATE_PREVIEW",
     "plan": "SPACEPICK_PRIVATE_PREVIEW_PLAN.md",
@@ -103,5 +118,25 @@
     "lastPushedSourceCommit": "9b455002b51152684919c17b6ddc5f9e83c374c3",
     "branch": "feature/spacepick-v2-1",
     "release": "prepared_not_deployed; 244 files, hash/input/private-exclusion checks passed"
+  },
+  "imagePrompts": {
+    "status": "local_complete",
+    "currentUnit": "IP3",
+    "plan": "SPACEPICK_IMAGE_PROMPT_PLAN.md",
+    "deployed": false,
+    "updatedAt": "2026-11-07T08:28:31.122763+09:00",
+    "localChecks": {
+      "promptRules": 6,
+      "readiness": 38,
+      "python": 65,
+      "node": 152,
+      "isolatedSQL": 7,
+      "browserGroups": 14,
+      "build": "passed"
+    },
+    "externalValidation": [
+      "운영 프런트 배포 미완료",
+      "실제 Gemini 웹 생성 품질·구조 보존 대조 미수행"
+    ]
   }
 }

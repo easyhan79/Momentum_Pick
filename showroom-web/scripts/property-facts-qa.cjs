@@ -16,16 +16,19 @@ const path=require('node:path');
  const pdfMode=process.env.PDF_REVIEW_QA==='1';
  const rentalMode=process.env.RENTAL_SCENARIO_QA==='1';
  const copyReviewMode=process.env.COPY_REVIEW_QA==='1';
+ const imagePromptMode=process.env.IMAGE_PROMPT_QA==='1';
  const customerRequestMode=process.env.CUSTOMER_REQUEST_QA==='1',inquiryInputs=[];
  const pdfFixture=pdfMode?JSON.parse(await fs.readFile(path.resolve(__dirname,'../test-results/v2-pdf/fixture.json'),'utf8')):null;
  const registrationMode=process.env.WEB_REGISTRATION_QA==='1'||pdfMode||v21Admin;let created=!registrationMode,queued=false;
  const queueInputs=[];
  const pdfDocuments=pdfMode?[{id:pdfFixture.assetId,caption:'합성 매각제안서',kind:'document',source_type:'owner_provided'},{id:pdfFixture.encryptedId,caption:'암호화된 합성 문서',kind:'document',source_type:'owner_provided'}]:[];
+ const promptAssets=imagePromptMode?[{id:'20000000-0000-4000-8000-000000000002',property_id:property,kind:'photo',source_type:'owner_provided',caption:'합성 원본 사진'},{id:'30000000-0000-4000-8000-000000000003',property_id:property,kind:'provided_plan',source_type:'owner_provided',caption:'합성 제공 도면'}]:[];
  let documentMode='normal';
  let room={id:property,property_id:property,slug:'factory-qa',showroom_status:'draft',revision:1,draft_content:{schema_version:'1.0',id:property,category:'industrial',title:'합성 공장 예시',subtitle:'검토용 제목',summary:'합성 브라우저 검증 자료입니다.',address:'합성 소재지',facts:[],concepts:[],unknowns:[],assets:[]}};
  const legacySummary='[사실 조건] 토지 100㎡입니다. [제공 주장] 장기 임대 중입니다. [활용 가설] 계약 승계 가능 여부는 확인이 필요합니다.';
  const privateCopyReview=[{category:'provided_claim',statement:'합성 제공자 주장 검토 메모',check:'임대차계약서로 계약기간과 승계 조건을 대조하세요.'}];
  if(copyReviewMode){room.draft_content.summary=legacySummary;room.published_content={summary:'기존 승인 문구'};}
+ if(imagePromptMode){room.draft_content.facts=[{key:'power_capacity',label:'전력 용량',value:0,unit:'kW',evidence:'owner_provided',source:'합성 제공자료'},{key:'private',label:'비공개 정보',value:'PRIVATE_VALUE',evidence:'owner_provided',publication:'private'}];room.draft_content.concepts=[{id:'concept-1',conceptName:'제조 운영 검토',headline:'활용 가설',rationale:'확인 필요',feasibility:'not_checked',zones:[{id:'zone-1-1',label:'작업',title:'작업 구역',body:'가설'}]}];room.published_content={summary:'기존 승인 문구'};}
  const mockFetch=async(url,init={})=>{
    const pathname=String(url);
    if(pathname.endsWith('/auth/v1/user'))return Response.json({id:property,app_metadata:{showroom_admin:true}});
@@ -57,8 +60,8 @@ const path=require('node:path');
  const crmHandler=createCrmHandler({url:'https://mock-db',key:'synthetic-server-key',fetcher:mockFetch});
  const base=process.env.SHOWROOM_QA_URL||'http://127.0.0.1:5173';
  assert.ok(['127.0.0.1','localhost'].includes(new URL(base).hostname));
- const directory=path.resolve(__dirname,pdfMode?(process.env.SHOWROOM_QA_URL?'../test-results/v2-pdf-built':'../test-results/v2-pdf'):v21Admin?(process.env.SHOWROOM_QA_URL?'../test-results/v21-admin-built':'../test-results/v21-admin-journey'):copyReviewMode?'../test-results/v2-copy-review':customerRequestMode?'../test-results/v2-customer-inquiry':rentalMode?'../test-results/v2-rental':registrationMode?'../test-results/v2-registration':'../test-results/v2-facts');await fs.mkdir(directory,{recursive:true});
- const result={passed:[],failures:[]},errors=[],unexpected=[];
+ const directory=path.resolve(__dirname,imagePromptMode?(process.env.SHOWROOM_QA_URL?'../test-results/image-prompts-built':'../test-results/image-prompts'):pdfMode?(process.env.SHOWROOM_QA_URL?'../test-results/v2-pdf-built':'../test-results/v2-pdf'):v21Admin?(process.env.SHOWROOM_QA_URL?'../test-results/v21-admin-built':'../test-results/v21-admin-journey'):copyReviewMode?'../test-results/v2-copy-review':customerRequestMode?'../test-results/v2-customer-inquiry':rentalMode?'../test-results/v2-rental':registrationMode?'../test-results/v2-registration':'../test-results/v2-facts');await fs.mkdir(directory,{recursive:true});
+ const result={passed:[],failures:[]},errors=[],unexpected=[],promptMutations=[];
  const browser=await chromium.launch({headless:true,...(process.env.CHROME_PATH?{executablePath:process.env.CHROME_PATH}:{})});
  let page;
  try{
@@ -84,9 +87,10 @@ const path=require('node:path');
          const encrypted=url.searchParams.get('assetId')===pdfFixture.encryptedId;
          return route.fulfill({contentType:'application/pdf',body:Buffer.from(encrypted?pdfFixture.encryptedBase64:pdfFixture.pdfBase64,'base64')});
        }
-       return route.fulfill({json:{assets:pdfDocuments}});
+       return route.fulfill({json:{assets:imagePromptMode?promptAssets:pdfDocuments}});
      }
      if(url.pathname==='/functions/v1/showroom-admin'){
+       if(imagePromptMode&&request.method()!=='GET')promptMutations.push(JSON.parse(request.postData()).action);
        const response=await admin(new Request(request.url(),{method:request.method(),headers:{Authorization:'Bearer synthetic-user','Content-Type':'application/json'},...(request.postData()?{body:request.postData()}:{})}));
        return route.fulfill({status:response.status,body:await response.text(),headers:{'content-type':'application/json','access-control-allow-origin':'*'}});
      }
@@ -195,6 +199,26 @@ const path=require('node:path');
      }
    }
    await page.getByRole('button',{name:'초안 열기',exact:true}).click();
+   if(imagePromptMode){
+     const before=structuredClone(room),panel=page.locator('#image-prompt-panel'),settings=page.locator('#image-settings');
+     const output=panel.getByLabel('Gemini 웹용 완성 프롬프트',{exact:true}),copy=panel.getByRole('button',{name:'이미지 프롬프트 복사',exact:true});
+     await output.waitFor();let prompt=await output.inputValue();assert.match(prompt,/대표 이미지/);assert.match(prompt,/전력 용량: 0 kW/);assert.doesNotMatch(prompt,/PRIVATE_VALUE/);
+     await panel.getByLabel('이미지 프롬프트 대상',{exact:true}).selectOption('concept-1');assert.match(await output.inputValue(),/x=27%, y=28%/);
+     await panel.getByLabel('이미지 프롬프트 작업 방식',{exact:true}).selectOption('edit');await panel.getByLabel('원하는 이미지 변경 · 선택',{exact:true}).fill('구조를 유지하고 외벽 색감만 회색으로 변경');
+     prompt=await output.inputValue();assert.match(prompt,/수정할 AI 이미지/);assert.match(prompt,/외벽 색감만/);assert.match(prompt,/실제 원본을 우선/);
+     result.passed.push('hero/concept generation and edit prompts use current draft; zero is preserved, private values excluded, zones and structural constraints retained');
+     await page.context().grantPermissions(['clipboard-read','clipboard-write'],{origin:base});await copy.click();assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),prompt);
+     const downloading=page.waitForEvent('download');await panel.getByRole('button',{name:'이미지 프롬프트 내려받기',exact:true}).click();const download=await downloading;await download.saveAs(path.join(directory,'synthetic-prompt.txt'));const downloaded=await fs.readFile(path.join(directory,'synthetic-prompt.txt'),'utf8');assert.ok(downloaded.includes(prompt));assert.doesNotMatch(downloaded,/PRIVATE_VALUE|20000000|30000000/);
+     result.passed.push('browser clipboard and UTF-8 text download contain matching prompt and no internal IDs or private numbers');
+     await settings.getByRole('button',{name:'이미지 생성 방식 설정',exact:true}).click();await settings.getByLabel('이미지 유형',{exact:true}).selectOption('photo');assert.equal(await copy.isDisabled(),true);
+     await settings.getByLabel('참고할 실제 자료',{exact:true}).selectOption(promptAssets[0].id);assert.equal(await copy.isDisabled(),true);
+     await settings.getByLabel('선택 자료를 AI 제작에 사용할 권한을 확인했습니다.',{exact:true}).check();assert.equal(await copy.isEnabled(),true);assert.match(await output.inputValue(),/카메라 위치·시점/);
+     await settings.getByLabel('이미지 유형',{exact:true}).selectOption('plan');assert.equal(await copy.isDisabled(),true);await settings.getByLabel('참고할 실제 자료',{exact:true}).selectOption(promptAssets[1].id);await settings.getByLabel('선택 자료를 AI 제작에 사용할 권한을 확인했습니다.',{exact:true}).check();assert.match(await output.inputValue(),/도면에서 확인되는 벽·기둥·출입구/);
+     result.passed.push('reference mode requires selected photo/plan and explicit rights; mode changes cannot reuse stale source permission');
+     for(const width of [1440,768,375]){await page.setViewportSize({width,height:1000});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+2));await panel.screenshot({path:path.join(directory,`prompt-${width}.png`)});}
+     assert.deepEqual(room,before);assert.deepEqual(promptMutations,['create-draft']);assert.deepEqual(errors,[]);assert.deepEqual(unexpected,[]);
+     result.passed.push('375/768/1440, no page/console errors, no image/AI job or budget mutation, saved draft and approval unchanged by prompt controls');return;
+   }
    if(copyReviewMode){
      const summary=page.getByLabel('요약 · AI 문구 검토 필요',{exact:true});
      await summary.waitFor();assert.equal(await summary.inputValue(),legacySummary);

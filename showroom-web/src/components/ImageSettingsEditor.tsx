@@ -1,5 +1,6 @@
 import {useEffect,useState} from 'react';
 import {mediaRequest} from '../lib/adminApi';import type {Showroom} from '../types/showroom';
+import {ImagePromptPanel} from './ImagePromptPanel';
 export function ImageSettingsEditor({content,busy,onChange}:{content:Showroom;busy:boolean;onChange:(value:Showroom)=>void}){
  const [assets,setAssets]=useState<{id:string;kind:string;source_type:string;caption:string}[]>([]),[error,setError]=useState('');
  useEffect(()=>{let active=true;void mediaRequest(`action=list&propertyId=${content.id}`).then(r=>r.json()).then(data=>{if(active)setAssets(data.assets);}).catch(()=>{if(active)setError('자료 목록을 불러오지 못했습니다. 초안을 다시 열어 주세요.');});return()=>{active=false;};},[content.id]);
@@ -10,5 +11,6 @@ export function ImageSettingsEditor({content,busy,onChange}:{content:Showroom;bu
    {settings.mode!=='concept'&&<><label>참고할 실제 자료<select aria-label="참고할 실제 자료" value={settings.sourceAssetId||''} onChange={e=>onChange({...content,imageSettings:{...settings,sourceAssetId:e.target.value||null,rightsApproved:false}})}><option value="">자료 선택 필요</option>{assets.filter(a=>a.source_type!=='ai_generated'&&a.kind===(settings.mode==='plan'?'provided_plan':'photo')).map(a=><option key={a.id} value={a.id}>{a.caption||a.id}</option>)}</select></label><label><input type="checkbox" checked={settings.rightsApproved} onChange={e=>onChange({...content,imageSettings:{...settings,rightsApproved:e.target.checked}})}/>선택 자료를 AI 제작에 사용할 권한을 확인했습니다.</label></>}
    <p>실제 구조·출입구·기둥·카메라 구도의 보존은 자동 보장되지 않습니다. 공개 전 원자료와 결과를 사람이 대조해야 합니다.</p>
   </fieldset>}{error&&<p role="alert">{error}</p>}
+  <ImagePromptPanel key={content.id} content={content} assets={assets} busy={busy}/>
  </section>;
 }

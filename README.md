@@ -13,6 +13,7 @@
 - [v2.1 완료 보고서·남은 운영 작업](SPACEPICK_V2_1_REPORT.md)
 - [본인 전용 배포·개발 검증 계획](SPACEPICK_PRIVATE_PREVIEW_PLAN.md)
 - [등록 매물 다시 글작성 기능·사용법·배포 조건](docs/COPY_REWRITE.md)
+- [Gemini 웹용 이미지 생성·수정 프롬프트](docs/IMAGE_PROMPTS.md)
 - [v2.1 재개 상태](SPACEPICK_V2_1_RUN_STATE.json) / [작업 기록](SPACEPICK_V2_1_PROGRESS.md)
 - [GitHub 업데이트 절차](docs/SPACEPICK_V2_GITHUB.md)
 
