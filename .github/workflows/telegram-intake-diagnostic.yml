@@ -1,0 +1,33 @@
+name: Telegram intake read-only diagnostic
+on:
+  push:
+    branches: [audit/telegram-intake-20261106]
+    paths:
+      - .github/workflows/telegram-intake-diagnostic.yml
+      - scripts/diagnose_telegram_intake.py
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    outputs:
+      verdict: ${{ steps.health.outputs.verdict }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check existing intake bindings without changing data
+        id: health
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+        run: python3 scripts/diagnose_telegram_intake.py
+  result:
+    needs: diagnose
+    name: "Intake diagnostic — ${{ needs.diagnose.outputs.verdict }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - name: Read-only checks complete
+        run: python3 -c "print('No messages sent; no webhook, queue or customer data changed.')"

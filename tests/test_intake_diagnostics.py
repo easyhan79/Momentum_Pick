@@ -1,0 +1,35 @@
+import json
+import unittest
+from scripts.diagnose_telegram_intake import diagnose,write_report,BASE
+
+
+class IntakeDiagnosticsTest(unittest.TestCase):
+    def test_safe_report_identifies_wrong_webhook_auth_without_exposing_bindings(self):
+        calls=[]
+        def reader(url,headers=None,method='GET'):
+            calls.append((url,method))
+            if url.endswith('/getMe'):return 200,{'ok':True,'result':{'username':'PRIVATE_BOT'}}
+            if url.endswith('/getWebhookInfo'):return 200,{'ok':True,'result':{'url':BASE+'/functions/v1/clever-endpoint','pending_update_count':3,'last_error_message':'Wrong response from the webhook: 401 Unauthorized'}}
+            if method=='HEAD':return 200,{}
+            return 200,dict(telegram_configured=False,dispatch_configured=True,webhook_secret_configured=True)
+        env=dict(TELEGRAM_TOKEN='123:PRIVATE_TOKEN',SUPABASE_URL=BASE,SUPABASE_KEY='PRIVATE_SERVER_KEY')
+        result=diagnose(env,reader)
+        self.assertEqual(result['webhook_last_error'],'HTTP_401');self.assertTrue(result['pending_updates'])
+        self.assertEqual(result['intake'],'EDGE_OK');self.assertFalse(result['telegram_configured'])
+        self.assertNotIn('PRIVATE',json.dumps(result));self.assertNotIn(BASE,json.dumps(result))
+        self.assertTrue(all(method in ('GET','HEAD') and not any(name in url for name in ['sendMessage','setWebhook','getUpdates']) for url,method in calls))
+    def test_missing_bindings_make_no_requests(self):
+        def reader(*args,**kwargs):raise AssertionError('unexpected request')
+        result=diagnose({},reader)
+        self.assertEqual(result['bot'],'BOT_UNCONFIGURED');self.assertEqual(result['database'],'DB_UNCHECKED')
+    def test_error_bodies_and_unexpected_target_are_not_published(self):
+        def reader(url,headers=None,method='GET'):
+            if url.endswith('/getMe'):return 401,{'message':'PRIVATE_TOKEN'}
+            if url.endswith('/getWebhookInfo'):return 200,{'ok':True,'result':{'url':'https://private.invalid/token','last_error_message':'PRIVATE_ERROR'}}
+            return 403,{'message':'PRIVATE_SERVER_ERROR'}
+        result=diagnose(dict(TELEGRAM_TOKEN='123:PRIVATE_TOKEN',SUPABASE_URL=BASE,SUPABASE_KEY='PRIVATE'),reader)
+        self.assertEqual(result['webhook'],'HOOK_TARGET_OTHER');self.assertEqual(result['webhook_last_error'],'REPORTED')
+        self.assertNotIn('PRIVATE',json.dumps(result))
+
+
+if __name__=='__main__':unittest.main()
