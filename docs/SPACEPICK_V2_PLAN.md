@@ -5,6 +5,7 @@
 ## 현재 위치
 
 - 전체 상태: T11 고객 정보 보강 구현·검증 완료. 텔레그램 분석 작업자가 사용하는 운영 main 갱신 완료. 웹 호스팅과 Supabase 신규 함수/migration의 실제 적용은 미완료.
+- 현재 긴급 확인: 사용자 Telegram 테스트 무응답. 읽기 전용 진단은 `docs/TELEGRAM_INTAKE_DIAGNOSTIC_20261106.md`와 `audit/telegram-intake-20261106` 브랜치에 기록. 봇/대화 대상 대조를 위해 사용자 답변 대기 중이며 접수 성공으로 표시하지 않음.
 - 현재 위치: 코드 커밋 5c489ae7eb60117dbc3236a2ea579db6ab838534를 원격 main에 반영했고 원격 조회로 확인했다. Telegram intake는 agent.yml을 main 기준으로 실행한다. 새 버전의 실제 분석 실행 성공을 아직 관측하지 않았다.
 - 다음 작업: 다음 정상 Actions 실행이 새 main을 사용하는지 확인하고, 고객 웹앱 및 신규 웹 관리 API/DB 변경을 기존 호스팅·Supabase에 적용한다. GitHub 코드 반영, Actions 실행 성공, 고객 화면 배포를 구분해 기록한다.
 - 재개 방법: 이 문서의 작업표와 마지막 작업 기록을 읽고 `git status --short`로 실제 변경을 확인한다. 진행 중인 작업부터 이어간다.
