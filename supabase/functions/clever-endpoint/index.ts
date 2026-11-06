@@ -44,4 +44,10 @@ export function createHandler(config:Config){
  };
 }
 declare const Deno:{env:{get(name:string):string|undefined};serve(handler:(req:Request)=>Promise<Response>):void};
-if(typeof Deno!=='undefined'){const env=Deno.env;console.log('intake configuration telegram='+!!(env.get('TELEGRAM_TOKEN')||env.get('TELEGRAM_BOT_TOKEN')||env.get('BOT_TOKEN'))+' dispatch='+!!(env.get('SPACEPICK_GITHUB_TOKEN')||env.get('GITHUB_TOKEN')||env.get('GH_PAT'))+' webhook_secret='+!!env.get('TELEGRAM_WEBHOOK_SECRET'));Deno.serve(createHandler({url:env.get('SUPABASE_URL')||'',key:env.get('SUPABASE_SERVICE_ROLE_KEY')||'',githubTokens:[env.get('SPACEPICK_GITHUB_TOKEN')||'',env.get('GITHUB_TOKEN')||'',env.get('GH_PAT')||''],repository:env.get('GITHUB_REPO')||'easyhan79/Momentum_Pick',telegramToken:env.get('TELEGRAM_TOKEN')||env.get('TELEGRAM_BOT_TOKEN')||env.get('BOT_TOKEN')||'',telegramSecret:env.get('TELEGRAM_WEBHOOK_SECRET')||''}));}
+if(typeof Deno!=='undefined'){
+ const env=Deno.env;
+ const githubTokens=['SPACEPICK_GITHUB_TOKEN','GITHUB_TOKEN','GH_PAT','GITHUB_PAT_TOKEN'].map(name=>env.get(name)||'');
+ const telegramToken=env.get('TELEGRAM_TOKEN')||env.get('TELEGRAM_BOT_TOKEN')||env.get('BOT_TOKEN')||'';
+ console.log('intake configuration telegram='+!!telegramToken+' dispatch='+githubTokens.some(Boolean)+' webhook_secret='+!!env.get('TELEGRAM_WEBHOOK_SECRET'));
+ Deno.serve(createHandler({url:env.get('SUPABASE_URL')||'',key:env.get('SUPABASE_SERVICE_ROLE_KEY')||'',githubTokens,repository:env.get('GITHUB_REPO')||'easyhan79/Momentum_Pick',telegramToken,telegramSecret:env.get('TELEGRAM_WEBHOOK_SECRET')||''}));
+}

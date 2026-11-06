@@ -5,6 +5,7 @@
 ## 현재 위치
 
 - 전체 상태: T11 고객 정보 보강 구현·검증 완료. 텔레그램 분석 작업자가 사용하는 운영 main 갱신 완료. 웹 호스팅과 Supabase 신규 함수/migration의 실제 적용은 미완료.
+- Telegram 토큰 후속: 사용자의 Supabase Custom secrets에 `GITHUB_PAT_TOKEN` 등록을 화면으로 확인. 접수 함수의 기존 세 별칭에 해당 이름이 없어 호환 수정·검증(접수 API 8개/타입 검사)을 완료했다. 운영 Supabase 함수 배포는 관리 연결 부재로 미완료. 상세: `docs/TELEGRAM_GITHUB_TOKEN_FIX.md`.
 - 현재 위치: 코드 커밋 5c489ae7eb60117dbc3236a2ea579db6ab838534를 원격 main에 반영했고 원격 조회로 확인했다. Telegram intake는 agent.yml을 main 기준으로 실행한다. 새 버전의 실제 분석 실행 성공을 아직 관측하지 않았다.
 - 다음 작업: 다음 정상 Actions 실행이 새 main을 사용하는지 확인하고, 고객 웹앱 및 신규 웹 관리 API/DB 변경을 기존 호스팅·Supabase에 적용한다. GitHub 코드 반영, Actions 실행 성공, 고객 화면 배포를 구분해 기록한다.
 - 재개 방법: 이 문서의 작업표와 마지막 작업 기록을 읽고 `git status --short`로 실제 변경을 확인한다. 진행 중인 작업부터 이어간다.

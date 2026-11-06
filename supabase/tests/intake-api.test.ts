@@ -9,3 +9,33 @@ test('missing dispatch and Telegram tokens are logged and remain recoverable wit
 test('failed dispatch still queues a receipt and HTTP Telegram failure is persisted for retry',async()=>{const h=harness({dispatchStatus:403,telegramFail:true});await h.handler(request());assert.equal(h.calls.at(-1).body.p_success,false);assert.equal(h.calls.at(-1).body.p_error,'telegram_401');assert.ok(h.logs.includes('intake acknowledgement=telegram_401'));assert.doesNotMatch(h.logs.join(' '),/bot-secret|dispatch-token|synthetic original/);});
 test('health endpoint requires server authentication and returns booleans only',async()=>{const h=harness();assert.equal((await h.handler(new Request('https://offline.invalid'))).status,401);const r=await h.handler(new Request('https://offline.invalid',{headers:{Authorization:'Bearer server-only'}}));assert.deepEqual(await r.json(),{telegram_configured:true,dispatch_configured:true,webhook_secret_configured:false});assert.equal(h.calls.length,0);});
 test('webhook secret and malformed identity fail before any database write',async()=>{const h=harness({telegramSecret:'known'});assert.equal((await h.handler(request())).status,403);assert.equal(h.calls.length,0);const plain=harness();assert.equal((await plain.handler(new Request('https://offline.invalid',{method:'POST',body:JSON.stringify({message:{text:'test',chat:{id:123}}})}))).status,400);assert.equal(plain.calls.length,0);});
+test('runtime boot accepts each existing GitHub token name and uses it for main dispatch without logging its value',async()=>{
+ const originalDeno=(globalThis as any).Deno,originalFetch=globalThis.fetch,originalLog=console.log;
+ try{
+  for(const name of ['SPACEPICK_GITHUB_TOKEN','GITHUB_TOKEN','GH_PAT','GITHUB_PAT_TOKEN']){
+   const calls:any[]=[],logs:string[]=[];let handler:any;
+   const values:Record<string,string>={SUPABASE_URL:config.url,SUPABASE_SERVICE_ROLE_KEY:config.key,[name]:'synthetic-private-dispatch-token'};
+   (globalThis as any).Deno={env:{get:(key:string)=>values[key]},serve:(value:any)=>{handler=value;}};
+   console.log=(value:any)=>{logs.push(String(value));};
+   globalThis.fetch=async(url:any,init:any)=>{
+    calls.push({url:String(url),headers:init.headers,body:JSON.parse(init.body)});
+    if(String(url).endsWith('telegram_ingest'))return Response.json({property_id:'synthetic',first:true,duplicate:false});
+    if(String(url).includes('api.github.com'))return new Response(null,{status:204});
+    return Response.json(true);
+   };
+   await import(new URL('../functions/clever-endpoint/index.ts?runtime-token='+name,import.meta.url).href);
+   assert.equal(typeof handler,'function');
+   const health=await handler(new Request(config.url,{headers:{Authorization:'Bearer '+config.key}}));
+   assert.equal((await health.json()).dispatch_configured,true,name);
+   assert.equal((await handler(request())).status,200);
+   const dispatch=calls.find(call=>call.url.includes('api.github.com'));
+   assert.ok(dispatch,name);assert.deepEqual(dispatch.body,{ref:'main'});
+   assert.equal(dispatch.headers.Authorization,'Bearer synthetic-private-dispatch-token');
+   assert.equal(calls.at(-1).body.p_code,'accepted');
+   assert.doesNotMatch(logs.join(' '),/synthetic-private-dispatch-token/);
+  }
+ }finally{
+  if(originalDeno===undefined)delete(globalThis as any).Deno;else(globalThis as any).Deno=originalDeno;
+  globalThis.fetch=originalFetch;console.log=originalLog;
+ }
+});
