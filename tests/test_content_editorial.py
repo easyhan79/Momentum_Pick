@@ -36,3 +36,11 @@ class Editorial(unittest.TestCase):
  def test_excessive_card_text_and_hype_are_flagged(self):
   copy=valid_copy();copy['insta_caption']=copy['insta_caption'].replace('공간의 핵심 질문 1','독점 급매 '+'가'*200)
   issues=audit_copy(copy);self.assertIn('copy:unsupported_superlative',issues);self.assertIn('cards:1:copy_length',issues)
+ def test_customer_summary_is_formatted_without_losing_private_review_or_source_quotes(self):
+  copy=valid_copy();raw='[제공 주장] 장기 임대 중입니다. [활용 가설] 계약 승계 가능 여부는 확인이 필요합니다.'
+  copy.update(usp_summary=raw,landing_copy='[사실 조건] 합성 물류센터',document_facts=[{'quote':raw}],copy_review=[{'category':'provided_claim','statement':'장기 임대','check':'계약기간 대조'}])
+  result=finalize_copy(copy,'장기 임대 중',lambda *args:self.fail('unneeded paid revision'))
+  self.assertEqual(result['_editorial']['status'],'ready');self.assertNotIn('[제공 주장]',result['usp_summary'])
+  self.assertIn('제공자 설명에 따르면',result['usp_summary']);self.assertIn('확인이 필요',result['usp_summary'])
+  self.assertEqual(result['_copy_original']['usp_summary'],raw)
+  self.assertEqual(result['document_facts'],copy['document_facts']);self.assertEqual(result['copy_review'],copy['copy_review'])

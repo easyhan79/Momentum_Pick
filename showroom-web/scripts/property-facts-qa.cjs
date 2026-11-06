@@ -11,6 +11,7 @@ const path=require('node:path');
  const property='10000000-0000-4000-8000-000000000001';
  const pdfMode=process.env.PDF_REVIEW_QA==='1';
  const rentalMode=process.env.RENTAL_SCENARIO_QA==='1';
+ const copyReviewMode=process.env.COPY_REVIEW_QA==='1';
  const customerRequestMode=process.env.CUSTOMER_REQUEST_QA==='1',inquiryInputs=[];
  const pdfFixture=pdfMode?JSON.parse(await fs.readFile(path.resolve(__dirname,'../test-results/v2-pdf/fixture.json'),'utf8')):null;
  const registrationMode=process.env.WEB_REGISTRATION_QA==='1'||pdfMode;let created=!registrationMode,queued=false;
@@ -18,6 +19,9 @@ const path=require('node:path');
  const pdfDocuments=pdfMode?[{id:pdfFixture.assetId,caption:'합성 매각제안서',kind:'document',source_type:'owner_provided'},{id:pdfFixture.encryptedId,caption:'암호화된 합성 문서',kind:'document',source_type:'owner_provided'}]:[];
  let documentMode='normal';
  let room={id:property,property_id:property,slug:'factory-qa',showroom_status:'draft',revision:1,draft_content:{schema_version:'1.0',id:property,category:'industrial',title:'합성 공장 예시',subtitle:'검토용 제목',summary:'합성 브라우저 검증 자료입니다.',address:'합성 소재지',facts:[],concepts:[],unknowns:[],assets:[]}};
+ const legacySummary='[사실 조건] 토지 100㎡입니다. [제공 주장] 장기 임대 중입니다. [활용 가설] 계약 승계 가능 여부는 확인이 필요합니다.';
+ const privateCopyReview=[{category:'provided_claim',statement:'합성 제공자 주장 검토 메모',check:'임대차계약서로 계약기간과 승계 조건을 대조하세요.'}];
+ if(copyReviewMode){room.draft_content.summary=legacySummary;room.published_content={summary:'기존 승인 문구'};}
  const mockFetch=async(url,init={})=>{
    const pathname=String(url);
    if(pathname.endsWith('/auth/v1/user'))return Response.json({id:property,app_metadata:{showroom_admin:true}});
@@ -35,7 +39,7 @@ const path=require('node:path');
    if(pdfMode&&pathname.includes('/property_assets?'))return Response.json(pdfDocuments.filter(doc=>!pathname.includes('id=in.')||pathname.includes(doc.id)));
    if(pdfMode&&pathname.includes('/property_analysis_jobs?'))return Response.json([{state:queueInputs.length===1?'failed':queued?'done':'waiting',attempts:queued?1:0,last_error_code:queueInputs.length===1?'document_pdf_encrypted':''}]);
    if(pdfMode&&pathname.includes('/properties?'))return Response.json(created?[{id:property,address:'합성 소재지',status:queueInputs.length>1?'analyzed':'pending',created_at:'2026-11-05T01:00:00Z',ai_contents:queueInputs.length>1?pdfFixture.ai:{}}]:[]);
-   if(pathname.includes('/properties?'))return Response.json(created?[{id:property,address:'합성 소재지',status:registrationMode&&!queued?'pending':'analyzed',created_at:'2026-11-05T01:00:00Z',ai_contents:{document_facts:registrationMode?[{key:'floor_structure',label:'층수',value:'지상 4층',unit:'',source_index:1,page:7,quote:'지상 4층',missing:false},{key:'floor_structure',label:'층수',value:'지상 3층',unit:'',source_index:1,page:8,quote:'지상 3층',missing:false}]:[],showroom_concepts:queued?[{concept_name:'생산시설 활용 검토',zone_plan:['작업 구역']}]:[]}}]:[]);
+   if(pathname.includes('/properties?'))return Response.json(created?[{id:property,address:'합성 소재지',status:registrationMode&&!queued?'pending':'analyzed',created_at:'2026-11-05T01:00:00Z',ai_contents:{...(copyReviewMode?{copy_review:privateCopyReview,usp_summary:legacySummary,target_1_blog:'[제공 주장] 장기 임대 중이며 승계는 별도 확인이 필요합니다.'}:{}),document_facts:registrationMode?[{key:'floor_structure',label:'층수',value:'지상 4층',unit:'',source_index:1,page:7,quote:'지상 4층',missing:false},{key:'floor_structure',label:'층수',value:'지상 3층',unit:'',source_index:1,page:8,quote:'지상 3층',missing:false}]:[],showroom_concepts:queued?[{concept_name:'생산시설 활용 검토',zone_plan:['작업 구역']}]:[]}}]:[]);
    if(['/property_assets?','/property_image_jobs?','/property_image_budgets?','/property_showroom_routes?','/property_analysis_jobs?'].some(p=>pathname.includes(p)))return Response.json([]);
    throw Error('Unexpected mock database request: '+pathname);
  };
@@ -43,7 +47,7 @@ const path=require('node:path');
  const publicHandler=createPublicHandler('https://mock-db','synthetic-server-key',mockFetch);
  const base=process.env.SHOWROOM_QA_URL||'http://127.0.0.1:5173';
  assert.ok(['127.0.0.1','localhost'].includes(new URL(base).hostname));
- const directory=path.resolve(__dirname,pdfMode?(process.env.SHOWROOM_QA_URL?'../test-results/v2-pdf-built':'../test-results/v2-pdf'):customerRequestMode?'../test-results/v2-customer-inquiry':rentalMode?'../test-results/v2-rental':registrationMode?'../test-results/v2-registration':'../test-results/v2-facts');await fs.mkdir(directory,{recursive:true});
+ const directory=path.resolve(__dirname,pdfMode?(process.env.SHOWROOM_QA_URL?'../test-results/v2-pdf-built':'../test-results/v2-pdf'):copyReviewMode?'../test-results/v2-copy-review':customerRequestMode?'../test-results/v2-customer-inquiry':rentalMode?'../test-results/v2-rental':registrationMode?'../test-results/v2-registration':'../test-results/v2-facts');await fs.mkdir(directory,{recursive:true});
  const result={passed:[],failures:[]},errors=[],unexpected=[];
  const browser=await chromium.launch({headless:true,...(process.env.CHROME_PATH?{executablePath:process.env.CHROME_PATH}:{})});
  let page;
@@ -181,6 +185,43 @@ const path=require('node:path');
      }
    }
    await page.getByRole('button',{name:'초안 열기',exact:true}).click();
+   if(copyReviewMode){
+     const summary=page.getByLabel('요약 · AI 문구 검토 필요',{exact:true});
+     await summary.waitFor();assert.equal(await summary.inputValue(),legacySummary);
+     const panel=page.locator('.copy-review-panel');await panel.getByText(privateCopyReview[0].statement,{exact:true}).waitFor();
+     assert.match(await panel.innerText(),/제공자 주장 · 미검증/);
+     result.passed.push('private structured review appears only in the admin studio; original draft is unchanged on open');
+     await page.getByRole('button',{name:'요약의 구분표시 정리',exact:true}).click();
+     const edited=await summary.inputValue();assert.doesNotMatch(edited,/\[(사실 조건|제공 주장|활용 가설)\]/);
+     assert.match(edited,/100㎡/);assert.match(edited,/제공자 설명에 따르면/);assert.match(edited,/계약 승계 가능 여부는 확인이 필요/);
+     assert.equal(room.draft_content.summary,legacySummary);
+     await page.locator('#showroom-draft').getByRole('button',{name:'초안 저장',exact:true}).click();
+     await page.waitForFunction(()=>document.querySelector('.admin-message')?.textContent?.includes('저장했습니다'));
+     assert.equal(room.draft_content.summary,edited);assert.deepEqual(room.published_content,{summary:'기존 승인 문구'});
+     result.passed.push('explicit formatting preserves numbers/qualifications and requires save; published snapshot stays unchanged');
+     await page.getByRole('button',{name:'선택 문구의 구분표시 정리',exact:true}).click();
+     assert.equal(room.draft_content.marketing,undefined);
+     await page.getByRole('button',{name:'광고 초안 저장',exact:true}).click();
+     await page.getByText('광고 초안을 비공개로 저장했습니다.',{exact:true}).waitFor();
+     assert.equal(room.draft_content.marketing.target_1_blog,'제공자 설명에 따르면 장기 임대 중이며 승계는 별도 확인이 필요합니다.');
+     assert.deepEqual(room.published_content,{summary:'기존 승인 문구'});
+     result.passed.push('legacy blog/card channel formatting is explicit, preserves conditions and saves only private marketing edits');
+     await page.getByRole('button',{name:'쇼룸 미리보기',exact:true}).click();
+     assert.equal(await page.locator('.copy-review-panel').count(),0);
+     assert.equal(await page.locator('.hero-description').innerText(),edited);
+     assert.equal((await page.locator('body').innerText()).includes(privateCopyReview[0].statement),false);
+     for(const width of [375,768,1440]){await page.setViewportSize({width,height:1000});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));}
+     await page.locator('.hero').screenshot({path:path.join(directory,'customer-summary.png')});
+     result.passed.push('customer preview shows natural prose and omits private review at 375/768/1440');
+     await page.getByRole('button',{name:'← 초안 편집으로 돌아가기',exact:true}).click();
+     await page.getByRole('button',{name:'저장본 다시 불러오기',exact:true}).click();
+     assert.equal(await summary.inputValue(),edited);
+     assert.equal(await page.getByRole('button',{name:'요약의 구분표시 정리',exact:true}).isDisabled(),true);
+     await panel.getByText(privateCopyReview[0].statement,{exact:true}).waitFor();
+     await panel.screenshot({path:path.join(directory,'admin-review.png')});
+     result.passed.push('saved edits survive reload; original AI review remains separate and no repeated formatting is offered');
+     assert.deepEqual(errors,[]);assert.deepEqual(unexpected,[]);return;
+   }
    if(registrationMode){
      await page.getByRole('button',{name:'완료된 AI 활용 콘셉트 가져오기',exact:true}).click();
      await page.waitForFunction(()=>document.querySelector('.admin-message')?.textContent?.includes('콘셉트를 비공개'));

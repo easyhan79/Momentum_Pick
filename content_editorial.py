@@ -1,12 +1,23 @@
 """Spacepick editorial brief and bounded automatic revision; no ranking claims."""
 import re
 from difflib import SequenceMatcher
+from customer_copy import prepare_customer_copy
 
 COPY_KEYS=('target_1_blog','target_2_blog','insta_caption')
 EDITORIAL_BRIEF='''
 [출판 편집 기준 — 최종 문안만 반환]
 독자가 매물의 의미를 이해하고 구체적인 다음 행동을 선택할 수 있는 전문 편집물로 작성한다.
 상위 1%·상위 노출·조회수·계약 성과를 보장하거나 본문에 그런 등급을 자칭하지 않는다.
+
+고객 문안(usp_summary, landing_copy, 블로그, 카드뉴스)은 자연스러운 문장으로 쓴다.
+[사실 조건], [사실 주장], [제공 주장], [제공정보], [활용 가설] 같은 내부 구분표시는 본문에 넣지 않는다.
+제공 정보는 '제공자료에 따르면' 또는 '제공자 설명에 따르면'처럼 출처를 문장으로 표현한다.
+활용 아이디어는 '검토할 수 있습니다'처럼 가설임을 밝히고 적용 전에 확인할 조건을 함께 쓴다.
+임대차 기간, 잔여 계약기간, 계약 승계, 보증금·임대료는 원문에 명시된 범위에서만 적는다.
+원문에 '장기 임대'만 있으면 '8년'으로 구체화하지 않는다. 계약 승계가 확인되지 않았으면
+승계가 된다고 단정하지 말고 '계약 승계 가능 여부는 확인이 필요합니다'라고 쓴다.
+landing_copy는 100자 이내의 짧은 제목 한 줄로, usp_summary는 출처·핵심 조건·확인사항을 담은 짧은 문단으로 쓴다.
+관리자용 구분과 확인할 내용은 copy_review에 별도로 기록한다. 이 분류 자체는 사실 검증 완료가 아니다.
 
 블로그 2편은 독자와 질문, 제목·도입·소제목·사례 설명이 서로 달라야 한다.
 각 편은 제목 1개(# 제목), 도입 2~3개의 짧은 문단, 핵심 요약,
@@ -67,7 +78,7 @@ def audit_copy(content):
     return issues
 
 def finalize_copy(package,source,revise=None):
-    result=dict(package)
+    result=prepare_customer_copy(package)
     for key in COPY_KEYS:result[key]=normalize(result.get(key))
     issues=audit_copy(result);revised=False
     if issues and revise:
@@ -78,5 +89,6 @@ def finalize_copy(package,source,revise=None):
             result.update({key:normalize(correction[key]) for key in COPY_KEYS});revised=True
             issues=audit_copy(result)
         except Exception:issues=issues+['copy:automatic_revision_unavailable']
-    result['_editorial']={'version':'spacepick-editorial-v2','status':'ready' if not issues else 'needs_revision','automatically_revised':revised,'issues':issues}
+    result=prepare_customer_copy(result)
+    result['_editorial']={'version':'spacepick-editorial-v3','status':'ready' if not issues else 'needs_revision','automatically_revised':revised,'issues':issues}
     return result

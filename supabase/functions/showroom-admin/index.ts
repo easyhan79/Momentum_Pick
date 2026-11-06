@@ -6,6 +6,7 @@ import {validateProfile,ProfileError,profilePublicationIssues} from '../_shared/
 import {originAllowed,corsOrigin,validSlug,slugSuggestions} from '../_shared/site.ts';
 import {publicationIssues} from '../_shared/publication.ts';
 import {queuePlan,dispatchPlan} from '../_shared/plan-queue.ts';
+import {naturalCustomerCopy,customerCopyReview} from '../_shared/customer-copy.ts';
 // No client-supplied claims are trusted. Auth is checked against GoTrue on every request.
 // Only explicitly approved snapshots may be published; original properties are never written.
 type Json = Record<string, any>;
@@ -13,7 +14,7 @@ const ORIGIN = 'https://momentum-pick-showroom-20261102.ljc3534.chatgpt.site';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const object = (v: unknown): Json => v && typeof v === 'object' && !Array.isArray(v) ? v as Json : {};
 const text = (v: unknown, limit = 2000): string => typeof v === 'string' ? v.trim().slice(0, limit) : '';
-export function headline(value:unknown){return text(value,2000).replace(/\\n/g,'\n').split('\n').map(s=>s.trim()).find(s=>s&&!s.startsWith('■'))?.slice(0,100)||'매물 정보 확인 필요';}
+export function headline(value:unknown){return naturalCustomerCopy(text(value,2000)).replace(/\\n/g,'\n').split('\n').map(s=>s.trim()).find(s=>s&&!s.startsWith('■'))?.slice(0,100)||'매물 정보 확인 필요';}
 export function toDraft(property: Json) {
   const ai = object(property.ai_contents);
   const category = text(ai.property_category);
@@ -28,7 +29,7 @@ export function toDraft(property: Json) {
   if (!concepts.length) unknowns.push('활용 컨셉 자료 확인 필요');
   return {visualMode:'ai_generated',schema_version:'1.0',id:property.id,category:/공장|물류|창고/.test(category)?'industrial':/토지|임야/.test(category)?'land':/건물|수익형/.test(category)?'income':/상가|오피스/.test(category)?'commercial':'unknown',
     title:'매물 검토 초안',subtitle:headline(ai.landing_copy),
-    summary:text(ai.usp_summary),address:text(property.address,300)||undefined,addressEvidence:'owner_provided',
+    summary:naturalCustomerCopy(text(ai.usp_summary)),address:text(property.address,300)||undefined,addressEvidence:'owner_provided',
     facts:[],concepts,unknowns,assets:[]};
 }
 class ApiError extends Error {
@@ -101,7 +102,7 @@ export function createHandler({url,key,fetcher=fetch,githubTokens=[]}:Config) {
         if(!properties.length)throw new ApiError(404,'property_not_found');
         if(properties[0].status!=='analyzed')throw new ApiError(409,'analysis_not_ready');
         const rooms=await db(`property_showrooms?property_id=eq.${id}&select=draft_content`);
-        return reply({content:marketingContent(properties[0].ai_contents,object(rooms[0]?.draft_content).marketing)});
+        return reply({content:marketingContent(properties[0].ai_contents,object(rooms[0]?.draft_content).marketing),copyReview:customerCopyReview(properties[0].ai_contents)});
       }
       if(req.method==='GET'&&query.get('action')==='image-package'){
         const id=query.get('propertyId')||'';if(!UUID.test(id))throw new ApiError(400,'invalid_property_id');

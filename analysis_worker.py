@@ -8,6 +8,7 @@ import re
 from datetime import datetime, timezone
 from ai_providers import Generation, ProviderError, generate_with_fallback
 from content_editorial import EDITORIAL_BRIEF,finalize_copy
+from customer_copy import customer_prose
 from pdf_evidence import inspect_pdf,citation_checks,document_summaries,PdfInspectionError
 
 MODEL = 'gemini-3.8-flash'
@@ -122,7 +123,7 @@ def draft(prop):
     ai = ai if isinstance(ai, dict) else {}
     category = text(ai.get('property_category'))
     kind = next((label for pattern, label in [('공장|물류|창고','industrial'),('토지|임야','land'),('건물|수익형','income'),('상가|오피스','commercial')] if re.search(pattern, category)), 'unknown')
-    headline = next((line.strip()[:100] for line in text(ai.get('landing_copy')).replace('\\n','\n').splitlines() if line.strip() and not line.strip().startswith('■')), '매물 정보 확인 필요')
+    headline = next((line.strip()[:100] for line in customer_prose(text(ai.get('landing_copy'))).replace('\\n','\n').splitlines() if line.strip() and not line.strip().startswith('■')), '매물 정보 확인 필요')
     concepts = []
     source = ai.get('showroom_concepts')
     for i, value in enumerate((source if isinstance(source, list) else [])[:3]):
@@ -130,7 +131,7 @@ def draft(prop):
         zones = item.get('zone_plan')
         zones = [v for v in (zones if isinstance(zones,list) else []) if isinstance(v,str) and v.strip()][:5]
         concepts.append({'id':f'concept-{i+1}','conceptName':text(item.get('concept_name'),100) or '활용 방향 확인 필요','headline':text(item.get('headline'),500),'rationale':text(item.get('cost_benefit')),'feasibility':'not_checked','zones':[{'id':f'zone-{i+1}-{j+1}','label':f'구역 {j+1}','title':text(v,120),'body':text(v),'indoorOutdoor':'unknown'} for j,v in enumerate(zones)]})
-    return {'visualMode':'ai_generated','schema_version':'1.0','id':prop['id'],'category':kind,'title':'매물 검토 초안','subtitle':headline,'summary':text(ai.get('usp_summary')),'address':text(prop.get('address'),300),'addressEvidence':'owner_provided','facts':[],'concepts':concepts,'unknowns':['면적·가격·이용권·인허가와 자료 출처 확인 필요','AI 문구와 활용 방향은 미검증 가설입니다.'],'assets':[]}
+    return {'visualMode':'ai_generated','schema_version':'1.0','id':prop['id'],'category':kind,'title':'매물 검토 초안','subtitle':headline,'summary':customer_prose(text(ai.get('usp_summary'))),'address':text(prop.get('address'),300),'addressEvidence':'owner_provided','facts':[],'concepts':concepts,'unknowns':['면적·가격·이용권·인허가와 자료 출처 확인 필요','AI 문구와 활용 방향은 미검증 가설입니다.'],'assets':[]}
 
 def synchronize_drafts(api):
     def pages(path):
@@ -148,7 +149,7 @@ def synchronize_drafts(api):
         existing.add(prop['id']); count += 1
     return count
 
-from typing import List
+from typing import List, Literal
 from pydantic import BaseModel, Field
 
 class ShowroomConcept(BaseModel):
@@ -167,16 +168,22 @@ class DocumentFact(BaseModel):
     quote: str = Field(max_length=300)
     missing: bool
 
+class CopyReviewItem(BaseModel):
+    category: Literal['provided_information','provided_claim','usage_hypothesis','needs_confirmation']
+    statement: str = Field(max_length=1000, description="관리자가 원문과 대조할 생성 문안의 조건 또는 주장")
+    check: str = Field(max_length=1000, description="확인해야 할 원자료 또는 미확인 조건. 검증 완료로 표시하지 않음")
+
 class UniversalMarketingPackage(BaseModel):
+    copy_review: List[CopyReviewItem] = Field(default_factory=list,max_length=20,description="관리자 전용 AI 분류·확인 메모. 제공정보/제공자 주장/활용가설/확인필요 구분. 고객 문안에 내부 구분표시를 붙이지 않음")
     document_facts: List[DocumentFact] = Field(default_factory=list, max_length=20, description="원문 대조용 추출 후보. 독립 검증 아님. 값 충돌·누락 보존")
     url_slug_candidates: List[str] = Field(default_factory=list, description="매물별 영문 URL 후보 3개, 소문자·숫자·하이픈, 3~64자")
     property_category: str = Field(description="자동 판별된 매물 유형 (예: 상업용 상가, 토지/임야, 대형 공장/물류부지, 수익형 건물 등)")
     detected_targets: List[str] = Field(description="이 매물에 가장 적합한 핵심 매수/임차 타겟층 2~3개")
-    usp_summary: str = Field(description="제공된 위치·면적·시설 조건의 3줄 요약. 사실·제공 주장·활용 가설 구분")
+    usp_summary: str = Field(description="고객용 자연스러운 짧은 요약. 출처와 미확인 조건을 문장에 남김. [사실 조건] 등의 내부 구분표시는 금지. 관리자 분류는 copy_review에 기록")
     target_1_blog: str = Field(description="독자 1의 질문에 답하는 완결된 글. # 제목, 도입, 4~7개 ## 소제목, 짧은 문단, 요약·출처·구체적 문의 안내. 실제 줄바꿈. 약 1400~2800자")
     target_2_blog: str = Field(description="독자 2의 다른 의사결정을 돕는 독립된 글. 1편을 단어만 바꿔 반복하지 않음. # 제목과 ## 소제목 4~7개, 짧은 문단, 약 1400~2800자")
     insta_caption: str = Field(description="[카드 1]~[카드 5]를 각각 독립 줄로 표기. 카드당 짧은 제목+설명 30~150자. 끝에 ※ 게시글 캡션과 해시태그 6~10개")
-    landing_copy: str = Field(description="제공 정보로 뒷받침되는 짧은 쇼룸 헤드라인과 핵심 조건. 수익률 추정 금지")
+    landing_copy: str = Field(description="100자 이내 고객용 제목 한 줄. 원문에 없는 임차기간·계약승계·수익률을 단정하지 않음. 내부 구분표시 금지")
     showroom_concepts: List[ShowroomConcept] = Field(description="웹 쇼룸 시뮬레이터에 들어갈 3가지 추천 활용/개발 컨셉 데이터")
 
 class EditorialCopy(BaseModel):

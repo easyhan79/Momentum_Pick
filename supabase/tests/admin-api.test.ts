@@ -12,6 +12,13 @@ test('marketing read requires admin and returns only private channel content',as
   const h=harness({id,app_metadata:{showroom_admin:true}},url=>url.includes('/properties?')?[{status:'analyzed',ai_contents:{target_1_blog:'generated',raw_input:'PRIVATE'}}]:[{draft_content:{marketing:{target_1_blog:'edited'}}}]);
   const response=await h.handler(request);assert.equal(response.status,200);const payload=await response.json();assert.equal(payload.content.target_1_blog,'edited');assert.doesNotMatch(JSON.stringify(payload),/PRIVATE/);
 });
+test('copy review is admin-only and separated from edited customer channel text',async()=>{
+ const request=new Request(`https://x.test?action=marketing&propertyId=${id}`,{headers:{Authorization:'Bearer user-token'}});
+ const denied=harness({id,app_metadata:{}});assert.equal((await denied.handler(request)).status,403);assert.equal(denied.calls(),0);
+ const h=harness({id,app_metadata:{showroom_admin:true}},url=>url.includes('/properties?')?[{status:'analyzed',ai_contents:{copy_review:[{category:'provided_claim',statement:'제공자 조건',check:'계약서 확인',raw_input:'PRIVATE'}]}}]:[{draft_content:{marketing:{target_1_blog:'관리자 편집 문구'}}}]);
+ const payload=await(await h.handler(request)).json();assert.equal(payload.content.target_1_blog,'관리자 편집 문구');
+ assert.deepEqual(payload.copyReview,[{category:'provided_claim',statement:'제공자 조건',check:'계약서 확인'}]);assert.doesNotMatch(JSON.stringify(payload),/PRIVATE/);
+});
 test('marketing saves preserve showroom edits and published snapshot with revision CAS',async()=>{
   const h=harness({id,app_metadata:{showroom_admin:true}},(url,init)=>{
     if(init.method==='PATCH'){assert.match(url,/revision=eq.4/);const p=JSON.parse(init.body as string);assert.deepEqual(Object.keys(p).sort(),['draft_content','revision']);assert.equal(p.draft_content.title,'existing');assert.equal(p.draft_content.marketing.target_1_blog,'edited');return[{revision:5}];}
