@@ -85,3 +85,45 @@
 - 검증: customer-decision 6; profile 7; admin 21; public 7; document 7; build; v21-customer-qa 5 kinds/3 widths
 - Git: feature/spacepick-v2-1 / 8cc2e558fdb61b6bdd6572a4e576f705a4337d17; v2.1 운영 배포 없음.
 - 다음: S2 커밋 후 S3 목적별 콘셉트 연결 및 자료 표현 구현
+
+## 2026-11-07T00:53:00.074559+09:00 — S3 / in_progress
+
+- 변경/완료 상태: S2 안전성/공개 계약 완료; 기존 concept/zone/image ID·예산 보호 재사용
+- 검증: 이 체크포인트에서 새 검증 없음
+- Git: feature/spacepick-v2-1 / b552355bd62411eec629c2182dcb87cfb76d6926; v2.1 운영 배포 없음.
+- 다음: 콘셉트 목적 연결·자료 조합별 비교·생성 조건과 오래된 이미지 회귀 구현
+
+## 2026-11-07T00:55:00.594311+09:00 — S3 / in_progress
+
+- 변경/완료 상태: 콘셉트 목적 연결/서버 허용 ID/공개 필터·이미지 무효화 서명, 자료 조합별 비교, 목적 필수조건 생성 입력 구현; 기존 콘셉트 2개·타입 검사 통과
+- 검증: node supabase/tests/concept-edits.test.ts; pnpm --dir showroom-web run typecheck
+- Git: feature/spacepick-v2-1 / b552355bd62411eec629c2182dcb87cfb76d6926; v2.1 운영 배포 없음.
+- 다음: S3 목적/이미지 비용 보호·자료 조합 회귀 및 브라우저 검증
+
+## 2026-11-07T00:56:03.277368+09:00 — S3 / in_progress
+
+- 변경/완료 상태: 목적 연결 순서를 집합으로 정규화해 불필요한 이미지 재생성 방지; 서버 목적조건·원본/AI 구분 검증 추가; 이미지 worker 회귀 통과
+- 검증: concept-edits 3; unittest tests.test_image_worker; frontend typecheck
+- Git: feature/spacepick-v2-1 / b552355bd62411eec629c2182dcb87cfb76d6926; v2.1 운영 배포 없음.
+- 다음: S3 5유형×4자료 조합 브라우저·SQL 이미지 보호 검사
+
+## 2026-11-07T00:56:56.658511+09:00 — S3 / blocked_test
+
+- 변경/완료 상태: 브라우저 초기 실패: 탭 접근성 이름에 CONCEPT 번호가 포함되어 exact-name 선택자 불일치. 구현의 안정된 탭 ID로 테스트 선택자 수정; SQL 이미지/예산/승인본 보호 검사 통과
+- 검증: 이 체크포인트에서 새 검증 없음
+- Git: feature/spacepick-v2-1 / b552355bd62411eec629c2182dcb87cfb76d6926; v2.1 운영 배포 없음.
+- 다음: 수정된 S3 20조합 브라우저 재실행; 합격 전 S4 진행 금지
+
+## 2026-11-07T00:58:27.076479+09:00 — S3 / blocked_test
+
+- 변경/완료 상태: 20조합 중 19개 통과 후 검사 중 소스 수정으로 Vite HMR이 마지막 실행 문맥을 종료함; 제품 통과로 표시하지 않음. 이제 소스 변경 중단 후 전체 재검사
+- 검증: 이 체크포인트에서 새 검증 없음
+- Git: feature/spacepick-v2-1 / b552355bd62411eec629c2182dcb87cfb76d6926; v2.1 운영 배포 없음.
+- 다음: V21_MATERIAL_QA=1 browser 20/20 통과 후에만 S3 완료; 이후 S4 시작
+
+## 2026-11-07T01:00:49.562515+09:00 — S3 / local_complete
+
+- 변경/완료 상태: 목적-콘셉트 연결·필수조건 입력·원본/AI 비교 완료; 20/20 조합과 단위/SQL/비용 보호 회귀 통과; 실패 원인·재실행 기록 보존
+- 검증: 20/20 v21 browser; concept 3/plan 4/image-setting 1/visual 1/image worker 11; concept-images SQL; build/Edge typecheck
+- Git: feature/spacepick-v2-1 / b552355bd62411eec629c2182dcb87cfb76d6926; v2.1 운영 배포 없음.
+- 다음: S3 커밋 후 S4 공개 확인항목/목적/콘셉트의 문의·CRM 서버 검증 구현

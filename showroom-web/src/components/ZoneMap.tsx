@@ -6,7 +6,7 @@ import { evidenceLabels, type Concept, type Asset } from '../types/showroom';
 export function ZoneMap({ concept, propertyId, privatePreview=false, illustration }: { illustration?:Asset; concept: Concept; propertyId?:string; privatePreview?:boolean }) {
   const [planUrl,setPlanUrl]=useState(''),[expanded,setExpanded]=useState(false);
   useEffect(()=>{let active=true,local='';setPlanUrl('');if(concept.plan){if(privatePreview&&propertyId){mediaRequest(`action=image&propertyId=${propertyId}&assetId=${concept.plan.assetId}`).then(r=>r.blob()).then(blob=>{local=URL.createObjectURL(blob);if(active)setPlanUrl(local);else URL.revokeObjectURL(local);}).catch(()=>{});}else if(concept.plan.url)setPlanUrl(concept.plan.url);}return()=>{active=false;if(local)URL.revokeObjectURL(local);};},[concept.plan?.assetId,concept.plan?.url,propertyId,privatePreview]);
-  const generated = !concept.plan && illustration?.generated;
+  const generated = !concept.plan && illustration?.approved===true && illustration?.generated;
   const surfaceUrl = concept.plan ? planUrl : generated ? illustration?.url : '';
   const caption = concept.plan?.caption || 'AI 공간 활용 구상도 · 실제 배치 및 인허가 미확인';
   const zones = concept.zones.slice(0, 5);

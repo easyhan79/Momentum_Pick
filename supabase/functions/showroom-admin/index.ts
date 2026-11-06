@@ -297,7 +297,7 @@ export function createHandler({url,key,fetcher=fetch,githubTokens=[]}:Config) {
         const validated=await validateConceptEdits(concepts,previousConcepts,async planId=>{
           const assets=await db(`property_assets?id=eq.${planId}&property_id=eq.${id}&bucket_id=eq.showroom-private-media&kind=eq.provided_plan&source_type=neq.ai_generated&select=id,caption`);
           return assets[0];
-        });
+        },edits.propertyProfile?.kind||prior.propertyProfile?.kind||prior.category||'unknown');
         let invalidatedSlots=changedConceptSlots(previousConcepts,validated);
         const manualComplete=validated.some(c=>c.plan)&&validated.every(c=>!c.plan||c.zones.every((z:Json)=>z.position));
         const planAnalysis=manualComplete&&['failed','needs_review'].includes(object(prior.planAnalysis).state)?{...prior.planAnalysis,state:'manual_reviewed'}:prior.planAnalysis;

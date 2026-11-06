@@ -13,6 +13,7 @@ export type Zone = {
   metric?: { label: string; value: string; evidence: EvidenceStatus; source: string };
 };
 export type Concept = {
+  purposeIds?:string[];
   plan?: {assetId:string;caption:string;url?:string};
   id: string; conceptName: string; headline: string; rationale: string;
   feasibility: 'not_checked' | 'reviewed'; zones: Zone[];

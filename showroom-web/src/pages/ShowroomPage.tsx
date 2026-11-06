@@ -1,3 +1,4 @@
+import {VisualEvidence} from '../components/VisualEvidence';
 import {DecisionCards} from '../components/DecisionCards';
 import {decisionCards,publicDecision} from '../../../supabase/functions/_shared/customer-decision.ts';
 import {visibleField} from '../../../supabase/functions/_shared/property-profile.ts';
@@ -11,7 +12,7 @@ import {RentalScenarioView} from '../components/RentalScenarioView';
 import {PropertyLocation} from '../components/PropertyLocation';
 import {profileFacts,publicProfileHighlights,profileSummary} from '../../../supabase/functions/_shared/property-profile.ts';
 import {useMediaLibrary} from '../lib/useMediaLibrary';
-import { useState } from 'react';
+import { useEffect,useState } from 'react';
 import { ArrowUpRight, Check, Copy } from 'lucide-react';
 import type { Showroom } from '../types/showroom';
 import { Hero } from '../components/Hero';
@@ -36,11 +37,12 @@ export function ShowroomPage({ data:sourceData, selector, liveDraft=false, publi
   const customerDecision=liveDraft&&data.propertyProfile?publicDecision(data.propertyProfile,data.propertyProfile.fields):data.customerDecision;
   const rental=liveDraft?data.propertyProfile?.modules?.rentalScenario:data.rentalScenario;
   const kind:ReviewKind=summary?.kind&&summary.kind!=='unknown'?summary.kind:data.category==='industrial'?'industrial':data.category;
-  const {purposeId,choose:choosePurpose,purpose}=useCustomerPurpose(data.id,kind);
+  const {purposeId,choose:choosePurpose,purpose}=useCustomerPurpose(data.id,kind,customerDecision?.purposes);
   const concepts = orderConcepts(data.concepts.slice(0,3),purpose);
   const purposeKeys=purpose?.keys||[];
   const orderedFacts=rankByKeys(facts,purposeKeys,f=>[f.key]);
   const [activeId, setActiveId] = useState(concepts[0]?.id ?? '');
+  useEffect(()=>setActiveId(concepts[0]?.id||''),[purposeId,data.id]);
   const [shareMessage, setShareMessage] = useState('');
   const [requestedMaterials,setRequestedMaterials]=useState<string[]>([]);
   function selectMaterial(material:string,checked:boolean){setRequestedMaterials(current=>checked?[...new Set([...current,material])].slice(0,12):current.filter(v=>v!==material));}
@@ -58,9 +60,9 @@ export function ShowroomPage({ data:sourceData, selector, liveDraft=false, publi
       {rental?.enabled&&<RentalScenarioView key={`${data.id}:${JSON.stringify(rental)}`} scenario={rental} privatePreview={liveDraft}/>}
       <Evidence unknowns={data.unknowns} facts={orderedFacts} priorityKeys={purposeKeys} kind={kind} selected={requestedMaterials} onSelect={selectMaterial}/>
       <section id="concepts" className="concept-section"><div className="section-shell"><div className="section-top"><div><p className="eyebrow">02 / CONCEPT SIMULATOR</p><h2>하나의 공간, 다른 가능성.</h2><p className="section-description">활용 방향을 선택하고 구역별 아이디어를 살펴보세요.</p></div><span className="evidence-tag evidence-ai_hypothesis">모든 컨셉은 검토 전 가설입니다</span></div>
-        {active ? <><ConceptTabs concepts={concepts} activeId={active.id} onSelect={setActiveId} /><ZoneMap key={active.id} concept={active} illustration={data.assets.find(a=>a.generated&&a.conceptId===active.id)} propertyId={data.id} privatePreview={liveDraft} /></> : <div className="empty-section glass"><h3>활용 컨셉 자료 확인 필요</h3><p>확인된 조건이 부족하여 임의의 배치나 업종을 제안하지 않습니다.</p></div>}
+        {active ? <><ConceptTabs concepts={concepts} activeId={active.id} onSelect={setActiveId} /><ZoneMap key={active.id} concept={active} illustration={data.assets.find(a=>a.approved&&a.generated&&a.conceptId===active.id)} propertyId={data.id} privatePreview={liveDraft} /></> : <div className="empty-section glass"><h3>활용 컨셉 자료 확인 필요</h3><p>확인된 조건이 부족하여 임의의 배치나 업종을 제안하지 않습니다.</p></div>}
       </div></section>
-      <ScenarioCalculator key={data.id} data={data} /><Gallery assets={data.assets} />{data.publicContact&&<aside className="section-shell property-location"><div className="glass property-terms"><h3>매물 담당자</h3><p>{data.publicContact.name} · {data.publicContact.phone}</p></div></aside>}{published&&inquirySlug?<LiveInquiry slug={inquirySlug} requestedTopics={requestedMaterials} onClearTopics={()=>setRequestedMaterials([])}/>:liveDraft||published?<section id="inquiry" className="section-shell empty-section"><h2>{published?'문의 접수 준비 중':'비공개 검토 중'}</h2><p>현재 화면에서는 문의를 접수하지 않습니다.</p>{!!requestedMaterials.length&&<ul>{requestedMaterials.map(v=><li key={v}>{v}</li>)}</ul>}</section>:<Inquiry requestedTopics={requestedMaterials} onClearTopics={()=>setRequestedMaterials([])}/>}
+      <VisualEvidence assets={data.assets} concept={active}/><ScenarioCalculator key={data.id} data={data} /><Gallery assets={data.assets} />{data.publicContact&&<aside className="section-shell property-location"><div className="glass property-terms"><h3>매물 담당자</h3><p>{data.publicContact.name} · {data.publicContact.phone}</p></div></aside>}{published&&inquirySlug?<LiveInquiry slug={inquirySlug} requestedTopics={requestedMaterials} onClearTopics={()=>setRequestedMaterials([])}/>:liveDraft||published?<section id="inquiry" className="section-shell empty-section"><h2>{published?'문의 접수 준비 중':'비공개 검토 중'}</h2><p>현재 화면에서는 문의를 접수하지 않습니다.</p>{!!requestedMaterials.length&&<ul>{requestedMaterials.map(v=><li key={v}>{v}</li>)}</ul>}</section>:<Inquiry requestedTopics={requestedMaterials} onClearTopics={()=>setRequestedMaterials([])}/>}
     </main>
     <footer className="site-footer section-shell"><div><p className="brand-word">SPACE<span>PICK</span></p><p>공간의 가능성을, 근거와 함께.</p></div><div><p>{published?'자료 기준: 관리자 승인 snapshot':liveDraft?'자료 기준: 등록 매물·AI 분석 결과 · 관리자 검토 전':'자료 기준: 제공 HTML 및 합성 fixtures · 2026.11.02'}</p><p>검토 중 자료입니다. AI 가설은 실제 이용 가능성·수익을 보장하지 않습니다.</p><a href="#">상단으로 ↑</a></div></footer>
     {shareMessage && <div className="share-status" role="status"><p>{shareMessage}</p><button onClick={() => setShareMessage('')} aria-label="링크 안내 닫기">×</button></div>}

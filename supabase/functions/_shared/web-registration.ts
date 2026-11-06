@@ -1,3 +1,4 @@
+import {purposesFor} from './customer-purpose.ts';
 import {validateProfile,profileSummary,ProfileError,type PropertyProfile} from './property-profile.ts';
 export type RegistrationContact={name:string;phone:string;publicApproved:boolean};
 export function registrationContact(value:unknown):RegistrationContact{
@@ -25,7 +26,7 @@ export function webAnalysisInput(draft:Record<string,any>){
  const p=draft.propertyProfile as PropertyProfile;
  if(!p)throw new ProfileError('invalid_registration');
  const fields=p.fields.filter(f=>f.useApproved&&f.status!=='unknown').map(f=>({label:f.label,value:f.value,unit:f.unit,status:f.status,source:f.sourceText}));
- const input={kind:p.kind,address:draft.address||'',transaction:p.transaction,price:profileSummary(p).price,description:draft.summary||'',fields};
+ const input={customerPurposes:purposesFor(p.kind).map(purpose=>({id:purpose.id,label:purpose.label,requiredKeys:purpose.keys,constraints:purpose.risk,additionalCheck:purpose.document})),kind:p.kind,address:draft.address||'',transaction:p.transaction,price:profileSummary(p).price,description:draft.summary||'',fields};
  // Web text must not become a Telegram attachment download directive.
  return '웹 등록 매물. 제공정보와 가설을 구분하고 누락 조건을 생성하지 마세요.\n'+JSON.stringify(input).replace(/\[(?:FILE|DOCUMENT)_ID:[^\]]*\]/g,'');
 }

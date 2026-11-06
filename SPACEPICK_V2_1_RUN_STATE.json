@@ -11,14 +11,14 @@
     "S5",
     "S6"
   ],
-  "currentStage": "S2",
+  "currentStage": "S3",
   "status": "local_complete",
-  "lastCompletedStage": "S2",
+  "lastCompletedStage": "S3",
   "lastSuccessfulCheck": {
-    "command": "customer-decision 6; profile 7; admin 21; public 7; document 7; build; v21-customer-qa 5 kinds/3 widths",
-    "at": "2026-11-07T00:52:48.464117+09:00"
+    "command": "20/20 v21 browser; concept 3/plan 4/image-setting 1/visual 1/image worker 11; concept-images SQL; build/Edge typecheck",
+    "at": "2026-11-07T01:00:49.562515+09:00"
   },
-  "lastCommit": "8cc2e558fdb61b6bdd6572a4e576f705a4337d17",
+  "lastCommit": "b552355bd62411eec629c2182dcb87cfb76d6926",
   "branch": "feature/spacepick-v2-1",
   "pushStatus": "not_pushed_v21",
   "blockers": [],
@@ -26,8 +26,8 @@
     "운영 배포 연결 미제공",
     "실제 AI/실매물/외부 데이터 검증 미수행"
   ],
-  "nextAction": "S2 커밋 후 S3 목적별 콘셉트 연결 및 자료 표현 구현",
-  "updatedAt": "2026-11-07T00:52:48.464117+09:00",
+  "nextAction": "S3 커밋 후 S4 공개 확인항목/목적/콘셉트의 문의·CRM 서버 검증 구현",
+  "updatedAt": "2026-11-07T01:00:49.562515+09:00",
   "stages": {
     "S0": {
       "status": "local_complete",
@@ -43,6 +43,11 @@
       "status": "local_complete",
       "updatedAt": "2026-11-07T00:52:48.464117+09:00",
       "lastUnit": "4단 카드·기준일·상태·목적 설정 편집·검토/공개 분리 완료; 신규 6개와 기존 42개 및 빌드/5유형 브라우저 통과"
+    },
+    "S3": {
+      "status": "local_complete",
+      "updatedAt": "2026-11-07T01:00:49.562515+09:00",
+      "lastUnit": "목적-콘셉트 연결·필수조건 입력·원본/AI 비교 완료; 20/20 조합과 단위/SQL/비용 보호 회귀 통과; 실패 원인·재실행 기록 보존"
     }
   }
 }

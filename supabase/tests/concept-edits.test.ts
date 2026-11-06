@@ -16,3 +16,12 @@ test('concepts bound content and positions and cannot forge plan URLs or verifie
  assert.equal(output[0].plan.url,undefined);assert.equal(output[0].zones[0].evidence,'ai_hypothesis');assert.equal(output[0].feasibility,'not_checked');
  await assert.rejects(validateConceptEdits([{...concept(),plan:{assetId:source}}],[],async()=>undefined));
 });
+
+test('purpose links are kind-scoped, server-derived and invalidate only affected image slots',async()=>{
+ const c={...concept(),purposeIds:['factory-research','factory-manufacturing'],purposeContext:[{secret:'CLIENT'}]};
+ const next=await validateConceptEdits([c],[concept()],async()=>undefined,'factory');
+ assert.deepEqual(next[0].purposeIds,['factory-manufacturing','factory-research']);assert.doesNotMatch(JSON.stringify(next),/CLIENT/);
+ assert.ok(next[0].purposeContext[0].requiredKeys.length);assert.deepEqual(changedConceptSlots([concept()],next),['concept-1']);
+ assert.deepEqual(changedConceptSlots([c],[{...c,purposeIds:[...c.purposeIds].reverse()}]),[]);
+ await assert.rejects(validateConceptEdits([{...concept(),purposeIds:['land-commercial']}],[],async()=>undefined,'factory'));
+});

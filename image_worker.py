@@ -41,6 +41,9 @@ def prompt_for(slot, draft):
     values = {k:draft.get(k) for k in ('category','title','subtitle','summary','facts')}
     if isinstance(draft.get('propertyProfile'), dict):
         values['facts'] = [{k:f.get(k) for k in ('label','value','unit','status','sourceText')} for f in draft['propertyProfile'].get('fields', []) if f.get('useApproved') is True and f.get('status') != 'unknown']
+    chosen = next((c for c in draft.get('concepts', []) if c.get('id') == slot), {})
+    values['purpose_requirements'] = chosen.get('purposeContext', [])[:8] if isinstance(chosen.get('purposeContext', []), list) else []
+    base += 'Purpose requirements are review questions, not verified facilities. Keep missing operating conditions hypothetical; do not depict confirmed capacity or permits. '
     context = json.dumps(values, ensure_ascii=False)[:7000]
     if slot == 'hero':
         return base + ('Create a premium illustrative property cover using the analysis below. '

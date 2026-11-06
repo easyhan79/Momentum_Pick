@@ -105,3 +105,11 @@ class ImageWorkerTest(unittest.TestCase):
         with self.assertRaises(ValueError):prompt_for('concept-2',{'concepts':[]})
 
 if __name__=='__main__':unittest.main()
+
+class PurposeImagePrompt(unittest.TestCase):
+    def test_purpose_requirements_are_questions_and_do_not_add_paid_calls(self):
+        from image_worker import prompt_for
+        draft={'category':'industrial','concepts':[{'id':'concept-1','conceptName':'합성 제조','headline':'검토','rationale':'전력 확인 필요','zones':[], 'purposeContext':[{'id':'factory-manufacturing','requiredKeys':['power_capacity'],'constraints':'수전 확인 필요'}]}]}
+        prompt=prompt_for('concept-1',draft)
+        self.assertIn('purpose_requirements',prompt);self.assertIn('power_capacity',prompt)
+        self.assertIn('not verified facilities',prompt);self.assertIn('missing operating conditions hypothetical',prompt)
