@@ -127,3 +127,59 @@
 - 검증: 20/20 v21 browser; concept 3/plan 4/image-setting 1/visual 1/image worker 11; concept-images SQL; build/Edge typecheck
 - Git: feature/spacepick-v2-1 / b552355bd62411eec629c2182dcb87cfb76d6926; v2.1 운영 배포 없음.
 - 다음: S3 커밋 후 S4 공개 확인항목/목적/콘셉트의 문의·CRM 서버 검증 구현
+
+## 2026-11-07T01:01:16.181232+09:00 — S4 / in_progress
+
+- 변경/완료 상태: S3 로컬 완료 커밋; 기존 문의/CRM/동의/중복·속도 제한 재사용
+- 검증: 이 체크포인트에서 새 검증 없음
+- Git: feature/spacepick-v2-1 / 0f8d975f67188643f90059f26d347c8c913edd0a; v2.1 운영 배포 없음.
+- 다음: 공개 승인본 기준 문맥 검증·문의 연결 및 승인 revision 고정 RPC 설계/구현
+
+## 2026-11-07T01:02:35.993231+09:00 — S4 / in_progress
+
+- 변경/완료 상태: 공개 DTO를 부작용 없는 공유 모듈로 분리하고 승인 snapshot 기준 문의 문맥 검증 추가. 기존 CRM 메모/보관/알림/제한 재사용. 승인 버전 경쟁을 막는 추가 RPC migration을 로컬 작성
+- 검증: 이 체크포인트에서 새 검증 없음
+- Git: feature/spacepick-v2-1 / 0f8d975f67188643f90059f26d347c8c913edd0a; v2.1 운영 배포 없음.
+- 다음: S4 고객 선택 UI·API/CRM·격리 SQL 검증 구현
+
+## 2026-11-07T01:04:30.297403+09:00 — S4 / blocked_test
+
+- 변경/완료 상태: S4 프런트 타입 검사에서 문의 문맥의 배열 거절 분기 때문에 TypeScript가 Record/배열 union으로 좁히는 오류 확인; 저장/운영 요청 없음
+- 검증: 이 체크포인트에서 새 검증 없음
+- Git: feature/spacepick-v2-1 / 0f8d975f67188643f90059f26d347c8c913edd0a; v2.1 운영 배포 없음.
+- 다음: 입력 객체/배열 검증을 캐스팅 이전으로 옮기고 타입 및 기존 API 회귀 재검사
+
+## 2026-11-07T01:04:34.410330+09:00 — S4 / in_progress
+
+- 변경/완료 상태: 타입 오류 수정 후 프런트 타입·기존 문의 7/공개 7 회귀 통과; S4 구현 계속
+- 검증: frontend typecheck; inquiry-api 7; public-showroom 7
+- Git: feature/spacepick-v2-1 / 0f8d975f67188643f90059f26d347c8c913edd0a; v2.1 운영 배포 없음.
+- 다음: 새 문의 문맥 변조/중복·SQL revision 고정 검사
+
+## 2026-11-07T01:06:56.740491+09:00 — S4 / in_progress
+
+- 변경/완료 상태: 공개 문맥 API 신규 5개와 기존 문의/공개 회귀 통과; S4 공개 선택→실제 handler→CRM 브라우저 시나리오 추가
+- 검증: customer-inquiry 5; frontend typecheck
+- Git: feature/spacepick-v2-1 / 0f8d975f67188643f90059f26d347c8c913edd0a; v2.1 운영 배포 없음.
+- 다음: 격리 SQL 결과 및 S4 브라우저 확인 후 완료
+
+## 2026-11-07T01:07:29.455353+09:00 — S4 / blocked_test
+
+- 변경/완료 상태: 격리 SQL fixture의 published_content가 빈 객체여서 기존 승인 snapshot 보호 제약에 걸림. 제약을 풀지 않고 유효한 합성 승인본으로 fixture 수정; API 5개는 통과
+- 검증: 이 체크포인트에서 새 검증 없음
+- Git: feature/spacepick-v2-1 / 0f8d975f67188643f90059f26d347c8c913edd0a; v2.1 운영 배포 없음.
+- 다음: 수정 SQL fixture로 동일 migration·중복/버전/보관/권한 검사 재실행
+
+## 2026-11-07T01:08:47.276610+09:00 — S4 / in_progress
+
+- 변경/완료 상태: 공개 선택→실제 문의 handler→인증된 기존 CRM 브라우저 통과; 익명 CRM 차단. Edge 타입 및 빌드 통과
+- 검증: V21_INQUIRY_QA browser 6 groups; Edge typecheck; frontend build
+- Git: feature/spacepick-v2-1 / 0f8d975f67188643f90059f26d347c8c913edd0a; v2.1 운영 배포 없음.
+- 다음: 격리 SQL 최종 결과 확인 후 S4 완료 커밋
+
+## 2026-11-07T01:09:43.304864+09:00 — S4 / local_complete
+
+- 변경/완료 상태: 공개 ID/라벨·매물/목적/콘셉트 검증과 기존 CRM 연결 완료; 신규/기존 API, 6그룹 브라우저, 격리 SQL·보관/역할/중복·revision 통과
+- 검증: customer-inquiry 5; inquiry-api 7; public 7; browser 6 groups; customer-inquiry SQL; build/Edge typecheck
+- Git: feature/spacepick-v2-1 / 0f8d975f67188643f90059f26d347c8c913edd0a; v2.1 운영 배포 없음.
+- 다음: S4 커밋 후 S5 제공자료 분석 품질 규칙과 건물 제공 렌트롤 구현

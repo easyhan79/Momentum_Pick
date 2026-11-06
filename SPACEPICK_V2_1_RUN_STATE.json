@@ -11,14 +11,14 @@
     "S5",
     "S6"
   ],
-  "currentStage": "S3",
+  "currentStage": "S4",
   "status": "local_complete",
-  "lastCompletedStage": "S3",
+  "lastCompletedStage": "S4",
   "lastSuccessfulCheck": {
-    "command": "20/20 v21 browser; concept 3/plan 4/image-setting 1/visual 1/image worker 11; concept-images SQL; build/Edge typecheck",
-    "at": "2026-11-07T01:00:49.562515+09:00"
+    "command": "customer-inquiry 5; inquiry-api 7; public 7; browser 6 groups; customer-inquiry SQL; build/Edge typecheck",
+    "at": "2026-11-07T01:09:43.304864+09:00"
   },
-  "lastCommit": "b552355bd62411eec629c2182dcb87cfb76d6926",
+  "lastCommit": "0f8d975f67188643f90059f26d347c8c913edd0a",
   "branch": "feature/spacepick-v2-1",
   "pushStatus": "not_pushed_v21",
   "blockers": [],
@@ -26,8 +26,8 @@
     "운영 배포 연결 미제공",
     "실제 AI/실매물/외부 데이터 검증 미수행"
   ],
-  "nextAction": "S3 커밋 후 S4 공개 확인항목/목적/콘셉트의 문의·CRM 서버 검증 구현",
-  "updatedAt": "2026-11-07T01:00:49.562515+09:00",
+  "nextAction": "S4 커밋 후 S5 제공자료 분석 품질 규칙과 건물 제공 렌트롤 구현",
+  "updatedAt": "2026-11-07T01:09:43.304864+09:00",
   "stages": {
     "S0": {
       "status": "local_complete",
@@ -48,6 +48,11 @@
       "status": "local_complete",
       "updatedAt": "2026-11-07T01:00:49.562515+09:00",
       "lastUnit": "목적-콘셉트 연결·필수조건 입력·원본/AI 비교 완료; 20/20 조합과 단위/SQL/비용 보호 회귀 통과; 실패 원인·재실행 기록 보존"
+    },
+    "S4": {
+      "status": "local_complete",
+      "updatedAt": "2026-11-07T01:09:43.304864+09:00",
+      "lastUnit": "공개 ID/라벨·매물/목적/콘셉트 검증과 기존 CRM 연결 완료; 신규/기존 API, 6그룹 브라우저, 격리 SQL·보관/역할/중복·revision 통과"
     }
   }
 }

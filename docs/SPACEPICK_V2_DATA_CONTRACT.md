@@ -98,3 +98,15 @@ T04는 공장형 필드 편집→저장→승인→공개 DTO 연결을 작은 �
 - 뷰어는 기존 인증·매물 소속 검사를 거친 PDF download 응답을 메모리에서 읽는다. Content-Type/8MB 스트리밍 제한/PDF header와 선택적 SHA256을 확인한 뒤 같은 사이트에서 제공하는 PDF.js Worker로 페이지를 렌더링한다. PDF 원본·추출 텍스트를 새 DB/공개 storage에 복제하지 않는다.
 - 후보 페이지가 원본 범위를 벗어나면 이를 알리고 1쪽을 명시적으로 표시한다. 원본 페이지 이동/확대, 해당 페이지의 추출 텍스트와 후보 인용을 나란히 보여주고 이미지 페이지의 직접 대조를 지원한다. OCR이나 사실 검증 승격은 수행하지 않는다.
 - 관리자 화면만으로 사용하며 원문을 외부 뷰어에 보내지 않는다. renderer/Worker/CMap/표준 폰트/decoder·종속 라이선스는 빌드 산출물에 포함한다. JavaScript evaluation/annotation 실행 계층을 사용하지 않는다. 기존 PDF 다운로드/API 권한/DB schema는 유지하므로 신규 migration은 없다.
+
+## v2.1 S1~S4 확장 (2026-11-07, 로컬)
+
+- 기존 income을 건물 전체로 사용하도록 propertyProfile.kind의 허용 값에 income을 추가했다. 기존 industrial은 자동 세분화하지 않는다. schema_version/profile version 및 기존 snapshot을 유지한다.
+- 필드 asOf는 선택적 YYYY-MM-DD 정보 기준일이다. 실제 달력 날짜를 검사하며 verification.at(대조한 시각)과 구분한다. 미제공 날짜를 현재 날짜로 채우지 않는다.
+- modules.customerDecision은 {version:1,enabled,publication,purposes:[{id,label}],reviewedBy?,reviewedAt?}. 기본 private. reviewConfirmed는 저장 요청에서만 사용하고 실제 확인자/시각은 서버가 부여한다. 근거·권한·목적 변경시 확인을 무효화한다. 이 검토 확인은 사실 검증 완료가 아니다.
+- 공개 customerDecision은 활성화+별도 공개 선택+검토 기록이 있는 승인 snapshot에서만 허용한다. 공개 가능한 profile field만 사용해 결론/근거·기준일/의미·제약/추가 확인사항을 만들며 원본 ID·검증 메모·확인자 계정은 제외한다. legacy verified를 신규 증빙 확인으로 승격하지 않는다.
+- purpose query는 방문자 상태다. 서버 저장값을 바꾸지 않는다. 공개 필요항목 ID는 need-{허용 slot key}; private fact UUID를 공개 문의 ID로 사용하지 않는다.
+- 콘셉트 purposeIds는 해당 매물 유형의 카탈로그 ID만 허용한다. canonical purposeContext(필수조건·제약·추가 확인)는 서버에서 만들고 클라이언트가 보낸 내용을 믿지 않는다. 목적 ID 집합 변경은 기존 이미지 무효화/예산 보호 RPC를 재사용한다. 공개 DTO는 purposeIds만 허용하고 내부 생성 문맥은 제외한다.
+- 문의 request_context는 선택적 {version:1,propertyId,purposeId,conceptId,checkIds}. 서버는 해당 slug의 현재 승인 snapshot을 공유 공개 DTO로 투영한 뒤 매물·목적·콘셉트·공개 체크 ID를 검증하고 라벨은 직접 재구성한다. 기존 CRM memo에 정규화한 문맥+고객 메모를 합쳐 저장하며 전체 2000자 제한을 지킨다. 개인정보 보관기간이 끝나면 기존 memo 삭제 정책으로 문맥도 지워진다.
+- 새 crm_register_context_inquiry RPC는 공개 매물과 승인 revision을 FOR SHARE로 고정한 뒤 기존 crm_register_inquiry를 호출한다. 기존 요청/알림/보관/속도/중복 제한을 유지한다. 다른 매물·stale revision·중복 fingerprint 변경·비공개 ID 요청은 거절한다. 신규 테이블·컬럼은 없고 추가 함수 migration 20261107010000_customer_inquiry_context.sql만 로컬 작성했다. 기존 request_context 없는 클라이언트는 기존 RPC 경로를 그대로 쓴다.
+- 실제 운영 적용 순서: 기존 migration 상태 확인 → 새 RPC → 관련 공유 모듈/문의·공개·관리 함수 → 프런트. 새 함수 없이 새 UI를 먼저 배포하거나 실패시 안전 검증을 건너뛰는 fallback을 하지 않는다.
