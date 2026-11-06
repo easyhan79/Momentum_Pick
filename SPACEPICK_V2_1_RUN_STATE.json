@@ -18,7 +18,7 @@
     "command": "readiness37 (Python65 Node146 SQL7); copy rewrite dev5 + built5 + copy-review5 + admin6 browser groups",
     "at": "2026-11-07T08:10:45.559952+09:00"
   },
-  "lastCommit": "82d4246386253c4e42f14330d59b4346f186f158",
+  "lastCommit": "9b455002b51152684919c17b6ddc5f9e83c374c3",
   "branch": "feature/spacepick-v2-1",
   "pushStatus": "feature_branch_pushed",
   "blockers": [],
@@ -27,7 +27,7 @@
     "실제 AI/실매물/외부 데이터 검증 미수행"
   ],
   "nextAction": "다시 글작성 R0~R3 로컬 완료. docs/COPY_REWRITE.md 순서로 운영 반영/활성화·실제 AI 검증; 기존 본인 전용 배포 연결은 별도 대기.",
-  "updatedAt": "2026-11-07T08:10:45.559952+09:00",
+  "updatedAt": "2026-11-07T08:12:20.130139+09:00",
   "stages": {
     "S0": {
       "status": "local_complete",
@@ -65,34 +65,9 @@
       "lastUnit": "S0~S6 구현/회귀/문서화 완료. S6 소스 296687a 개발 브랜치 push 성공; 통합35·브라우저64·preflight·깨끗한 소스 패키지232파일/해시/공개입력 검사 통과. 운영 main/DB/함수/호스팅 미변경"
     }
   },
-  "lastPushedCommit": "296687a984eb4a1f11a4fa8b56eaaf8104fdbcb9",
+  "lastPushedCommit": "9b455002b51152684919c17b6ddc5f9e83c374c3",
   "remoteBranch": "feature/spacepick-v2-1",
-  "workingTreeChanges": [
-    "README.md",
-    "SPACEPICK_V2_1_PROGRESS.md",
-    "SPACEPICK_V2_1_RUN_STATE.json",
-    "docs/SPACEPICK_CURRENT_DEVELOPMENT_STATUS.md",
-    "docs/SPACEPICK_V2_DATA_CONTRACT.md",
-    "docs/SPACEPICK_V2_PLAN.md",
-    "scripts/check_v2_readiness.py",
-    "scripts/package_v2_release.py",
-    "showroom-web/src/components/MarketingPackage.tsx",
-    "showroom-web/src/lib/adminApi.ts",
-    "showroom-web/src/pages/AdminPropertyPage.tsx",
-    "showroom-web/src/styles.css",
-    "supabase/functions/showroom-admin/index.ts",
-    ".github/workflows/copy-rewrite.yml",
-    "SPACEPICK_COPY_REWRITE_PLAN.md",
-    "copy_rewrite_worker.py",
-    "docs/COPY_REWRITE.md",
-    "showroom-web/scripts/copy-rewrite-qa.cjs",
-    "showroom-web/src/components/CopyRewritePanel.tsx",
-    "supabase/functions/_shared/copy-rewrite.ts",
-    "supabase/migrations/20261107020000_copy_rewrites.sql",
-    "supabase/tests/copy-rewrite-api.test.ts",
-    "supabase/tests/copy-rewrite-db.test.mjs",
-    "tests/test_copy_rewrite.py"
-  ],
+  "workingTreeChanges": [],
   "followUp": {
     "id": "PRIVATE_PREVIEW",
     "plan": "SPACEPICK_PRIVATE_PREVIEW_PLAN.md",
@@ -111,7 +86,7 @@
     "currentUnit": "R3",
     "plan": "SPACEPICK_COPY_REWRITE_PLAN.md",
     "deployed": false,
-    "updatedAt": "2026-11-07T08:10:45.559952+09:00",
+    "updatedAt": "2026-11-07T08:12:20.130139+09:00",
     "localChecks": {
       "readiness": 37,
       "python": 65,
@@ -123,6 +98,10 @@
     "externalValidation": [
       "운영 추가 migration/workflow/관리함수/프런트 배포·활성화 미완료",
       "실제 AI 생성·dispatch/스케줄 검증 미수행"
-    ]
+    ],
+    "sourceCommit": "9b455002b51152684919c17b6ddc5f9e83c374c3",
+    "lastPushedSourceCommit": "9b455002b51152684919c17b6ddc5f9e83c374c3",
+    "branch": "feature/spacepick-v2-1",
+    "release": "prepared_not_deployed; 244 files, hash/input/private-exclusion checks passed"
   }
 }

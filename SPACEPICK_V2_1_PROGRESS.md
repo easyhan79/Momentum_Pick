@@ -343,3 +343,9 @@
 - 보존: 기존 properties.ai_contents/승인 snapshot/이미지·콘셉트·사실정보 불변, 미저장/새 revision 덮어쓰기 및 늦은 worker 결과 차단.
 - 외부 미완료: 실제 AI·운영 migration/dispatch/workflow·관리함수·프런트/활성화. 실제 호출·운영 배포/설정 변경 없음.
 - 다음: 검증 소스/기록을 기존 개발 브랜치에 commit/push하고 배포 준비 패키지 갱신. 운영 적용 순서는 docs/COPY_REWRITE.md.
+
+## 2026-11-07T08:12:20.130139+09:00 — COPY_REWRITE / GitHub·패키지 확인
+
+- 소스 체크포인트 9b455002b51152684919c17b6ddc5f9e83c374c3를 feature/spacepick-v2-1에 push 성공. 재작성의 계획/구현/검증 기록도 포함. main 병합·운영 변경 없음.
+- 깨끗한 소스로 배포 준비 244파일 생성, worker/workflow/추가 SQL·두 후속 계획·사용법 포함·모든 파일 SHA256·PDF/첨부/환경파일 제외 검사 통과. prepared_not_deployed. 최종 기록 commit 후 패키지만 다시 생성한다.
+- 다음: docs/COPY_REWRITE.md의 배포/활성화 및 실제 AI 결과 검증. 이번 기능은 로컬 완료이며 현재 운영 화면에서 사용 가능하다고 표시하지 않는다.
