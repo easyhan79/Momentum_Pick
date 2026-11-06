@@ -102,19 +102,33 @@ def diagnose(environment,reader=read):
             result['actual_hook_health']='HEALTH_PROTOCOL_OK' if status==200 and all(isinstance(body.get(name),bool) for name in fields) else 'UNKNOWN_RESPONSE' if status==200 else f'HTTP_{status}'
             result['actual_hook_error_class']=body.get('_error_class','NONE')
         if result['database']=='DB_ACCESS_OK':
-            result.update(test_message_state(reader,headers))
+            result.update(test_message_state(reader,headers,environment.get('INTAKE_WINDOW_START'),environment.get('INTAKE_WINDOW_END')))
     return result
 
 
-def test_message_state(reader,headers):
+def test_message_state(reader,headers,window_start=None,window_end=None):
     since=(datetime.now(timezone.utc)-timedelta(hours=24)).isoformat()
-    query=urlencode({'select':'id,status,created_at','raw_input':'ilike.*테스트*','created_at':'gte.'+since,'order':'created_at.desc','limit':'2'})
+    filters=[('select','id,status,created_at'),('order','created_at.desc'),('limit','2')]
+    scope='TEST'
+    if window_start or window_end:
+        try:
+            start=datetime.fromisoformat(window_start or '')
+            end=datetime.fromisoformat(window_end or '')
+            if start.utcoffset() is None or end.utcoffset() is None or not timedelta(0)<end-start<=timedelta(minutes=10):
+                raise ValueError('invalid_window')
+        except (ValueError,TypeError):
+            return {'test_record':'WINDOW_INVALID'}
+        filters.extend([('created_at','gte.'+start.isoformat()),('created_at','lt.'+end.isoformat())])
+        scope='WINDOW'
+    else:
+        filters.extend([('raw_input','ilike.*테스트*'),('created_at','gte.'+since)])
+    query=urlencode(filters)
     status,rows=reader(BASE+'/rest/v1/properties?'+query,headers)
     if status!=200 or not isinstance(rows,list):
-        return {'test_record':'TEST_LOOKUP_UNAVAILABLE'}
+        return {'test_record':scope+'_LOOKUP_UNAVAILABLE'}
     if not rows:
-        return {'test_record':'TEST_NOT_FOUND_24H'}
-    result={'test_record':'TEST_FOUND' if len(rows)==1 else 'TEST_MULTIPLE_MATCHES'}
+        return {'test_record':'WINDOW_NOT_FOUND' if scope=='WINDOW' else 'TEST_NOT_FOUND_24H'}
+    result={'test_record':scope+'_FOUND' if len(rows)==1 else scope+'_MULTIPLE_MATCHES'}
     latest=rows[0]
     result['test_property_state']=latest.get('status') if latest.get('status') in ('pending','analyzed','failed') else 'OTHER'
     identifier=latest.get('id','')

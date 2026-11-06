@@ -1,5 +1,6 @@
 import json
 import unittest
+from urllib.parse import urlsplit,parse_qs
 from scripts.diagnose_telegram_intake import diagnose,write_report,test_message_state,BASE
 
 
@@ -52,6 +53,22 @@ class IntakeDiagnosticsTest(unittest.TestCase):
         self.assertEqual(result['test_record'],'TEST_FOUND');self.assertEqual(result['analysis_state'],'waiting')
         self.assertEqual(result['dispatch_result'],'http_401')
         self.assertNotIn(identifier,json.dumps(result));self.assertNotIn('PRIVATE',json.dumps(result))
+
+    def test_send_time_window_does_not_require_test_keyword(self):
+        calls=[]
+        def reader(url,headers=None,method='GET'):
+            calls.append(url)
+            query=parse_qs(urlsplit(url).query)
+            self.assertNotIn('raw_input',query)
+            self.assertEqual(query['created_at'],['gte.2026-11-06T08:32:00+00:00','lt.2026-11-06T08:36:00+00:00'])
+            return 200,[]
+        result=test_message_state(reader,{},'2026-11-06T08:32:00+00:00','2026-11-06T08:36:00+00:00')
+        self.assertEqual(result['test_record'],'WINDOW_NOT_FOUND');self.assertEqual(len(calls),1)
+
+    def test_invalid_or_overbroad_window_makes_no_requests(self):
+        def reader(*args,**kwargs):raise AssertionError('unexpected request')
+        for start,end in [('2026-11-06T08:32:00','2026-11-06T08:36:00'),('2026-11-06T08:32:00+00:00','2026-11-06T09:36:00+00:00'),('bad','bad')]:
+            self.assertEqual(test_message_state(reader,{},start,end),{'test_record':'WINDOW_INVALID'})
 
 
 if __name__=='__main__':unittest.main()

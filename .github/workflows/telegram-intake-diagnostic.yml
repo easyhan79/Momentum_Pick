@@ -24,6 +24,9 @@ jobs:
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          # Screenshot: Nov 6, 17:34 KST. Time-only lookup; no test-word assumption.
+          INTAKE_WINDOW_START: '2026-11-06T08:32:00+00:00'
+          INTAKE_WINDOW_END: '2026-11-06T08:36:00+00:00'
         run: python3 scripts/diagnose_telegram_intake.py
   result:
     needs: diagnose
