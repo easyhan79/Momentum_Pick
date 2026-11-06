@@ -118,3 +118,11 @@ T04는 공장형 필드 편집→저장→승인→공개 DTO 연결을 작은 �
 - 승인 시점의 공개 가능한 근거만 사용해 최상위 customerDecision 보고서를 published_content에 저장한다. 공개 GET은 새로 분석하지 않고 이 동결 보고서를 허용 목록으로 투영한다. 보고서의 참조 값·출처·기준일은 같은 승인 profile의 공개 가능한 필드와 일치해야 하며 private/타 자료 참조가 있는 카드는 제외한다. 승인 보고서가 없으면 모듈 설정만으로 분석을 자동 공개하지 않는다.
 - JSONB 객체 키 순서와 무관하게 입력/검토 동일성 및 참조를 비교한다. 근거를 바꾼 초안은 재검토가 필요하지만 이전 승인 snapshot의 보고서·수치는 유지된다.
 - 건물 층별 임대 현황은 공개 허용된 provided/verified rent_roll 기록만 표시한다. 미제공 층·공실률·계약금액을 보충하거나 합산하지 않는다. 실제 수익과 입력 가정 계산은 구분하고 기존 rentalScenario를 별도 링크/모듈로 유지한다.
+## 후속: 등록 매물 문안 재작성 (2026-11-07)
+
+- 기존 Showroom/propertyProfile/public DTO version은 유지한다. 재작성 원문·결과는 private `property_copy_rewrites`에 별도 보관하며 공개 projection에 추가하지 않는다.
+- 관리자 GET `action=copy-rewrites&propertyId=UUID`: 활성화 여부와 허용 목록으로 투영한 최근 10개 작업. source/claim token/actor는 제외한다.
+- POST `queue-copy-rewrite`: propertyId/requestId(UUID), 저장 revision, 선택 fields(subtitle/summary/target_1_blog/target_2_blog/insta_caption), instruction(0~1000자). source/기존 문안/actor는 서버가 실제 저장본과 인증 정보에서 구성한다.
+- POST `apply-copy-rewrite`: propertyId/requestId/revision. DB가 현재 revision과 base_revision을 동시에 확인하고 선택 필드만 draft_content에 원자 적용한다. published_content, properties.ai_contents, 자료/콘셉트/사실정보는 보존한다.
+- POST `discard-copy-rewrite`: propertyId/requestId. 작업 취소/폐기만 수행하며 기존 글을 유지한다. state는 queued/running/done/failed/applied/discarded, DB lease/attempt 최대3회/시간당 신규 요청3회/동일 요청 재전송 규칙을 유지한다.
+- 추가 SQL `20261107020000_copy_rewrites.sql`, worker/workflow·기능 활성화·배포 순서는 `COPY_REWRITE.md` 참조. 로컬 완료와 운영 적용 완료를 구분한다.

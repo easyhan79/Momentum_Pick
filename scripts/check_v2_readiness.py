@@ -29,7 +29,7 @@ cases.append(('supabase/tests/rental-scenario.test.ts',[node,'supabase/tests/ren
 cases.append(('tests/private-pdf.test.ts',[node,'tests/private-pdf.test.ts'],ROOT))
 cases.append(('tests/customer-review.test.ts',[node,'tests/customer-review.test.ts'],ROOT))
 cases.append(('supabase/tests/customer-copy.test.ts',[node,'supabase/tests/customer-copy.test.ts'],ROOT))
-for filename in ['supabase/tests/customer-purpose.test.ts','supabase/tests/customer-decision.test.ts','supabase/tests/customer-inquiry.test.ts','supabase/tests/analysis-quality.test.ts','supabase/tests/inquiry-api.test.ts','supabase/tests/intake-api.test.ts','tests/visual-evidence.test.ts']:
+for filename in ['supabase/tests/customer-purpose.test.ts','supabase/tests/customer-decision.test.ts','supabase/tests/customer-inquiry.test.ts','supabase/tests/analysis-quality.test.ts','supabase/tests/inquiry-api.test.ts','supabase/tests/intake-api.test.ts','supabase/tests/copy-rewrite-api.test.ts','tests/visual-evidence.test.ts']:
  cases.append((filename,[node,filename],ROOT))
 cases.append(('showroom-web/scripts/built-assets.test.mjs',[node,'showroom-web/scripts/built-assets.test.mjs'],ROOT))
 report={'started_at':datetime.now(ZoneInfo('Asia/Seoul')).isoformat(),'scope':'local build, typecheck, mock tests, bounded PDF inspection and isolated SQL; production/browser/provider accuracy excluded','checks':[],'complete':False,'current_check':None}
@@ -51,7 +51,7 @@ for name,command,directory in cases:
  check['seconds']=round(time.monotonic()-start,2);report['checks'].append(check)
  report['current_check']=None;checkpoint()
  print(check['status'].upper(),name,flush=True)
-for filename in ['web-registration-db.test.mjs','concept-images-db.test.mjs','private-pdf-bucket-db.test.mjs','customer-inquiry-db.test.mjs','analysis-snapshot-db.test.mjs','telegram-intake.test.mjs']:
+for filename in ['web-registration-db.test.mjs','concept-images-db.test.mjs','private-pdf-bucket-db.test.mjs','customer-inquiry-db.test.mjs','analysis-snapshot-db.test.mjs','telegram-intake.test.mjs','copy-rewrite-db.test.mjs']:
  report['current_check']=filename;checkpoint()
  if not os.environ.get('PGLITE_MODULE'):
   check={'name':filename,'status':'unrun','reason':'Set PGLITE_MODULE to the installed @electric-sql/pglite ESM entry'}

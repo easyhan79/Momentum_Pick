@@ -1,0 +1,34 @@
+name: Private property copy rewrites
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '4,9,14,19,24,29,34,39,44,49,54,59 * * * *'
+concurrency:
+  group: spacepick-private-copy-rewrites
+  cancel-in-progress: false
+jobs:
+  rewrite:
+    if: ${{ vars.COPY_REWRITE_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install existing provider dependencies
+        run: pip install google-genai==2.34.0 requests==2.34.2 pydantic==2.14.2 -r requirements-pdf.txt
+      - name: Create private text candidates only
+        env:
+          COPY_REWRITE_ENABLED: 'true'
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          AI_PROVIDER_ORDER: ${{ vars.AI_PROVIDER_ORDER || 'gemini,openai,anthropic' }}
+          OPENAI_MODEL: ${{ vars.OPENAI_MODEL || 'gpt-6.1-terra' }}
+          ANTHROPIC_MODEL: ${{ vars.ANTHROPIC_MODEL || 'claude-sonnet-5-5' }}
+        run: python -u copy_rewrite_worker.py

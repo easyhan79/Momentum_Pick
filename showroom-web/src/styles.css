@@ -76,3 +76,11 @@
 .customer-purpose{padding-top:56px;padding-bottom:32px}.customer-purpose select{display:block;width:min(100%,520px);margin:12px 0;padding:14px;background:#112126;color:var(--text,#edf1ee);border:1px solid #425451;border-radius:10px}.customer-purpose p{line-height:1.8}.purpose-slot-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:14px;margin-top:24px}.purpose-slot{padding:20px;min-width:0;overflow-wrap:anywhere}.purpose-slot small{display:block;margin-top:8px;color:#aabcb5}.purpose-risk{border-left:3px solid #d6b653;padding-left:16px}
 .decision-card-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:18px}.decision-card{padding:24px;min-width:0;overflow-wrap:anywhere}.decision-card h4{margin:24px 0 8px;color:#dcc274}.decision-card p,.decision-card small{line-height:1.8}.decision-card label{display:flex;gap:10px;align-items:flex-start}
 .visual-evidence-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:18px}.visual-evidence-grid article{padding:20px;min-width:0}.visual-evidence-grid .asset-image{height:260px}.visual-evidence p{line-height:1.8}
+/* Compare private rewrite candidates without letting long copy widen mobile pages. */
+.rewrite-columns{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem}
+.copy-rewrite fieldset{border:0;padding:0;margin:0 0 1rem}
+.copy-rewrite fieldset>label:has(input[type="checkbox"]){display:flex;align-items:center;gap:.6rem;margin:.6rem 0}
+.copy-rewrite input[type="checkbox"]{width:1rem;height:1rem;flex:0 0 auto;margin:0}
+.rewrite-columns>div{min-width:0}
+.rewrite-comparison pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:28rem;overflow:auto;font:inherit;padding:1rem;border:1px solid var(--line,#263537);border-radius:12px}
+@media(max-width:720px){.rewrite-columns{grid-template-columns:minmax(0,1fr)}}

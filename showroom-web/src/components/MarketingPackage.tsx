@@ -12,11 +12,12 @@ import {naturalCustomerCopy,type CopyReviewItem} from '../../../supabase/functio
 
 type Content={target_1_blog:string;target_2_blog:string;insta_caption:string};
 const channels=[['target_1_blog','블로그 · 타깃 1'],['target_2_blog','블로그 · 타깃 2'],['insta_caption','인스타그램 · 카드뉴스 구성안']] as const;
-export function MarketingPackage({propertyId,revision,onSaved,locked,concepts=[]}:{propertyId:string;concepts?:Concept[];revision:number;onSaved:(revision:number)=>void;locked:boolean}){
+export function MarketingPackage({propertyId,revision,onSaved,locked,concepts=[],onDirtyChange}:{propertyId:string;concepts?:Concept[];revision:number;onSaved:(revision:number)=>void;locked:boolean;onDirtyChange?:(dirty:boolean)=>void}){
   const [content,setContent]=useState<Content|null>(null),[channel,setChannel]=useState<keyof Content>('target_1_blog');
   const [copyReview,setCopyReview]=useState<CopyReviewItem[]>([]);
   const [busy,setBusy]=useState(false),[dirty,setDirty]=useState(false),[message,setMessage]=useState(''),[error,setError]=useState(false);
   const [photo]=useState<string>(),[editing,setEditing]=useState(false),[mediaRefresh,setMediaRefresh]=useState(0);
+  useEffect(()=>{onDirtyChange?.(dirty);},[dirty,onDirtyChange]);
   const refreshImages=useCallback(()=>setMediaRefresh(n=>n+1),[]);
   const library=useMediaLibrary(propertyId,mediaRefresh);
   const structureIssues=content?reviewCopy(content[channel],channel==='insta_caption'?'cards':'blog'):[];

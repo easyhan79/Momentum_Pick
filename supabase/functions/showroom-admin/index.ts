@@ -8,6 +8,7 @@ import {originAllowed,corsOrigin,validSlug,slugSuggestions} from '../_shared/sit
 import {publicationIssues} from '../_shared/publication.ts';
 import {queuePlan,dispatchPlan} from '../_shared/plan-queue.ts';
 import {naturalCustomerCopy,customerCopyReview} from '../_shared/customer-copy.ts';
+import {rewriteSnapshot,rewriteJob,selectedRewriteFields,dispatchRewrite} from '../_shared/copy-rewrite.ts';
 // No client-supplied claims are trusted. Auth is checked against GoTrue on every request.
 // Only explicitly approved snapshots may be published; original properties are never written.
 type Json = Record<string, any>;
@@ -42,11 +43,11 @@ export function marketingContent(ai:unknown,saved:unknown={}) {
   const source=object(ai), edits=object(saved);
   return Object.fromEntries(marketingFields.map(field=>[field,text(Object.hasOwn(edits,field)?edits[field]:source[field],18000)]));
 }
-type Config = {url:string;key:string;fetcher?:typeof fetch;githubTokens?:string[]};
-export function createHandler({url,key,fetcher=fetch,githubTokens=[]}:Config) {
+type Config = {url:string;key:string;fetcher?:typeof fetch;githubTokens?:string[];copyRewriteEnabled?:boolean};
+export function createHandler({url,key,fetcher=fetch,githubTokens=[],copyRewriteEnabled=false}:Config) {
   async function db(path:string, options:RequestInit={}) {
     const response=await fetcher(`${url}/rest/v1/${path}`,{...options,redirect:'error',headers:{apikey:key,Authorization:`Bearer ${key}`,'Content-Type':'application/json',...options.headers},signal:AbortSignal.timeout(15000)});
-    if(!response.ok){const e=await response.json().catch(()=>({}));const code=e.code==='23505'?'slug_taken':e.message;if(['source_missing','draft_missing','concept_missing','invalid_slot','invalid_registration','web_intake_missing'].includes(code))throw new ApiError(400,code);if(['slug_taken','revision_conflict','invalid_slug','invalid_listing_state','registration_request_conflict','analysis_already_running','concept_image_busy'].includes(code))throw new ApiError(code.startsWith('invalid_')?400:409,code);throw new ApiError(502,'database_unavailable');}
+    if(!response.ok){const e=await response.json().catch(()=>({}));const code=e.code==='23505'?'slug_taken':e.message;if(code==='rewrite_rate_limited')throw new ApiError(429,code);if(['rewrite_busy','rewrite_stale','rewrite_not_ready','rewrite_request_conflict'].includes(code))throw new ApiError(409,code);if(code==='rewrite_missing')throw new ApiError(404,code);if(code==='rewrite_invalid')throw new ApiError(400,code);if(['source_missing','draft_missing','concept_missing','invalid_slot','invalid_registration','web_intake_missing'].includes(code))throw new ApiError(400,code);if(['slug_taken','revision_conflict','invalid_slug','invalid_listing_state','registration_request_conflict','analysis_already_running','concept_image_busy'].includes(code))throw new ApiError(code.startsWith('invalid_')?400:409,code);throw new ApiError(502,'database_unavailable');}
     const responseText=await response.text();
     return responseText.trim()?JSON.parse(responseText):null;
   }
@@ -97,6 +98,12 @@ export function createHandler({url,key,fetcher=fetch,githubTokens=[]}:Config) {
         const jobs=await db(`property_analysis_jobs?property_id=eq.${id}&select=state,attempts,last_error_code`);
         return reply({sourceVersion:await documentReviewVersion(ai),candidates,issues:documentIssues(candidates),documents:documentInspectionSummaries(ai),analysis:documentAnalysisState(jobs[0])});
       }
+      if(req.method==='GET'&&query.get('action')==='copy-rewrites'){
+        const id=query.get('propertyId')||'';if(!UUID.test(id))throw new ApiError(400,'invalid_property_id');
+        if(!copyRewriteEnabled)return reply({available:false,jobs:[]});
+        const rows=await db(`property_copy_rewrites?property_id=eq.${id}&select=id,base_revision,fields,instruction,state,attempts,last_error_code,original,result,created_at,updated_at&order=created_at.desc&limit=10`);
+        return reply({available:true,jobs:rows.map(rewriteJob)});
+      }
       if(req.method==='GET'&&query.get('action')==='marketing') {
         const id=query.get('propertyId')||'';if(!UUID.test(id))throw new ApiError(400,'invalid_property_id');
         const properties=await db(`properties?id=eq.${id}&select=id,status,ai_contents`);
@@ -132,6 +139,24 @@ export function createHandler({url,key,fetcher=fetch,githubTokens=[]}:Config) {
         return reply({showroom:rooms[0],duplicate:created.duplicate});
       }
       const id=body.propertyId;if(typeof id!=='string'||!UUID.test(id)) throw new ApiError(400,'invalid_property_id');
+      if(req.method==='POST'&&['queue-copy-rewrite','apply-copy-rewrite','discard-copy-rewrite'].includes(body.action)){
+        if(!copyRewriteEnabled)throw new ApiError(503,'rewrite_unavailable');
+        if(!UUID.test(body.requestId||''))throw new ApiError(400,'rewrite_invalid');
+        if(body.action==='discard-copy-rewrite')return reply(await db('rpc/copy_rewrite_decide',{method:'POST',body:JSON.stringify({p_id:body.requestId,p_property:id,p_revision:0,p_apply:false})}));
+        if(!Number.isSafeInteger(body.revision)||body.revision<1||body.revision>=2147483647)throw new ApiError(400,'invalid_revision');
+        if(body.action==='apply-copy-rewrite'){
+          const room=await db('rpc/copy_rewrite_decide',{method:'POST',body:JSON.stringify({p_id:body.requestId,p_property:id,p_revision:body.revision,p_apply:true})});return reply({showroom:room});
+        }
+        let fields;try{fields=selectedRewriteFields(body.fields);}catch{throw new ApiError(400,'rewrite_invalid');}
+        if(typeof body.instruction!=='string'||body.instruction.length>1000)throw new ApiError(400,'rewrite_invalid');
+        const rows=await db(`property_showrooms?property_id=eq.${id}&select=draft_content,revision`);if(!rows.length)throw new ApiError(404,'draft_not_found');
+        if(rows[0].revision!==body.revision)throw new ApiError(409,'revision_conflict');
+        const properties=await db(`properties?id=eq.${id}&select=raw_input,ai_contents`);if(!properties.length)throw new ApiError(404,'property_not_found');
+        const snapshot=rewriteSnapshot(rows[0].draft_content,properties[0]);
+        if(new TextEncoder().encode(JSON.stringify(snapshot.source)).byteLength>80000)throw new ApiError(400,'rewrite_invalid');
+        const queued=await db('rpc/copy_rewrite_queue',{method:'POST',body:JSON.stringify({p_id:body.requestId,p_property:id,p_actor:user.id,p_revision:body.revision,p_fields:fields,p_instruction:body.instruction.trim(),p_source:snapshot.source,p_original:Object.fromEntries(fields.map(f=>[f,snapshot.original[f]]))})});
+        return reply({...queued,dispatched:queued.queued?await dispatchRewrite(githubTokens,fetcher):false});
+      }
       if(req.method==='POST'&&body.action==='import-document-facts'){
         if(!Number.isSafeInteger(body.revision)||body.revision<1)throw new ApiError(400,'invalid_revision');
         const rows=await db(`property_showrooms?property_id=eq.${id}&select=*`);if(!rows.length)throw new ApiError(404,'draft_not_found');
@@ -345,4 +370,4 @@ export function createHandler({url,key,fetcher=fetch,githubTokens=[]}:Config) {
 }
 // Supabase injects existing server credentials. They never enter browser code.
 declare const Deno: {env:{get(name:string):string|undefined};serve(handler:(req:Request)=>Promise<Response>):void};
-if(typeof Deno!=='undefined') Deno.serve(createHandler({url:Deno.env.get('SUPABASE_URL')!,key:Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,githubTokens:[Deno.env.get('GITHUB_TOKEN')||'',Deno.env.get('GH_PAT')||'']}));
+if(typeof Deno!=='undefined') Deno.serve(createHandler({url:Deno.env.get('SUPABASE_URL')!,key:Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,copyRewriteEnabled:Deno.env.get('COPY_REWRITE_ENABLED')==='true',githubTokens:['GITHUB_TOKEN','GH_PAT','GITHUB_PAT','GITHUB_PAT_TOKEN'].map(name=>Deno.env.get(name)||'')}));

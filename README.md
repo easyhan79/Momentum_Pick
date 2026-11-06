@@ -12,6 +12,7 @@
 - [실제 구현 기준 아키텍처와 매물 게시/프로그램 배포 구분](docs/SPACEPICK_V2_ARCHITECTURE.md)
 - [v2.1 완료 보고서·남은 운영 작업](SPACEPICK_V2_1_REPORT.md)
 - [본인 전용 배포·개발 검증 계획](SPACEPICK_PRIVATE_PREVIEW_PLAN.md)
+- [등록 매물 다시 글작성 기능·사용법·배포 조건](docs/COPY_REWRITE.md)
 - [v2.1 재개 상태](SPACEPICK_V2_1_RUN_STATE.json) / [작업 기록](SPACEPICK_V2_1_PROGRESS.md)
 - [GitHub 업데이트 절차](docs/SPACEPICK_V2_GITHUB.md)
 
