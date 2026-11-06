@@ -1,4 +1,4 @@
-import {evidenceLabels,type Showroom} from '../types/showroom';
+import {evidenceLabels,factEvidenceLabel,type Showroom} from '../types/showroom';
 
 export function PropertyOverview({summary,highlights}:{summary?:Showroom['propertySummary'];highlights?:Showroom['highlights']}){
   if(!summary&&!highlights?.length)return null;
@@ -11,7 +11,7 @@ export function PropertyOverview({summary,highlights}:{summary?:Showroom['proper
     </div>}
     {!!highlights?.length&&<div className="property-highlights">{highlights.map((highlight,index)=><article key={index} className="glass property-highlight">
       <span className="small-label">검토 이유 {index+1}</span><h3>{highlight.title}</h3><p>{highlight.description}</p>
-      <ul>{highlight.references.map((fact,i)=><li key={`${fact.key}-${i}`}><strong>{fact.label}: {fact.value}{fact.unit&&` ${fact.unit}`}</strong><span className={`evidence-tag evidence-${fact.evidence}`}>{evidenceLabels[fact.evidence]}</span><p className="fact-source">{fact.source}</p></li>)}</ul>
+      <ul>{highlight.references.map((fact,i)=><li key={`${fact.key}-${i}`}><strong>{fact.label}: {fact.value}{fact.unit&&` ${fact.unit}`}</strong><span className={`evidence-tag evidence-${fact.evidence}`}>{factEvidenceLabel(fact)}</span><p className="fact-source">{fact.source}</p></li>)}</ul>
       {highlight.constraints&&<p className="section-description">제약·확인사항: {highlight.constraints}</p>}
     </article>)}</div>}
   </section>;

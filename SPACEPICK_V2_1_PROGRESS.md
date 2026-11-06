@@ -50,3 +50,38 @@
 - 검증: node supabase/tests/customer-purpose.test.ts; node supabase/tests/property-profile.test.ts; node supabase/tests/web-registration-api.test.ts; pnpm --dir showroom-web run build; scripts/v21-customer-qa.cjs (5 groups passed)
 - Git: feature/spacepick-v2-1 / d88cf11a8575b36d45c7acba90709ea4ab2bfd14; v2.1 운영 배포 없음.
 - 다음: S1 로컬 커밋 후 S2 4단 판단 카드·공개 계약 구현
+
+## 2026-11-07T00:46:13.844268+09:00 — S2 / in_progress
+
+- 변경/완료 상태: S1 완료 커밋; 기존 profile 공개 권한과 검증 기록을 재사용
+- 검증: 이 체크포인트에서 새 검증 없음
+- Git: feature/spacepick-v2-1 / 8cc2e558fdb61b6bdd6572a4e576f705a4337d17; v2.1 운영 배포 없음.
+- 다음: 4단 판단 카드 DTO·기준일·비공개/승인 경계 구현과 검사
+
+## 2026-11-07T00:48:38.724401+09:00 — S2 / in_progress
+
+- 변경/완료 상태: 4단 판단 DTO/UI, 정보 기준일, 5상태 문구, opt-in 비공개 기본·서버 검토 승인·공개 필터 구현
+- 검증: 이 체크포인트에서 새 검증 없음
+- Git: feature/spacepick-v2-1 / 8cc2e558fdb61b6bdd6572a4e576f705a4337d17; v2.1 운영 배포 없음.
+- 다음: S2 판단 카드 설정 관리자 UI와 비공개/충돌/0/미입력/승인본 회귀 검사
+
+## 2026-11-07T00:50:13.989328+09:00 — S2 / in_progress
+
+- 변경/완료 상태: 관리자 판단 카드 준비·목적 표시명 편집·검토 확인·공개 범위 UI 연결; PDF/필드 변경시 검토 무효화; 신규 보안 검사 5개 통과
+- 검증: node supabase/tests/customer-decision.test.ts; pnpm --dir showroom-web run typecheck
+- Git: feature/spacepick-v2-1 / 8cc2e558fdb61b6bdd6572a4e576f705a4337d17; v2.1 운영 배포 없음.
+- 다음: S2 기존 회귀 및 카드 브라우저/공개 DTO 검사 후 완료
+
+## 2026-11-07T00:51:01.295958+09:00 — S2 / in_progress
+
+- 변경/완료 상태: 판단 카드 비공개/근거 변경 무효화·명시적 검토 해제·5상태 UI 적용; 기존 프로필/승인/문서 회귀 통과
+- 검증: customer-decision/property-profile/admin-api/public-showroom/document-review tests; frontend build
+- Git: feature/spacepick-v2-1 / 8cc2e558fdb61b6bdd6572a4e576f705a4337d17; v2.1 운영 배포 없음.
+- 다음: S2 공개 카드 기준일·4단계 브라우저 확인 후 완료 커밋
+
+## 2026-11-07T00:52:48.464117+09:00 — S2 / local_complete
+
+- 변경/완료 상태: 4단 카드·기준일·상태·목적 설정 편집·검토/공개 분리 완료; 신규 6개와 기존 42개 및 빌드/5유형 브라우저 통과
+- 검증: customer-decision 6; profile 7; admin 21; public 7; document 7; build; v21-customer-qa 5 kinds/3 widths
+- Git: feature/spacepick-v2-1 / 8cc2e558fdb61b6bdd6572a4e576f705a4337d17; v2.1 운영 배포 없음.
+- 다음: S2 커밋 후 S3 목적별 콘셉트 연결 및 자료 표현 구현

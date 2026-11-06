@@ -4,7 +4,7 @@ export type EvidenceStatus = 'verified' | 'owner_provided' | 'ai_hypothesis' | '
 export type PropertyCategory = 'commercial' | 'industrial' | 'land' | 'income' | 'unknown';
 export type Fact = {
   key: string; label: string; value: string | number | null; unit?: string;
-  evidence: EvidenceStatus; source: string; publication?: 'private'|'approved';
+  evidence: EvidenceStatus; source: string; status?:import('../../../supabase/functions/_shared/property-profile.ts').ProfileStatus; asOf?:string; publication?: 'private'|'approved';
 };
 export type Zone = {
   position?: {x:number;y:number}; evidence?: EvidenceStatus;
@@ -23,6 +23,7 @@ export type Asset = {
   kind: 'example' | 'photo' | 'concept' | 'provided_plan'; approved: boolean;
 };
 export type Showroom = {
+  customerDecision?:import('../../../supabase/functions/_shared/customer-decision.ts').PublicDecision;
   rentalScenario?: import('../../../supabase/functions/_shared/rental-scenario.ts').RentalScenario;
   propertyProfile?: PropertyProfile;
   imageSettings?: ImageSettings;
@@ -50,3 +51,5 @@ export const categoryLabels: Record<PropertyCategory, string> = {
   commercial: '상가 · 오피스', industrial: '공장 · 물류부지',
   land: '토지 · 임야', income: '수익형 건물', unknown: '유형 확인 필요',
 };
+
+export function factEvidenceLabel(fact:Fact){const labels={verified:'증빙 대조 확인',provided:'제공자료 기준',inferred:'자료 기반 해석',generated:'AI 활용 제안',unknown:'확인 필요'};return fact.status?labels[fact.status]:evidenceLabels[fact.evidence];}

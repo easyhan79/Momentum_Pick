@@ -1,5 +1,5 @@
 import { CircleHelp } from 'lucide-react';
-import { evidenceLabels, type Fact } from '../types/showroom';
+import { evidenceLabels,factEvidenceLabel, type Fact } from '../types/showroom';
 import { hasFactValue } from '../lib/industrialReview';
 
 export function Facts({ facts }: { facts: Fact[] }) {
@@ -8,7 +8,7 @@ export function Facts({ facts }: { facts: Fact[] }) {
     <div className="facts-grid">{facts.map((fact,index) => <article className="fact-card glass" key={`${fact.key}-${index}`}>
       <p className="small-label">{fact.label}</p>
       <p className={`fact-value ${!hasFactValue(fact.value) ? 'unknown-value' : ''}`}>{hasFactValue(fact.value) ? fact.value : '확인 필요'}{hasFactValue(fact.value) && fact.unit && <span>{fact.unit}</span>}</p>
-      <span className={`evidence-tag evidence-${fact.evidence}`}>{evidenceLabels[fact.evidence]}</span>
+      <span className={`evidence-tag evidence-${fact.evidence}`}>{factEvidenceLabel(fact)}</span>
       <p className="fact-source">{fact.source}</p>{fact.publication==='private'&&<span className="evidence-tag">비공개 항목 · 초안에서만 표시</span>}
     </article>)}</div>
   </section>;

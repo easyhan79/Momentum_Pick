@@ -64,5 +64,7 @@ export function importDocumentCandidates(profile:PropertyProfile,candidates:Docu
   const value=/^(land_area|building_area|gross_floor_area|exclusive_area|contract_area|warehouse_area|power_capacity|clear_height|floor_load)$/.test(c.key)&&/^\d+(\.\d+)?$/.test(numeric)?Number(numeric):c.value;
   return {id:crypto.randomUUID(),key:c.key,label:c.label,value,unit:c.unit,status:'provided',sourceText:`${c.sourceIndex?'첨부 '+c.sourceIndex:'제공 텍스트'}${c.page?' · '+c.page+'쪽':''} · AI 추출 · 원문 대조 필요`,sourceIds:sources.has(c.sourceIndex)?[sources.get(c.sourceIndex)!]:[],useApproved:false,publication:'private'};
  });
- return {...profile,fields:[...profile.fields,...fields]};
+ const decision=profile.modules?.customerDecision;
+ const modules=decision?{...profile.modules,customerDecision:{...decision,reviewedBy:undefined,reviewedAt:undefined,reviewConfirmed:false}}:profile.modules;
+ return {...profile,fields:[...profile.fields,...fields],...(modules?{modules}:{})};
 }

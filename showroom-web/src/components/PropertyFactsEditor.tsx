@@ -1,3 +1,4 @@
+import {DecisionSettingsEditor} from './DecisionSettingsEditor';
 import {propertyFieldTemplates,isNumericFactKey} from '../lib/propertyFields';
 import {PropertyHighlightsEditor} from './PropertyHighlightsEditor';
 import {RentalScenarioEditor} from './RentalScenarioEditor';
@@ -15,7 +16,11 @@ export function PropertyFactsEditor({propertyId,content,busy,onChange}:{property
   const profile=content.propertyProfile;
   const templates=propertyFieldTemplates(profile?.kind==='unknown'?content.category:profile?.kind||content.category);
   useEffect(()=>{let active=true;setAssets([]);setError('');void mediaRequest(`action=list&propertyId=${propertyId}`).then(r=>r.json()).then(data=>{if(active)setAssets(data.assets||[]);}).catch(()=>{if(active)setError('근거자료 목록을 불러오지 못했습니다. 초안을 다시 열어 확인해 주세요.');});return()=>{active=false;};},[propertyId]);
-  function update(next:PropertyProfile){onChange({...content,propertyProfile:{...next,sourcePermissions:next.sourcePermissions.filter(permission=>next.fields.some(field=>field.sourceIds.includes(permission.assetId)))}});}
+  function update(next:PropertyProfile){
+    const changed=profile&&JSON.stringify([profile.kind,profile.price,profile.fields,profile.sourcePermissions,profile.modules?.rentalScenario])!==JSON.stringify([next.kind,next.price,next.fields,next.sourcePermissions,next.modules?.rentalScenario]);
+    if(changed&&next.modules?.customerDecision){const decision={...next.modules.customerDecision,reviewConfirmed:false};delete decision.reviewedBy;delete decision.reviewedAt;next={...next,modules:{...next.modules,customerDecision:decision}};}
+    onChange({...content,propertyProfile:{...next,sourcePermissions:next.sourcePermissions.filter(permission=>next.fields.some(field=>field.sourceIds.includes(permission.assetId)))}});
+  }
   function editField(id:string,patch:Partial<ProfileField>,confirmation=false){if(!profile)return;update({...profile,fields:profile.fields.map(f=>f.id!==id?f:{...f,...patch,...(!confirmation&&f.verification?{verification:{...(patch.verification||f.verification),confirmed:false,by:undefined,at:undefined}}:{})})});}
   function start(){
     const fields:ProfileField[]=content.facts.map(f=>({...emptyField(f.key,f.label,f.unit||''),value:f.value,status:f.evidence==='owner_provided'?'provided':f.evidence==='ai_hypothesis'?'inferred':'unknown',sourceText:f.source}));
@@ -45,6 +50,7 @@ export function PropertyFactsEditor({propertyId,content,busy,onChange}:{property
           <label>값<input type={valueType(field)==='number'?'number':'text'} step="any" maxLength={2000} value={field.value??''} onChange={e=>{const raw=e.target.value;editField(field.id,{value:raw.trim()===''?null:valueType(field)==='number'?Number(raw):raw});}}/></label>
           <label>단위<input maxLength={30} value={field.unit} onChange={e=>editField(field.id,{unit:e.target.value})}/></label></div>
         <label>정보 상태<select aria-label="정보 상태" value={field.status} onChange={e=>editField(field.id,{status:e.target.value as ProfileField['status']})}><option value="unknown">확인 필요</option><option value="provided">제공정보 · 미검증</option><option value="verified">증빙 대조 완료</option><option value="inferred">자료 기반 추론</option><option value="generated">AI 생성</option></select></label>
+        <label>정보 기준일 · 선택<input type="date" value={field.asOf||''} onChange={e=>editField(field.id,{asOf:e.target.value})}/></label>
         <label>공개할 출처 설명 · 개인정보 제외<input maxLength={500} value={field.sourceText} onChange={e=>editField(field.id,{sourceText:e.target.value})}/></label>
         <label>근거자료 · 여러 개 선택 가능<select aria-label="근거자료 · 여러 개 선택 가능" multiple value={field.sourceIds} onChange={e=>editField(field.id,{sourceIds:Array.from(e.target.selectedOptions,option=>option.value)})}>{assets.map(asset=><option key={asset.id} value={asset.id}>{asset.caption||asset.id}{asset.source_type==='ai_generated'?' (AI 생성)':''}</option>)}</select></label>
         <button type="button" className="button button-outline" disabled={!field.sourceIds.length} onClick={()=>editField(field.id,{sourceIds:[]})}>근거 연결 해제</button>
@@ -61,6 +67,7 @@ export function PropertyFactsEditor({propertyId,content,busy,onChange}:{property
         const change=(patch:Partial<typeof permission>)=>update({...profile,sourcePermissions:[...profile.sourcePermissions.filter(s=>s.assetId!==asset.id),{...permission,...patch}]});
         return <fieldset disabled={busy} key={asset.id}><legend>{asset.caption||asset.id}</legend><label><input type="checkbox" checked={permission.useApproved} onChange={e=>change({useApproved:e.target.checked})}/>자료 사용 권한 확인</label><label><input type="checkbox" checked={permission.allowDerivedPublication} onChange={e=>change({allowDerivedPublication:e.target.checked})}/>자료에서 가져온 정보의 공개 허용 확인</label></fieldset>;
       })}
+      <DecisionSettingsEditor profile={profile} busy={busy} onChange={update}/>
       <PropertyHighlightsEditor profile={profile} busy={busy} onChange={update}/>
       <RentalScenarioEditor value={profile.modules?.rentalScenario} busy={busy} onChange={rentalScenario=>update({...profile,modules:{...profile.modules,rentalScenario}})}/>
     </>}

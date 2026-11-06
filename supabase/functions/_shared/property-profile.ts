@@ -1,9 +1,10 @@
+import {validateDecisionSettings,type DecisionSettings} from './customer-decision.ts';
 // Shared data contract. No runtime credentials or database calls in this module.
 import {validateRentalScenario,rentalScenarioIssues} from './rental-scenario.ts';
 import type {RentalScenario} from './rental-scenario.ts';
 export type ProfileStatus='verified'|'provided'|'inferred'|'generated'|'unknown';
-export type ProfileField={id:string;key:string;label:string;value:string|number|null;unit:string;status:ProfileStatus;sourceText:string;sourceIds:string[];useApproved:boolean;publication:'private'|'approved';verification?:{method:string;by?:string;at?:string;confirmed?:boolean}};
-export type PropertyProfile={version:1;kind:'factory'|'logistics'|'commercial'|'land'|'income'|'unknown';transaction:'sale'|'lease'|'unknown';price:{status:'fixed'|'negotiable'|'unknown';saleWon:number|null;depositWon:number|null;monthlyWon:number|null};fields:ProfileField[];sourcePermissions:{assetId:string;useApproved:boolean;allowDerivedPublication:boolean}[];highlights:{id:string;title:string;description:string;fieldIds:string[];constraints:string}[];modules?:{rentalScenario?:RentalScenario}};
+export type ProfileField={id:string;key:string;label:string;value:string|number|null;unit:string;status:ProfileStatus;sourceText:string;asOf?:string;sourceIds:string[];useApproved:boolean;publication:'private'|'approved';verification?:{method:string;by?:string;at?:string;confirmed?:boolean}};
+export type PropertyProfile={version:1;kind:'factory'|'logistics'|'commercial'|'land'|'income'|'unknown';transaction:'sale'|'lease'|'unknown';price:{status:'fixed'|'negotiable'|'unknown';saleWon:number|null;depositWon:number|null;monthlyWon:number|null};fields:ProfileField[];sourcePermissions:{assetId:string;useApproved:boolean;allowDerivedPublication:boolean}[];highlights:{id:string;title:string;description:string;fieldIds:string[];constraints:string}[];modules?:{rentalScenario?:RentalScenario;customerDecision?:DecisionSettings}};
 type ObjectValue=Record<string,any>;
 const obj=(v:unknown):ObjectValue=>v!==null&&typeof v==='object'&&!Array.isArray(v)?v:{};
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -39,12 +40,13 @@ export function validateProfile(input:unknown,context:ValidationContext):Propert
     else if(val!==null&&(typeof val!=='number'||!Number.isFinite(val)))fail();
     if(typeof f.useApproved!=='boolean')fail();
     const field:ProfileField={id,key,label:text(f.label,100,true),value:val,unit:text(f.unit,30),status:one(f.status,['verified','provided','inferred','generated','unknown']),sourceText:text(f.sourceText,500),sourceIds:ids(f.sourceIds,10,uuid),useApproved:f.useApproved,publication:one(f.publication,['private','approved'])};
+    if(f.asOf!==undefined&&f.asOf!==''){const date=text(f.asOf,10);if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!Number.isFinite(Date.parse(date))||new Date(date).toISOString().slice(0,10)!==date)fail('invalid_fact_date');field.asOf=date;}
     if(field.sourceIds.some(id=>!assets.has(id)))fail('profile_source_missing');
     if(field.status==='verified'){
       const v=obj(f.verification),method=text(v.method,2000,true);
       if(method.length<10||!hasValue(field.value)||!field.sourceIds.length||field.sourceIds.some(id=>assets.get(id)?.source_type==='ai_generated'))fail('profile_verification_required');
       const previous=context.previous?.fields.find(old=>old.id===id);
-      const same=previous?.status==='verified'&&previous.verification?.by&&previous.verification?.at&&JSON.stringify([previous.key,previous.value,previous.unit,previous.sourceText,previous.sourceIds,previous.verification.method])===JSON.stringify([field.key,field.value,field.unit,field.sourceText,field.sourceIds,method]);
+      const same=previous?.status==='verified'&&previous.verification?.by&&previous.verification?.at&&JSON.stringify([previous.key,previous.value,previous.unit,previous.sourceText,previous.sourceIds,previous.asOf||null,previous.verification.method])===JSON.stringify([field.key,field.value,field.unit,field.sourceText,field.sourceIds,field.asOf||null,method]);
       if(!same&&v.confirmed!==true)fail('profile_verification_required');
       field.verification=same?{method,by:previous!.verification!.by,at:previous!.verification!.at}:{method,by:context.userId,at:context.now};
     }
@@ -60,21 +62,23 @@ export function validateProfile(input:unknown,context:ValidationContext):Propert
   if(new Set(result.highlights.map(h=>h.id)).size!==result.highlights.length)fail();
   if(p.modules!==undefined){
     if(!p.modules||typeof p.modules!=='object'||Array.isArray(p.modules))fail('invalid_rental_scenario');
+    result.modules={};
     if(p.modules.rentalScenario!==undefined){
-      try{result.modules={rentalScenario:validateRentalScenario(p.modules.rentalScenario)};}
+      try{result.modules.rentalScenario=validateRentalScenario(p.modules.rentalScenario);}
       catch{fail('invalid_rental_scenario');}
     }
   }
+  if(p.modules?.customerDecision!==undefined){try{result.modules={...result.modules,customerDecision:validateDecisionSettings(p.modules.customerDecision,result,context)};}catch{fail('invalid_customer_decision');}}
   return result;
 }
 
-function visibleField(field:ProfileField,profile:PropertyProfile){
+export function visibleField(field:ProfileField,profile:PropertyProfile){
   return field.publication==='approved'&&field.useApproved===true&&!!field.sourceText&&field.status!=='unknown'&&hasValue(field.value)
     &&field.sourceIds.every(id=>profile.sourcePermissions.some(s=>s.assetId===id&&s.useApproved===true&&s.allowDerivedPublication===true))
     &&(field.status!=='verified'||!!field.verification?.by&&!!field.verification?.at);
 }
 export function profileFacts(profile:PropertyProfile,includePrivate=false){
-  return profile.fields.filter(f=>includePrivate||visibleField(f,profile)).map(f=>({key:f.key,label:f.label,value:f.value,unit:f.unit,evidence:f.status==='verified'?'verified' as const:f.status==='provided'?'owner_provided' as const:f.status==='unknown'?'needs_review' as const:'ai_hypothesis' as const,source:f.sourceText||'출처 확인 필요',...(includePrivate?{publication:f.publication}:{})}));
+  return profile.fields.filter(f=>includePrivate||visibleField(f,profile)).map(f=>({key:f.key,label:f.label,value:f.value,unit:f.unit,evidence:f.status==='verified'?'verified' as const:f.status==='provided'?'owner_provided' as const:f.status==='unknown'?'needs_review' as const:'ai_hypothesis' as const,source:f.sourceText||'출처 확인 필요',status:f.status,...(f.asOf?{asOf:f.asOf}:{}),...(includePrivate?{publication:f.publication}:{})}));
 }
 export function publicProfileHighlights(profile:PropertyProfile){
   const visible=new Set(profile.fields.filter(f=>visibleField(f,profile)&&['verified','provided'].includes(f.status)).map(f=>f.id));
@@ -97,6 +101,8 @@ export function profilePublicationIssues(profile:PropertyProfile,assets:{id:stri
   if(profile.fields.some(f=>f.publication==='approved'&&!visibleField(f,profile)))add('공개할 정보의 값·출처·사용 권한과 근거자료 공개 범위를 확인해 주세요.');
   const sourceIds=profile.fields.flatMap(f=>f.sourceIds);
   if(sourceIds.some(id=>!assets.some(a=>a.id===id)))add('삭제되었거나 다른 매물에 속하는 근거자료를 다시 연결해 주세요.');
+  const decision=profile.modules?.customerDecision;
+  if(decision?.enabled&&decision.publication==='approved'&&(!decision.reviewedBy||!decision.reviewedAt))add('목적별 판단 카드의 근거·제약을 다시 검토하고 확인해 주세요.');
   const rental=profile.modules?.rentalScenario;
   if(rental?.enabled&&rental.publication==='approved'){
     try{for(const message of rentalScenarioIssues(validateRentalScenario(rental)))issues.push({code:'profile_review_required',message:`임대 가정 계산: ${message}`,target:'rental-scenario-editor'});}
