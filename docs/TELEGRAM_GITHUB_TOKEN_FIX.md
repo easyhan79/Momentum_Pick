@@ -17,6 +17,7 @@
 ## 운영 적용 상태와 다음 단계
 
 - 소스 수정·검증 완료. GitHub main 소스 반영과 Supabase 함수 배포는 별개다.
+- 코드 커밋 `246f54970ff47f2daf3eecaf00cb1876eef23986`을 원격 main과 `fix/telegram-github-pat-token`에 반영하고 원격 조회로 확인했다.
 - 현재 Supabase 함수 관리 연결이 없어 운영 함수 배포는 미완료다. DB service key로 관리 API 권한을 대신하지 않는다.
 - 기존 Supabase 프로젝트에서 Edge Functions → `clever-endpoint` → Code를 열어 운영 코드의 GitHub 토큰 환경변수 읽기 부분에도 `GITHUB_PAT_TOKEN`을 포함해야 한다. 운영 코드가 저장소와 다른 버전이면 기존 Webhook 인증·파라미터 처리 등을 검토하고 보존하며 필요한 별칭만 적용한다. 실제 운영 소스를 보지 않은 상태에서 함수 전체를 교체하지 않는다.
 - 저장소 최신 코드의 이름 목록은 다음과 같다.
