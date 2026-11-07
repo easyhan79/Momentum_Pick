@@ -87,3 +87,7 @@
 .image-prompt-panel{margin-top:28px;padding-top:20px;border-top:1px solid var(--line);min-width:0;overflow-wrap:anywhere}
 .image-prompt-panel textarea[readonly]{min-height:320px;line-height:1.7}
 .image-prompt-panel fieldset{border:0;padding:0;min-width:0}
+.intake-receipt{padding:14px;border:1px solid var(--line);border-radius:12px;overflow-wrap:anywhere;margin:14px 0}
+.web-intake-registration fieldset{border:0;padding:0;min-width:0}
+.web-intake-registration label:has(input[type="checkbox"]){display:flex;gap:.6rem;align-items:center}
+.web-intake-registration input[type="checkbox"]{width:1rem;height:1rem;flex:0 0 auto}

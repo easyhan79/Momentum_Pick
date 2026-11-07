@@ -1,8 +1,14 @@
-import {useRef,useState} from 'react';
+import {useEffect,useRef,useState} from 'react';
 import {api} from '../lib/adminApi';
 import type {Showroom} from '../types/showroom';
+import {WebIntakeRegistration} from './WebIntakeRegistration';
 type Draft={id:string;property_id:string;revision:number;slug:string;showroom_status:string;draft_content:Showroom};
-export function NewPropertyForm({onCreated}:{onCreated:(draft:Draft)=>void}){
+export function NewPropertyForm({onCreated,resume}:{onCreated:(draft:Draft)=>void;resume?:{requestId:string;nonce:number}}){
+ const [enabled,setEnabled]=useState<boolean|null>(null);
+ useEffect(()=>{let active=true;void api<{enabled:boolean}>('action=web-intake-config').then(v=>{if(active)setEnabled(v.enabled);}).catch(()=>{if(active)setEnabled(false);});return()=>{active=false;};},[]);
+ return enabled===null?<p role="status">매물 등록 화면을 준비하고 있습니다.</p>:enabled?<WebIntakeRegistration onCreated={onCreated} resume={resume}/>:<LegacyNewPropertyForm onCreated={onCreated}/>;
+}
+function LegacyNewPropertyForm({onCreated}:{onCreated:(draft:Draft)=>void}){
  const [open,setOpen]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState('');
  const request=useRef(crypto.randomUUID());
  async function submit(form:HTMLFormElement){
