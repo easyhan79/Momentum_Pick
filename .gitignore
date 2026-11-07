@@ -221,3 +221,6 @@ __marimo__/
 
 # Frontend source helpers are not Python build artifacts (lib/ above).
 !showroom-web/src/lib/
+
+supabase/.temp/
+
