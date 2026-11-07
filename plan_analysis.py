@@ -36,7 +36,7 @@ def apply_annotations(content, asset, result):
     return output
 
 
-def analyze_uploaded_plans(url, headers, gemini_key, requests, emit=print):
+def analyze_uploaded_plans(url, headers, gemini_key, requests, emit=print, executor='legacy_actions'):
     from google import genai
     from google.genai import types
     def rest(path, method='GET', body=None):
@@ -52,8 +52,22 @@ def analyze_uploaded_plans(url, headers, gemini_key, requests, emit=print):
         if not re.fullmatch(r'[0-9a-f-]{36}', property_id) or not content.get('concepts'):
             continue
         state = content.get('planAnalysis', {})
+        if state.get('executorKind','legacy_actions') != executor:
+            continue
+        if content.get('imagePolicy',{}).get('mode')=='manual_web' and not state:
+            continue
+        if executor=='web_worker' and state.get('state')=='failed':
+            continue
         requested = state.get('assetId') if state.get('state') in ('queued', 'running', 'failed') else None
         if requested and not re.fullmatch(r'[0-9a-f-]{36}', requested):
+            continue
+        if executor=='web_worker' and state.get('state')=='running':
+            # No blind repeat after uncertain provider outcome. A human can
+            # request a fresh bounded run after reviewing usage.
+            started=state.get('startedAt')
+            if started and (datetime.now(timezone.utc)-datetime.fromisoformat(started)).total_seconds()>=600:
+                marker={**state,'state':'failed','errorCode':'outcome_unknown'}
+                rest(f"property_showrooms?property_id=eq.{property_id}&revision=eq.{row['revision']}",'PATCH',{'draft_content':{**content,'planAnalysis':marker},'revision':row['revision']+1})
             continue
         if state.get('state') == 'running':
             started = state.get('startedAt')

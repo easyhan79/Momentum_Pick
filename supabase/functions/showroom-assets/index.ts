@@ -19,7 +19,7 @@ async function boundedBody(req:Request){
   while(true){const {done,value}=await reader.read();if(done)break;total+=value.length;if(total>MAX_BODY){await reader.cancel();throw new MediaError(413,'file_too_large');}parts.push(value);}
   const data=new Uint8Array(total);let offset=0;for(const part of parts){data.set(part,offset);offset+=part.length;}return data;
 }
-export function createAssetsHandler({url,key,fetcher=fetch,githubTokens=[]}:{url:string;key:string;fetcher?:typeof fetch;githubTokens?:string[]}){
+export function createAssetsHandler({url,key,fetcher=fetch,githubTokens=[],adminWebEnabled=false}:{url:string;key:string;fetcher?:typeof fetch;githubTokens?:string[];adminWebEnabled?:boolean}){
   async function upstream(path:string,init:RequestInit={}){return fetcher(`${url}/${path}`,{...init,redirect:'error',headers:{apikey:key,Authorization:`Bearer ${key}`,...init.headers},signal:AbortSignal.timeout(20000)});}
   async function db(path:string,init:RequestInit={}){const r=await upstream(`rest/v1/${path}`,{...init,headers:{'Content-Type':'application/json',...init.headers}});if(!r.ok)throw new MediaError(502,'media_unavailable');const body=await r.text();return body?JSON.parse(body):null;}
   async function privateBucket(){
@@ -44,7 +44,7 @@ export function createAssetsHandler({url,key,fetcher=fetch,githubTokens=[]}:{url
         const assets=await db(`property_assets?property_id=eq.${id}&bucket_id=eq.${BUCKET}&kind=eq.document&source_type=neq.ai_generated&storage_path=like.*.pdf&select=id,caption&order=created_at.asc&limit=100`);
         return reply({assets});
       }
-      if(req.method==='GET'&&action==='list'){const assets=await db(`property_assets?property_id=eq.${id}&bucket_id=eq.${BUCKET}&select=id,kind,source_type,caption,is_approved,created_at&order=created_at.desc&limit=100`);return reply({assets});}
+      if(req.method==='GET'&&action==='list'){const assets=await db(`property_assets?property_id=eq.${id}&bucket_id=eq.${BUCKET}&select=id,kind,source_type,caption,is_approved,created_at${adminWebEnabled?',ai_metadata':''}&order=created_at.desc&limit=100`);return reply({assets});}
       if(req.method==='GET'&&action==='document'){
         const assetId=query.get('assetId')||'';if(!UUID.test(assetId))throw new MediaError(400,'invalid_asset_id');
         const assets=await db(`property_assets?id=eq.${assetId}&property_id=eq.${id}&bucket_id=eq.${BUCKET}&kind=eq.document&source_type=neq.ai_generated&select=storage_path`);
@@ -68,21 +68,30 @@ export function createAssetsHandler({url,key,fetcher=fetch,githubTokens=[]}:{url
         const rows=await db(`property_assets?id=eq.${body.assetId}&property_id=eq.${id}&bucket_id=eq.${BUCKET}&source_type=neq.ai_generated&kind=neq.concept&select=id,kind`,{method:'PATCH',headers:{Prefer:'return=representation'},body:JSON.stringify({kind:body.kind})});
         if(!rows.length)throw new MediaError(404,'asset_not_found');return reply({asset:rows[0]});
       }
-      if(req.method!=='POST'||action!=='upload')throw new MediaError(400,'invalid_action');
+      if(action==='upload-ai'&&!adminWebEnabled)throw new MediaError(503,'manual_images_unavailable');
+      const manual=action==='upload-ai';
+      if(req.method!=='POST'||!['upload','upload-ai'].includes(action||''))throw new MediaError(400,'invalid_action');
       if(!req.headers.get('content-type')?.startsWith('multipart/form-data;'))throw new MediaError(400,'invalid_upload');
       const bytes=await boundedBody(req);let form:FormData;try{form=await new Response(bytes,{headers:{'Content-Type':req.headers.get('content-type')!}}).formData();}catch{throw new MediaError(400,'invalid_upload');}
       const file=form.get('file'),kind=form.get('kind'),source=form.get('source_type'),caption=form.get('caption'),defer=form.get('defer_generation');
       if(defer!==null&&!['true','false'].includes(String(defer)))throw new MediaError(400,'invalid_metadata');
       if(!(file instanceof Blob)||file.size===0||file.size>MAX_FILE)throw new MediaError(413,'file_too_large');
-      if(!['photo','provided_plan','document'].includes(String(kind))||!['owner_provided','photographed'].includes(String(source))||typeof caption!=='string'||!caption.trim()||caption.length>2000)throw new MediaError(400,'invalid_metadata');
+      if(!(manual?kind==='concept':['photo','provided_plan','document'].includes(String(kind)))||!(manual?source==='ai_generated':['owner_provided','photographed'].includes(String(source)))||typeof caption!=='string'||!caption.trim()||caption.length>2000)throw new MediaError(400,'invalid_metadata');
+      let aiMetadata:Record<string,unknown>|null=null;
+      if(manual){
+        const provider=form.get('provider'),prompt=form.get('prompt'),imageType=form.get('image_type');let refs:unknown;try{refs=JSON.parse(String(form.get('reference_ids')||'[]'));}catch{throw new MediaError(400,'invalid_metadata');}
+        if(form.get('rights_approved')!=='true'||typeof provider!=='string'||!provider.trim()||provider.length>80||typeof prompt!=='string'||prompt.length>3000||!['concept','plan','photo'].includes(String(imageType))||!Array.isArray(refs)||refs.length>12||new Set(refs).size!==refs.length||refs.some(v=>typeof v!=='string'||!UUID.test(v)))throw new MediaError(400,'invalid_metadata');
+        if(refs.length){const owned=await db(`property_assets?property_id=eq.${id}&bucket_id=eq.${BUCKET}&id=in.(${refs.join(',')})&select=id`);if(owned.length!==refs.length)throw new MediaError(400,'invalid_reference');}
+        aiMetadata={provider:provider.trim(),prompt,referenceIds:refs,imageType,rightsApproved:true,uploadedBy:user.id,uploadedAt:new Date().toISOString()};
+      }
       const fileBytes=new Uint8Array(await file.arrayBuffer()),pdf=kind==='document'&&new TextDecoder().decode(fileBytes.slice(0,5))==='%PDF-',type=pdf?{mime:'application/pdf',ext:'pdf'}:kind==='document'?null:imageType(fileBytes);if(!type||type.mime!==file.type)throw new MediaError(415,'invalid_image');
       await privateBucket();const assetId=crypto.randomUUID(),path=`${id}/${assetId}.${type.ext}`;
       const uploaded=await upstream(`storage/v1/object/${BUCKET}/${path}`,{method:'POST',headers:{'Content-Type':type.mime,'x-upsert':'false','Cache-Control':'max-age=0'},body:fileBytes});if(!uploaded.ok)throw new MediaError(502,'upload_failed');
-      try{await db('property_assets',{method:'POST',body:JSON.stringify({id:assetId,property_id:id,kind,source_type:source,caption:caption.trim(),bucket_id:BUCKET,storage_path:path,is_approved:false})});}
+      try{await db('property_assets',{method:'POST',body:JSON.stringify({id:assetId,property_id:id,kind,source_type:source,caption:caption.trim(),bucket_id:BUCKET,storage_path:path,is_approved:false,...(adminWebEnabled?{sha256:Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',fileBytes))).map(v=>v.toString(16).padStart(2,'0')).join(''),byte_size:fileBytes.length,ai_metadata:aiMetadata}:{})})});}
       catch{try{await upstream(`storage/v1/object/${BUCKET}`,{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({prefixes:[path]})});}catch{/* Orphan contains only a newly generated private path. */}throw new MediaError(502,'metadata_save_failed');}
-      let analysis='not_requested',imageStatus='queue_failed';let dispatchNeeded=false;
-      if(defer!=='true'&&kind==='provided_plan'){try{await queuePlan(db,id,assetId);analysis='queued_scheduled';dispatchNeeded=true;}catch{analysis='queue_failed';}}
-      if(defer!=='true'&&kind!=='document')try{const job=await db('rpc/image_enqueue',{method:'POST',body:JSON.stringify({p_property:id,p_slot:'hero'})});imageStatus=job.state;dispatchNeeded=dispatchNeeded||job.state==='queued';await db('rpc/image_sync_assets',{method:'POST',body:JSON.stringify({p_property:id})});}catch{/* Source remains stored; administrator can request generation again. */}
+      let analysis='not_requested',imageStatus='not_requested';let dispatchNeeded=false;
+      if(!adminWebEnabled&&defer!=='true'&&kind==='provided_plan'){try{await queuePlan(db,id,assetId);analysis='queued_scheduled';dispatchNeeded=true;}catch{analysis='queue_failed';}}
+      if(!adminWebEnabled&&defer!=='true'&&kind!=='document')try{const job=await db('rpc/image_enqueue',{method:'POST',body:JSON.stringify({p_property:id,p_slot:'hero'})});imageStatus=job.state;dispatchNeeded=dispatchNeeded||job.state==='queued';await db('rpc/image_sync_assets',{method:'POST',body:JSON.stringify({p_property:id})});}catch{/* Source remains stored; administrator can request generation again. */}
       const dispatched=dispatchNeeded?await dispatchPlan(githubTokens,fetcher):false;
       if(analysis==='queued_scheduled'&&dispatched)analysis='queued_immediate';
       return reply({id:assetId,status:'private_review_pending',analysis,imageStatus,dispatched},201);
@@ -90,4 +99,4 @@ export function createAssetsHandler({url,key,fetcher=fetch,githubTokens=[]}:{url
   };
 }
 declare const Deno:{env:{get(name:string):string|undefined};serve(handler:(req:Request)=>Promise<Response>):void};
-if(typeof Deno!=='undefined')Deno.serve(createAssetsHandler({url:Deno.env.get('SUPABASE_URL')!,key:Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,githubTokens:[Deno.env.get('GITHUB_TOKEN')||'',Deno.env.get('GH_PAT')||'']}));
+if(typeof Deno!=='undefined')Deno.serve(createAssetsHandler({url:Deno.env.get('SUPABASE_URL')!,key:Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,adminWebEnabled:Deno.env.get('ADMIN_WEB_ENABLED')==='true',githubTokens:[Deno.env.get('GITHUB_TOKEN')||'',Deno.env.get('GH_PAT')||'']}));

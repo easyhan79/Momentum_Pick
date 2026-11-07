@@ -1,0 +1,5 @@
+# Shared with the existing analysis workflow; no Telegram library needed.
+google-genai==2.34.0
+requests==2.34.2
+pydantic==2.14.2
+-r requirements-pdf.txt

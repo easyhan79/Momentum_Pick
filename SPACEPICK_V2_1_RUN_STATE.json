@@ -26,7 +26,7 @@
     "운영 배포 연결 미제공",
     "실제 AI/실매물/외부 데이터 검증 미수행"
   ],
-  "nextAction": "W1 원문·접수 복구 체크포인트 저장 후 W2 실행 이력/라우팅·W3 Telegram 무관 worker로 진행",
+  "nextAction": "W3/W4 보조 실행자 분리 및 W6 수동 AI 이미지→W7 전체 로컬검증→W8/W9 전환/되돌리기 준비. 운영 연결은 별도 증거 필요.",
   "updatedAt": "2026-11-07T14:26:34.577393+09:00",
   "stages": {
     "S0": {
@@ -133,12 +133,12 @@
     "scope": "implementation",
     "planStatus": "complete",
     "status": "in_progress",
-    "currentUnit": "W2: processing runs and executor boundary",
-    "nextUnit": "W1/W2",
+    "currentUnit": "W7: owner-only environment isolation and full browser QA",
+    "nextUnit": "W3/W4 then W6, W7-W9",
     "implementationStarted": true,
     "deployed": false,
     "baselineCommit": "320d53e9a1d8ef67b7d93340251fd94993342a41",
-    "updatedAt": "2026-11-07T14:26:34.577393+09:00",
+    "updatedAt": "2026-11-07T14:53:16.143371+09:00",
     "planningChecks": [
       "기존 등록/API/queue/worker/media/재작성/프롬프트·배포/권한 코드 및 문서 대조",
       "문서 내부 연결 38개 유효, W0-W9/A01-A21 누락 없음, Markdown fence/diff 확인",
@@ -149,8 +149,8 @@
         "status": "planning_complete"
       },
       "W1": {
-        "status": "in_progress",
-        "localUnit": "original/receipt/autosave/recovery complete; final workflow integration pending",
+        "status": "local_complete",
+        "localUnit": "입력 원문/등록 모드/서버 자동저장/접수 복구 및 새로운 실행 접수 통합 검증",
         "checks": {
           "readiness": 40,
           "python": 65,
@@ -161,23 +161,28 @@
         }
       },
       "W2": {
-        "status": "in_progress",
-        "localUnit": "private input versions and idempotent receipt/write RPCs complete; analysis run routing next"
+        "status": "local_complete",
+        "localUnit": "append-only source revisions, frozen runs, executor fencing, bounded claim/lease/candidate, cancel and explicit apply"
       },
       "W3": {
-        "status": "not_started"
+        "status": "local_complete",
+        "localUnit": "analysis/provider/editorial plus rewrite/plan/explicit-image executor separation; legacy/web claim fences"
       },
       "W4": {
-        "status": "not_started"
+        "status": "local_complete_pending_host",
+        "localUnit": "persistent worker, independent heartbeat/lease, stop/config guards, candidate recovery, service config prepared; no host deployment"
       },
       "W5": {
-        "status": "not_started"
+        "status": "local_complete",
+        "localUnit": "web queue/status/cancel/stale-result block/preview/selective apply browser verified"
       },
       "W6": {
-        "status": "not_started"
+        "status": "in_progress",
+        "localUnit": "AI result upload/provenance/private classification/manual slot overrides/sync/concept invalidation SQL and API passed; browser upload investigation"
       },
       "W7": {
-        "status": "not_started"
+        "status": "in_progress",
+        "localUnit": "44 readiness checks passed, browser new flow 5 groups passed then manual-upload failure under investigation"
       },
       "W8": {
         "status": "not_started"
@@ -193,6 +198,17 @@
     ],
     "planCommit": "17a821ddeb0648157bfd75bd4c9f4759f4e7eb4d",
     "lastPushedPlanCommit": "17a821ddeb0648157bfd75bd4c9f4759f4e7eb4d",
-    "branch": "feature/spacepick-v2-1"
+    "branch": "feature/spacepick-v2-1",
+    "sourceCommit": "d0ad0b2",
+    "lastPushedSourceCommit": "d0ad0b2",
+    "localChecks": {
+      "readiness": 44,
+      "newApi": 5,
+      "workerPython": 7,
+      "SQL": 10,
+      "browserDevGroups": 5,
+      "productionCalls": 0,
+      "python": 72
+    }
   }
 }

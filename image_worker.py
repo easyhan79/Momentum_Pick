@@ -75,7 +75,7 @@ def image_type(data):
     raise ValueError('invalid_image')
 
 
-def process_image_jobs(url, headers, gemini_key, requests, limit=4, emit=print):
+def process_image_jobs(url, headers, gemini_key, requests, limit=4, emit=print, executor='legacy_actions'):
     def rest(path, body=None, method=None):
         r = requests.request(method or ('POST' if body is not None else 'GET'), url+'/rest/v1/'+path,
                              headers={**headers, 'Prefer':'return=representation'}, json=body,
@@ -85,7 +85,9 @@ def process_image_jobs(url, headers, gemini_key, requests, limit=4, emit=print):
         return r.json() if r.content else None
     # Only new/explicitly opted-in drafts auto-enqueue a complete package. Existing jobs are idempotent.
     rooms = rest("property_showrooms?draft_content->>visualMode=eq.ai_generated&select=property_id,draft_content&order=updated_at.desc&limit=100")
-    for room in rooms:
+    for room in rooms if executor=='legacy_actions' else []:
+        if room['draft_content'].get('imagePolicy',{}).get('mode')=='manual_web':
+            continue
         settings = room['draft_content'].get('imageSettings')
         if settings and settings.get('mode') != 'concept' and (not settings.get('sourceAssetId') or settings.get('rightsApproved') is not True):
             continue
@@ -93,11 +95,11 @@ def process_image_jobs(url, headers, gemini_key, requests, limit=4, emit=print):
         for slot in slots:
             rest('rpc/image_enqueue', {'p_property':room['property_id'], 'p_slot':slot})
         rest('rpc/image_sync_assets', {'p_property':room['property_id']})
-    for running in rest('property_image_jobs?state=eq.running&select=property_id,slot&limit=100'):
+    for running in rest('property_image_jobs?state=eq.running&executor_kind=eq.'+executor+'&select=property_id,slot&limit=100'):
         rest('rpc/image_enqueue', {'p_property':running['property_id'], 'p_slot':running['slot']})
-    jobs = rest('property_image_jobs?state=eq.queued&select=id&order=updated_at&limit='+str(limit))
+    jobs = rest('property_image_jobs?state=eq.queued&executor_kind=eq.'+executor+'&select=id&order=updated_at&limit='+str(limit))
     for item in jobs:
-        job = rest('rpc/image_claim', {'p_job':item['id']})
+        job = rest('rpc/'+('web_image_claim' if executor=='web_worker' else 'image_claim'), {'p_job':item['id']})
         if not job:
             continue
         pid, token, job_id = job['property_id'], job['claim_token'], job['id']
@@ -105,7 +107,9 @@ def process_image_jobs(url, headers, gemini_key, requests, limit=4, emit=print):
         generated_asset = None
         error = ''
         try:
-            draft = rest(f'property_showrooms?property_id=eq.{pid}&select=draft_content')[0]['draft_content']
+            draft = job.get('input_snapshot') if executor=='web_worker' else rest(f'property_showrooms?property_id=eq.{pid}&select=draft_content')[0]['draft_content']
+            if not isinstance(draft,dict):
+                raise ValueError('image_snapshot_required')
             settings = draft.get('imageSettings')
             mode = settings.get('mode') if settings else 'legacy'
             if mode not in ('legacy','concept','plan','photo'):

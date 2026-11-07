@@ -9,6 +9,7 @@ import {publicationIssues} from '../_shared/publication.ts';
 import {queuePlan,dispatchPlan} from '../_shared/plan-queue.ts';
 import {naturalCustomerCopy,customerCopyReview} from '../_shared/customer-copy.ts';
 import {rewriteSnapshot,rewriteJob,selectedRewriteFields,dispatchRewrite} from '../_shared/copy-rewrite.ts';
+import {ProcessingError,queueWebProcessing,webProcessingStatus,applyWebProcessing} from '../_shared/web-processing.ts';
 // No client-supplied claims are trusted. Auth is checked against GoTrue on every request.
 // Only explicitly approved snapshots may be published; original properties are never written.
 type Json = Record<string, any>;
@@ -43,11 +44,11 @@ export function marketingContent(ai:unknown,saved:unknown={}) {
   const source=object(ai), edits=object(saved);
   return Object.fromEntries(marketingFields.map(field=>[field,text(Object.hasOwn(edits,field)?edits[field]:source[field],18000)]));
 }
-type Config = {url:string;key:string;fetcher?:typeof fetch;githubTokens?:string[];copyRewriteEnabled?:boolean;adminWebEnabled?:boolean};
-export function createHandler({url,key,fetcher=fetch,githubTokens=[],copyRewriteEnabled=false,adminWebEnabled=false}:Config) {
+type Config = {url:string;key:string;fetcher?:typeof fetch;githubTokens?:string[];copyRewriteEnabled?:boolean;adminWebEnabled?:boolean;webProcessingEnabled?:boolean;apiImagesEnabled?:boolean;workerEnvironment?:string};
+export function createHandler({url,key,fetcher=fetch,githubTokens=[],copyRewriteEnabled=false,adminWebEnabled=false,webProcessingEnabled=false,apiImagesEnabled=false,workerEnvironment='production'}:Config) {
   async function db(path:string, options:RequestInit={}) {
     const response=await fetcher(`${url}/rest/v1/${path}`,{...options,redirect:'error',headers:{apikey:key,Authorization:`Bearer ${key}`,'Content-Type':'application/json',...options.headers},signal:AbortSignal.timeout(15000)});
-    if(!response.ok){const e=await response.json().catch(()=>({}));const code=e.code==='23505'?'slug_taken':e.message;if(['web_write_conflict','web_form_closed','web_form_open'].includes(code))throw new ApiError(409,code);if(code==='web_source_invalid')throw new ApiError(400,code);if(code==='rewrite_rate_limited')throw new ApiError(429,code);if(['rewrite_busy','rewrite_stale','rewrite_not_ready','rewrite_request_conflict'].includes(code))throw new ApiError(409,code);if(code==='rewrite_missing')throw new ApiError(404,code);if(code==='rewrite_invalid')throw new ApiError(400,code);if(['source_missing','draft_missing','concept_missing','invalid_slot','invalid_registration','web_intake_missing'].includes(code))throw new ApiError(400,code);if(['slug_taken','revision_conflict','invalid_slug','invalid_listing_state','registration_request_conflict','analysis_already_running','concept_image_busy'].includes(code))throw new ApiError(code.startsWith('invalid_')?400:409,code);throw new ApiError(502,'database_unavailable');}
+    if(!response.ok){const e=await response.json().catch(()=>({}));const code=e.code==='23505'?'slug_taken':e.message;if(['manual_image_selected','manual_image_already_selected','processing_pending','processing_stale','processing_request_conflict','processing_not_ready'].includes(code))throw new ApiError(409,code);if(code==='processing_rate_limited')throw new ApiError(429,code);if(code==='processing_missing')throw new ApiError(404,code);if(['invalid_processing_request','invalid_processing_result','web_source_required'].includes(code))throw new ApiError(400,code);if(['web_write_conflict','web_form_closed','web_form_open'].includes(code))throw new ApiError(409,code);if(code==='web_source_invalid')throw new ApiError(400,code);if(code==='rewrite_rate_limited')throw new ApiError(429,code);if(['rewrite_busy','rewrite_stale','rewrite_not_ready','rewrite_request_conflict'].includes(code))throw new ApiError(409,code);if(code==='rewrite_missing')throw new ApiError(404,code);if(code==='rewrite_invalid')throw new ApiError(400,code);if(['source_missing','draft_missing','concept_missing','invalid_slot','invalid_registration','web_intake_missing'].includes(code))throw new ApiError(400,code);if(['slug_taken','revision_conflict','invalid_slug','invalid_listing_state','registration_request_conflict','analysis_already_running','concept_image_busy'].includes(code))throw new ApiError(code.startsWith('invalid_')?400:409,code);throw new ApiError(502,'database_unavailable');}
     const responseText=await response.text();
     return responseText.trim()?JSON.parse(responseText):null;
   }
@@ -70,7 +71,11 @@ export function createHandler({url,key,fetcher=fetch,githubTokens=[],copyRewrite
       const user=await auth.json();
       if(!user.id||user.is_anonymous||object(user.app_metadata).showroom_admin!==true) throw new ApiError(403,'admin_required');
       const query=new URL(req.url).searchParams;
-      if(req.method==='GET'&&query.get('action')==='web-intake-config')return reply({enabled:adminWebEnabled});
+      if(req.method==='GET'&&query.get('action')==='web-intake-config')return reply({enabled:adminWebEnabled,processingEnabled:webProcessingEnabled,manualImagesEnabled:adminWebEnabled,apiImagesEnabled});
+      if(req.method==='GET'&&query.get('action')==='processing-status'){
+        if(!adminWebEnabled)throw new ApiError(503,'web_intake_unavailable');const id=query.get('propertyId')||'';if(!UUID.test(id))throw new ApiError(400,'invalid_property_id');
+        return reply(await webProcessingStatus(db,id,user.id,webProcessingEnabled,workerEnvironment));
+      }
       if(req.method==='GET'&&query.get('action')==='intake-receipt'){
         if(!adminWebEnabled)throw new ApiError(503,'web_intake_unavailable');
         const requestId=query.get('requestId'),propertyId=query.get('propertyId');
@@ -148,6 +153,14 @@ export function createHandler({url,key,fetcher=fetch,githubTokens=[],copyRewrite
         return reply({showroom:rooms[0],duplicate:created.duplicate});
       }
       const id=body.propertyId;if(typeof id!=='string'||!UUID.test(id)) throw new ApiError(400,'invalid_property_id');
+      if(req.method==='POST'&&body.action==='select-manual-image'){
+        if(!adminWebEnabled)throw new ApiError(503,'web_processing_unavailable');if(!Number.isSafeInteger(body.revision)||body.revision<1||!['hero','concept-1','concept-2','concept-3'].includes(body.slot)||body.assetId!==null&&!UUID.test(body.assetId||''))throw new ApiError(400,'invalid_processing_request');return reply({showroom:await db('rpc/web_select_manual_image',{method:'POST',body:JSON.stringify({p_property:id,p_revision:body.revision,p_slot:body.slot,p_asset:body.assetId})})});
+      }
+      if(req.method==='POST'&&['apply-web-processing','cancel-web-processing'].includes(body.action)){
+        if(!adminWebEnabled||!webProcessingEnabled)throw new ApiError(503,'web_processing_unavailable');
+        if(body.action==='apply-web-processing')return reply(await applyWebProcessing(db,id,user.id,body,result=>toDraft({id,ai_contents:result}),marketingContent));
+        if(!UUID.test(body.runId||''))throw new ApiError(400,'invalid_processing_request');return reply(await db('rpc/web_cancel_processing',{method:'POST',body:JSON.stringify({p_property:id,p_actor:user.id,p_run:body.runId})}));
+      }
       if(req.method==='POST'&&['save-web-intake','save-web-source'].includes(body.action)){
         if(!adminWebEnabled)throw new ApiError(503,'web_intake_unavailable');
         if(!UUID.test(body.requestId||'')||!Number.isSafeInteger(body.revision)||body.revision<1||body.revision>=2147483647)throw new ApiError(400,'invalid_registration');
@@ -182,8 +195,10 @@ export function createHandler({url,key,fetcher=fetch,githubTokens=[],copyRewrite
         const properties=await db(`properties?id=eq.${id}&select=raw_input,ai_contents`);if(!properties.length)throw new ApiError(404,'property_not_found');
         const snapshot=rewriteSnapshot(rows[0].draft_content,properties[0]);
         if(new TextEncoder().encode(JSON.stringify(snapshot.source)).byteLength>80000)throw new ApiError(400,'rewrite_invalid');
-        const queued=await db('rpc/copy_rewrite_queue',{method:'POST',body:JSON.stringify({p_id:body.requestId,p_property:id,p_actor:user.id,p_revision:body.revision,p_fields:fields,p_instruction:body.instruction.trim(),p_source:snapshot.source,p_original:Object.fromEntries(fields.map(f=>[f,snapshot.original[f]]))})});
-        return reply({...queued,dispatched:queued.queued?await dispatchRewrite(githubTokens,fetcher):false});
+        if(adminWebEnabled&&!webProcessingEnabled)throw new ApiError(503,'web_processing_unavailable');
+        if(adminWebEnabled&&rows[0].draft_content.registration?.channel==='web'){const intake=await db('rpc/web_intake_receipt',{method:'POST',body:JSON.stringify({p_actor:user.id,p_property:id,p_request:null})});if(!intake?.receipt.sourceAvailable)throw new ApiError(400,'web_source_required');(snapshot.source as Json).providedText=intake.receipt.providedText.replace(/\[(?:FILE|DOCUMENT)_ID:[^\]]*\]/g,'');}
+        const queued=await db('rpc/'+(adminWebEnabled?'web_copy_rewrite_queue':'copy_rewrite_queue'),{method:'POST',body:JSON.stringify({p_id:body.requestId,p_property:id,p_actor:user.id,p_revision:body.revision,p_fields:fields,p_instruction:body.instruction.trim(),p_source:snapshot.source,p_original:Object.fromEntries(fields.map(f=>[f,snapshot.original[f]]))})});
+        return reply({...queued,dispatched:!adminWebEnabled&&queued.queued?await dispatchRewrite(githubTokens,fetcher):false});
       }
       if(req.method==='POST'&&body.action==='import-document-facts'){
         if(!Number.isSafeInteger(body.revision)||body.revision<1)throw new ApiError(400,'invalid_revision');
@@ -209,6 +224,7 @@ export function createHandler({url,key,fetcher=fetch,githubTokens=[],copyRewrite
         if(!saved.length)throw new ApiError(409,'revision_conflict');return reply({showroom:saved[0]});
       }
       if(req.method==='POST'&&['queue-web-analysis','apply-web-analysis'].includes(body.action)){
+        if(adminWebEnabled){if(!webProcessingEnabled)throw new ApiError(503,'web_processing_unavailable');if(body.action!=='queue-web-analysis')throw new ApiError(409,'processing_use_result');return reply({...await queueWebProcessing(db,id,user.id,body),executor:'web_worker',dispatched:false});}
         if(!Number.isSafeInteger(body.revision)||body.revision<1)throw new ApiError(400,'invalid_revision');
         const rows=await db(`property_showrooms?property_id=eq.${id}&select=*`);
         if(!rows.length)throw new ApiError(404,'draft_not_found');
@@ -255,6 +271,7 @@ export function createHandler({url,key,fetcher=fetch,githubTokens=[],copyRewrite
         if(!saved.length)throw new ApiError(409,'revision_conflict');return reply({showroom:saved[0]});
       }
       if(req.method==='POST'&&body.action==='generate-package'){
+        if(adminWebEnabled)throw new ApiError(400,'web_image_single_only');
         const rooms=await db(`property_showrooms?property_id=eq.${id}&select=draft_content`);if(!rooms.length)throw new ApiError(404,'draft_not_found');
         await generationReady(rooms[0].draft_content,id);
         const slots=['hero',...(rooms[0].draft_content.concepts||[]).map((c:Json)=>c.id).filter((slot:string)=>['concept-1','concept-2','concept-3'].includes(slot))];
@@ -263,13 +280,15 @@ export function createHandler({url,key,fetcher=fetch,githubTokens=[],copyRewrite
         return reply({jobs,dispatched:jobs.some(j=>j.state==='queued')?await dispatchPlan(githubTokens,fetcher):false});
       }
       if(req.method==='POST'&&body.action==='generate-image'){
+        if(adminWebEnabled&&(!webProcessingEnabled||!apiImagesEnabled||body.costConfirmed!==true))throw new ApiError(503,'api_image_opt_in_required');
         if(!['hero','concept-1','concept-2','concept-3'].includes(body.slot)||body.retry!==undefined&&typeof body.retry!=='boolean')throw new ApiError(400,'invalid_image_slot');
         const rooms=await db(`property_showrooms?property_id=eq.${id}&select=draft_content`);if(!rooms.length)throw new ApiError(404,'draft_not_found');await generationReady(rooms[0].draft_content,id);
-        const job=await db('rpc/image_enqueue',{method:'POST',body:JSON.stringify({p_property:id,p_slot:body.slot,p_retry:body.retry===true})});
+        const job=await db('rpc/'+(adminWebEnabled?'web_image_enqueue':'image_enqueue'),{method:'POST',body:JSON.stringify({p_property:id,p_slot:body.slot,p_retry:body.retry===true})});
         await db('rpc/image_sync_assets',{method:'POST',body:JSON.stringify({p_property:id})});
-        const dispatched=job.state==='queued'?await dispatchPlan(githubTokens,fetcher):false;return reply({job,dispatched});
+        const dispatched=!adminWebEnabled&&job.state==='queued'?await dispatchPlan(githubTokens,fetcher):false;return reply({job,dispatched});
       }
       if(req.method==='POST'&&body.action==='analyze-plan'){
+        if(adminWebEnabled){if(!webProcessingEnabled)throw new ApiError(503,'web_processing_unavailable');if(!UUID.test(body.assetId||'')||!Number.isSafeInteger(body.revision))throw new ApiError(400,'invalid_plan');return reply({showroom:await db('rpc/web_queue_plan',{method:'POST',body:JSON.stringify({p_property:id,p_asset:body.assetId,p_revision:body.revision,p_request:crypto.randomUUID()})}),dispatched:false});}
         if(!UUID.test(body.assetId||'')||!Number.isSafeInteger(body.revision))throw new ApiError(400,'invalid_plan');
         let showroom;try{showroom=await queuePlan(db,id,body.assetId,body.revision);}catch(e){throw new ApiError(409,e instanceof Error?e.message:'plan_queue_failed');}
         const dispatched=await dispatchPlan(githubTokens,fetcher);return reply({showroom,dispatched});
@@ -394,10 +413,10 @@ export function createHandler({url,key,fetcher=fetch,githubTokens=[],copyRewrite
       }
       throw new ApiError(400,'invalid_action');
     } catch(error) {
-      return reply({error:error instanceof ApiError||error instanceof ProfileError||error instanceof ConceptError||error instanceof ImageSettingsError?error.code:'service_unavailable'},error instanceof ApiError?error.status:error instanceof ProfileError||error instanceof ConceptError||error instanceof ImageSettingsError?400:503);
+      return reply({error:error instanceof ApiError||error instanceof ProcessingError||error instanceof ProfileError||error instanceof ConceptError||error instanceof ImageSettingsError?error.code:'service_unavailable'},error instanceof ApiError||error instanceof ProcessingError?error.status:error instanceof ProfileError||error instanceof ConceptError||error instanceof ImageSettingsError?400:503);
     }
   };
 }
 // Supabase injects existing server credentials. They never enter browser code.
 declare const Deno: {env:{get(name:string):string|undefined};serve(handler:(req:Request)=>Promise<Response>):void};
-if(typeof Deno!=='undefined') Deno.serve(createHandler({url:Deno.env.get('SUPABASE_URL')!,key:Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,copyRewriteEnabled:Deno.env.get('COPY_REWRITE_ENABLED')==='true',adminWebEnabled:Deno.env.get('ADMIN_WEB_ENABLED')==='true',githubTokens:['GITHUB_TOKEN','GH_PAT','GITHUB_PAT','GITHUB_PAT_TOKEN'].map(name=>Deno.env.get(name)||'')}));
+if(typeof Deno!=='undefined') Deno.serve(createHandler({url:Deno.env.get('SUPABASE_URL')!,key:Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,copyRewriteEnabled:Deno.env.get('COPY_REWRITE_ENABLED')==='true',adminWebEnabled:Deno.env.get('ADMIN_WEB_ENABLED')==='true',webProcessingEnabled:Deno.env.get('WEB_PROCESSING_ENABLED')==='true',apiImagesEnabled:Deno.env.get('WEB_API_IMAGES_ENABLED')==='true',workerEnvironment:Deno.env.get('WORKER_ENVIRONMENT')||'production',githubTokens:['GITHUB_TOKEN','GH_PAT','GITHUB_PAT','GITHUB_PAT_TOKEN'].map(name=>Deno.env.get(name)||'')}));

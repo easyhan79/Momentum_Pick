@@ -402,3 +402,18 @@
 - 검증: 통합40항목(Python65/Node158/SQL8/build/Edge타입) 전부 통과; 개발/최종 빌드 신규 브라우저 각각5그룹 통과. 저장/접수 응답 유실을 의도적으로 발생시켜 중복0·이후 입력 보존·원문/요약 분리·375/768/1440·권한/승인본 보존 확인.
 - 수정: textarea label의 입력 후 접근성 이름 변화를 명시 aria-label로 수정, Edge 반환형에 없는 필드 구조 분해 제거 후 검사 재실행 통과. 실패 기록을 성공으로 대체했다고 가정하지 않음.
 - 다음: 실행 이력/입력 snapshot과 legacy/new 실행자 경계를 추가. 아직 웹 분석의 Actions 실행 경로 전환 전이며 운영 migration/설정/AI 요청 없음.
+
+## 2026-11-07T14:43:18.399526+09:00 — W2 완료 / W3-W5 첫 실행 단위
+
+- 변경: 원문/자료 선택 snapshot 실행 이력, 기존 Actions claim과 웹 실행자 분리, 취소·lease·5회 제한·유료 결과 불명 처리, 결과 후보 영속 저장 및 명시적 선택 적용. 기존 광고 문안 fallback/승인 snapshot 보호. 공유 analyze_job/provider/editorial 분리, 별도 상시 웹 worker와 웹 상태/결과 화면 구현.
+- 검증: 통합 readiness 42항목 모두 통과(격리 SQL 9 포함), 신규 실행 API 5, worker Python 7, 입력복구→새 실행 접수 Chromium 5그룹 통과. 신규 DB fixture의 필수 profile/승인 필드 누락을 수정하고 재통과.
+- 완료: W1/W2 로컬 완료. W3/W4/W5 진행 중. 후속 보조 실행자 코드가 작업 트리에 있으며 아직 검증 전. 운영/실제 AI/알림 호출 0, 기능 flag 기본 OFF.
+- Git: 직전 입력 단위 d0ad0b2는 feature 브랜치 push 완료. 이번 단위 미커밋.
+- 다음: 재작성/도면/이미지 실행자 분리, 수동 이미지 보존, 운영 배포 키트 및 시나리오 검증.
+
+## 2026-11-07T14:53:16.143371+09:00 — W3/W4/W5 로컬 완료, W6/W7 검증 진행
+
+- 변경: 재작성·도면·명시적 이미지 실행자 라우팅과 기존 Actions fencing, 지속 worker의 단계별 장애 격리와 heartbeat/환경 검사, systemd/서버 설정 예시, 수동 AI 이미지 provenance/upload/비교/slot 선택과 자동 sync 보호·콘셉트 변경 연결 해제. 운영 절차·복구 지침 작성.
+- 검증: readiness 44항목 전체 통과(Python72, 신규 이미지 API3, 실행 API5, 격리 SQL10 포함). 레거시 이미지 단위7개는 새 쿼리 순서에 mock 경로가 맞지 않아 실패했으며, 동등한 executor filter를 유지하면서 조회 조건 순서를 정리해 Python72 재통과. SQL fixture UUID cast/SQL NULL 바인딩을 바로잡아 재통과.
+- 브라우저: 원문 복구/새 실행 접수/오래된 결과 적용 차단/취소/새 결과 명시 적용 통과. 새 수동 AI 업로드 완료 안내를 기다리다 실패하여 원인 진단 중이며 W6 브라우저 완료로 표시하지 않음.
+- 운영: DB/함수/사이트/worker 설치·AI 호출·알림 모두 미실행. flags OFF. 다음: 이미지 브라우저 문제 해결, 본인 전용/환경 분리 설정과 5유형 QA, inventory/pilot/rollback 준비.

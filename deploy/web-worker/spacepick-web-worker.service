@@ -1,0 +1,25 @@
+[Unit]
+Description=SpacePick private web processing worker
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+DynamicUser=yes
+WorkingDirectory=/opt/spacepick
+EnvironmentFile=/etc/spacepick/web-worker.env
+ExecStart=/opt/spacepick/.venv/bin/python -u web_worker.py
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=360
+KillSignal=SIGTERM
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+MemoryMax=1G
+CPUQuota=100%
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

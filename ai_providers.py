@@ -139,6 +139,8 @@ def generate_with_fallback(parts, schema, validate, env, post, gemini_generate, 
                 raise ProviderError(provider + '_schema_invalid', True) from None
         except ProviderError as exc:
             emit(f'ai provider={provider} failed={exc.safe_code}', flush=True)
+            if env.get('AI_STOP_ON_UNCERTAIN') == 'true' and (exc.safe_code.endswith('_transport') or exc.safe_code.endswith(('_http_408', '_http_504'))):
+                raise ProviderError('outcome_unknown', allow_fallback=False) from None
             if not exc.allow_fallback:
                 raise
             transient = transient or exc.retryable

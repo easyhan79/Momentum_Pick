@@ -39,21 +39,25 @@ def validate_result(value, fields):
     return output
 
 
-def run(api, generate, emit=print, limit=2):
+def run(api, generate, emit=print, limit=2, persist=None):
     stats = {'done': 0, 'deferred': 0, 'failed': 0}
     for _ in range(limit):
         job = api('copy_rewrite_claim', {})
         if not job:
             break
         try:
-            fields = job['fields']
-            schema = result_schema(fields)
-            prompt = BRIEF + '\n[입력 자료]\n' + json.dumps({
-                'selectedFields': fields, 'writingDirection': job['instruction'],
-                'providedData': job['source'], 'previousCopyNotEvidence': job['original']}, ensure_ascii=False)
-            generated = generate([prompt], schema, lambda value: validate_result(value, fields))
-            result = validate_result(generated.text if isinstance(generated, Generation) else generated, fields)
-            provenance = {'provider': generated.provider, 'model': generated.model, 'at': datetime.now(timezone.utc).isoformat()} if isinstance(generated, Generation) else None
+            if job.get('candidate') is not None:
+                result=validate_result(job['candidate'],job['fields'])
+                provenance=job.get('candidate_generation')
+            else:
+                fields = job['fields']
+                schema = result_schema(fields)
+                prompt = BRIEF + '\n[입력 자료]\n' + json.dumps({
+                    'selectedFields': fields, 'writingDirection': job['instruction'],
+                    'providedData': job['source'], 'previousCopyNotEvidence': job['original']}, ensure_ascii=False)
+                generated = generate([prompt], schema, lambda value: validate_result(value, fields))
+                result = validate_result(generated.text if isinstance(generated, Generation) else generated, fields)
+                provenance = {'provider': generated.provider, 'model': generated.model, 'at': datetime.now(timezone.utc).isoformat()} if isinstance(generated, Generation) else None
         except Exception as exc:
             code, retryable = failure(exc)
             accepted = api('copy_rewrite_complete', {'p_id': job['id'], 'p_token': job['token'], 'p_result': None, 'p_error': code, 'p_retryable': retryable})
@@ -63,6 +67,9 @@ def run(api, generate, emit=print, limit=2):
             emit('copy rewrite deferred or failed code=' + code, flush=True)
             continue
         # A DB failure must propagate; it must not trigger another model call here.
+        if persist is not None and job.get('candidate') is None:
+            if not persist(job,result,provenance):
+                raise RuntimeError('rewrite_claim_lost')
         accepted = api('copy_rewrite_complete', {'p_id': job['id'], 'p_token': job['token'], 'p_result': result, 'p_generation': provenance})
         if not accepted:
             raise RuntimeError('rewrite_claim_lost')
@@ -70,6 +77,26 @@ def run(api, generate, emit=print, limit=2):
         emit('copy rewrite candidate saved', flush=True)
     emit(json.dumps(stats, sort_keys=True), flush=True)
     return stats
+
+
+def generation_service(environment,requests):
+    from google import genai
+    from google.genai import types
+    def generate(parts, schema, validate):
+        def gemini(contents, model, timeout):
+            with genai.Client(api_key=environment['GEMINI_API_KEY'], http_options=types.HttpOptions(timeout=int(timeout*1000), retry_options=types.HttpRetryOptions(attempts=1))) as client:
+                response = client.models.generate_content(model=model, contents=contents, config=types.GenerateContentConfig(response_mime_type='application/json', response_json_schema=schema, temperature=0.65, max_output_tokens=16384))
+                if getattr(getattr(response, 'prompt_feedback', None), 'block_reason', None) not in (None, 0, 'BLOCK_REASON_UNSPECIFIED'):
+                    raise ProviderError('gemini_refusal', allow_fallback=False)
+                for candidate in response.candidates or []:
+                    reason = str(getattr(candidate, 'finish_reason', '')).split('.')[-1]
+                    if reason in ('SAFETY', 'PROHIBITED_CONTENT', 'BLOCKLIST', 'SPII'):
+                        raise ProviderError('gemini_refusal', allow_fallback=False)
+                    if reason == 'MAX_TOKENS':
+                        raise ProviderError('gemini_incomplete', True)
+                return response.text
+        return generate_with_fallback(parts, schema, validate, environment, requests.post, gemini)
+    return generate
 
 
 def main():
@@ -97,20 +124,7 @@ def main():
             raise RuntimeError('rewrite_database_unavailable')
         return response.json()
 
-    def generate(parts, schema, validate):
-        def gemini(contents, model, timeout):
-            with genai.Client(api_key=os.environ['GEMINI_API_KEY'], http_options=types.HttpOptions(timeout=int(timeout*1000), retry_options=types.HttpRetryOptions(attempts=1))) as client:
-                response = client.models.generate_content(model=model, contents=contents, config=types.GenerateContentConfig(response_mime_type='application/json', response_json_schema=schema, temperature=0.65, max_output_tokens=16384))
-                if getattr(getattr(response, 'prompt_feedback', None), 'block_reason', None) not in (None, 0, 'BLOCK_REASON_UNSPECIFIED'):
-                    raise ProviderError('gemini_refusal', allow_fallback=False)
-                for candidate in response.candidates or []:
-                    reason = str(getattr(candidate, 'finish_reason', '')).split('.')[-1]
-                    if reason in ('SAFETY', 'PROHIBITED_CONTENT', 'BLOCKLIST', 'SPII'):
-                        raise ProviderError('gemini_refusal', allow_fallback=False)
-                    if reason == 'MAX_TOKENS':
-                        raise ProviderError('gemini_incomplete', True)
-                return response.text
-        return generate_with_fallback(parts, schema, validate, os.environ, requests.post, gemini)
+    generate=generation_service(os.environ,requests)
     run(api, generate)
 
 
