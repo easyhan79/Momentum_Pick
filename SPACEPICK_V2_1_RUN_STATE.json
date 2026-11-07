@@ -18,7 +18,7 @@
     "command": "readiness38 (Python65 Node152 SQL7); image prompts dev4+built4+admin6 browser groups",
     "at": "2026-11-07T08:28:31.122763+09:00"
   },
-  "lastCommit": "320d53e9a1d8ef67b7d93340251fd94993342a41",
+  "lastCommit": "17a821ddeb0648157bfd75bd4c9f4759f4e7eb4d",
   "branch": "feature/spacepick-v2-1",
   "pushStatus": "feature_branch_pushed",
   "blockers": [],
@@ -27,7 +27,7 @@
     "실제 AI/실매물/외부 데이터 검증 미수행"
   ],
   "nextAction": "관리자 웹 전환 계획 W0 완료. W1/W2의 원문 보존·저장 복구/접수증·작업 계약부터 구현할 수 있음. 이번 요청은 계획 작성만 수행, W1-W9 미착수.",
-  "updatedAt": "2026-11-07T13:29:55.445099+09:00",
+  "updatedAt": "2026-11-07T13:31:40.502822+09:00",
   "stages": {
     "S0": {
       "status": "local_complete",
@@ -65,17 +65,9 @@
       "lastUnit": "S0~S6 구현/회귀/문서화 완료. S6 소스 296687a 개발 브랜치 push 성공; 통합35·브라우저64·preflight·깨끗한 소스 패키지232파일/해시/공개입력 검사 통과. 운영 main/DB/함수/호스팅 미변경"
     }
   },
-  "lastPushedCommit": "54e38a5c21283d1946be087e6654d1111661a8fb",
+  "lastPushedCommit": "17a821ddeb0648157bfd75bd4c9f4759f4e7eb4d",
   "remoteBranch": "feature/spacepick-v2-1",
-  "workingTreeChanges": [
-    "README.md",
-    "SPACEPICK_V2_1_PROGRESS.md",
-    "SPACEPICK_V2_1_RUN_STATE.json",
-    "docs/SPACEPICK_CURRENT_DEVELOPMENT_STATUS.md",
-    "docs/SPACEPICK_V2_ARCHITECTURE.md",
-    "docs/SPACEPICK_V2_PLAN.md",
-    "SPACEPICK_ADMIN_WEB_TRANSITION_PLAN.md"
-  ],
+  "workingTreeChanges": [],
   "followUp": {
     "id": "PRIVATE_PREVIEW",
     "plan": "SPACEPICK_PRIVATE_PREVIEW_PLAN.md",
@@ -146,7 +138,7 @@
     "implementationStarted": false,
     "deployed": false,
     "baselineCommit": "320d53e9a1d8ef67b7d93340251fd94993342a41",
-    "updatedAt": "2026-11-07T13:29:55.445099+09:00",
+    "updatedAt": "2026-11-07T13:31:40.502822+09:00",
     "planningChecks": [
       "기존 등록/API/queue/worker/media/재작성/프롬프트·배포/권한 코드 및 문서 대조",
       "문서 내부 연결 38개 유효, W0-W9/A01-A21 누락 없음, Markdown fence/diff 확인",
@@ -188,6 +180,9 @@
       "전용 worker의 실제 실행 대상·권한·유지비/사양",
       "본인 시험 계정·격리 데이터·환경별 URL/키/리다이렉트",
       "운영 migration/함수/호스팅/기존 큐와 실행자 전환 이력"
-    ]
+    ],
+    "planCommit": "17a821ddeb0648157bfd75bd4c9f4759f4e7eb4d",
+    "lastPushedPlanCommit": "17a821ddeb0648157bfd75bd4c9f4759f4e7eb4d",
+    "branch": "feature/spacepick-v2-1"
   }
 }
