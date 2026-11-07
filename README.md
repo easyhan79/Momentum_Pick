@@ -9,6 +9,7 @@
 - [SpacePick v2 개발계획·작업상태·재개 안내](docs/SPACEPICK_V2_PLAN.md)
 - [현재 개발 완료·미완료 항목과 다음 작업 순서](docs/SPACEPICK_CURRENT_DEVELOPMENT_STATUS.md)
 - [관리자 웹 주 입력·AI 작업자 전환 실행계획](SPACEPICK_ADMIN_WEB_TRANSITION_PLAN.md) / [구현 기록](docs/ADMIN_WEB_IMPLEMENTATION.md) / [사용·설치·전환·복구](docs/ADMIN_WEB_OPERATIONS.md)
+- [관리자 사용 안내](docs/SPACEPICK_ADMIN_USER_GUIDE.md) / [운영 반영 인계서](docs/SPACEPICK_DEPLOYMENT_HANDOFF.md)
 - [SpacePick v2 검증·적용 순서](docs/SPACEPICK_V2_VALIDATION.md)
 - [실제 구현 기준 아키텍처와 매물 게시/프로그램 배포 구분](docs/SPACEPICK_V2_ARCHITECTURE.md)
 - [v2.1 완료 보고서·남은 운영 작업](SPACEPICK_V2_1_REPORT.md)

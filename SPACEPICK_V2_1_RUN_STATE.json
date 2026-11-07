@@ -26,8 +26,8 @@
     "운영 배포 연결 미제공",
     "실제 AI/실매물/외부 데이터 검증 미수행"
   ],
-  "nextAction": "완료한 W1~W6 반복 개발 금지. 실제 관리 연결·본인 계정·격리 프로젝트·worker 호스트 확인 후 W7 시험 배포→W8 읽기 전용 inventory/선택 매물 pilot→W9 관측·복구·운영 전환. docs/ADMIN_WEB_RELEASE_STATUS.md 및 ADMIN_WEB_OPERATIONS.md 참조.",
-  "updatedAt": "2026-11-07T15:14:37.345569+09:00",
+  "nextAction": "운영 배포는 미완료. 사용자 승인 재요청 대신 실제 게시/Supabase 관리 연결을 확보한 실행환경에서 SPACEPICK_DEPLOYMENT_HANDOFF.md 순서로 이어갈 것. 사용 안내는 운영 검증 후 확정.",
+  "updatedAt": "2026-11-07T22:38:06.779853+09:00",
   "stages": {
     "S0": {
       "status": "local_complete",
@@ -138,7 +138,7 @@
     "implementationStarted": true,
     "deployed": false,
     "baselineCommit": "320d53e9a1d8ef67b7d93340251fd94993342a41",
-    "updatedAt": "2026-11-07T15:14:37.345569+09:00",
+    "updatedAt": "2026-11-07T22:38:06.779853+09:00",
     "planningChecks": [
       "기존 등록/API/queue/worker/media/재작성/프롬프트·배포/권한 코드 및 문서 대조",
       "문서 내부 연결 38개 유효, W0-W9/A01-A21 누락 없음, Markdown fence/diff 확인",
@@ -243,6 +243,30 @@
       "archiveSha256": "98b51d755ea08da6c4710e7f958995b60f665f2b3d5b6ba2ff486950ad607b52",
       "archive": "showroom-web/test-results/release/SpacePick-v2-release.zip",
       "validation": "all file hashes, source/service inputs, no private PDFs/attachments/node_modules; production frontend target restored"
+    },
+    "productionRollout": {
+      "status": "blocked_external",
+      "requestedBehavior": "User can visit actual admin URL, register/store property, analyze real text/files, edit facts/copy/images and approve/publish",
+      "authorization": "user explicitly requested production deployment and usable end-to-end operation; no further permission required within this scope",
+      "checkedAt": "2026-11-07T22:38:06.779853+09:00",
+      "executedProductionWrites": false,
+      "completed": false,
+      "missingConnections": [
+        "existing site publishing management connection",
+        "Supabase management/deployment credential or usable authenticated browser",
+        "operational web-worker runtime binding"
+      ],
+      "prepared": [
+        "docs/SPACEPICK_ADMIN_USER_GUIDE.md",
+        "docs/SPACEPICK_DEPLOYMENT_HANDOFF.md",
+        "supabase/review/admin_web_production_preflight.sql"
+      ],
+      "checks": [
+        "read-only catalog inspection tested against missing and present schemas in PGlite; no application data writes",
+        "GitHub CLI read-only repo API retried with inherited proxy outside sandbox: Forbidden; GH_TOKEN name exists but valid API access not established",
+        "identity manifest contains zero connections; no Supabase deployment credential configured; desktop control tools absent"
+      ],
+      "nextAction": "Connect a publishing/management-capable execution environment; run read-only production inspection before selecting missing migrations; verify actual input/storage/AI/edit/publish; finalize the user guide using the live site"
     }
   }
 }
