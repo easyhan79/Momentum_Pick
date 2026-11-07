@@ -446,3 +446,5 @@
 - 실제 게시 권한이 있는 환경에서 이어갈 소스/대상/실행자/순서/완료 기준을 SPACEPICK_DEPLOYMENT_HANDOFF.md에 작성. 기존 준비 코드 재개와 운영 인계를 위해 사용.
 - 읽기 전용 admin_web_production_preflight.sql 추가: 신규 테이블 누락 상태와 일부 객체 존재 상태 모두 격리 DB에서 실행·read_only/on·객체/함수 digest 결과·애플리케이션 데이터 쓰기0 검증. 실제 운영에서는 아직 실행하지 않음.
 - 운영 데이터/설정/웹 파일 변경0, paid provider/Telegram 호출0, main 병합0. 다음: 실제 게시·DB 관리 연결을 확보한 환경에서 구조 점검→필요 migration/Edge/worker/frontend 적용→실계정 전체 여정 검증→사용 안내 확정.
+
+- 상세 사용 안내/인계/사전점검 source `6304de75e838fae6976781cae340a956a8ff9765` 기능 브랜치 push 완료. 갱신한 인계 ZIP287파일/3,831,740바이트 SHA-256 `6fda5e91a8c3599d15d24d0177964344c4ea43cf40e0ae3d51f65d7592debc5c` 검증. 운영 배포 미실행 상태 유지.

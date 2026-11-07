@@ -237,10 +237,10 @@
     ],
     "release": {
       "status": "prepared_not_deployed",
-      "baseCommit": "a34f3e50ecb09e633df9f1e7dd50f2fb70516d85",
+      "baseCommit": "6304de75e838fae6976781cae340a956a8ff9765",
       "sourceWorktreeCleanAtPackage": true,
-      "files": 284,
-      "archiveSha256": "98b51d755ea08da6c4710e7f958995b60f665f2b3d5b6ba2ff486950ad607b52",
+      "files": 287,
+      "archiveSha256": "6fda5e91a8c3599d15d24d0177964344c4ea43cf40e0ae3d51f65d7592debc5c",
       "archive": "showroom-web/test-results/release/SpacePick-v2-release.zip",
       "validation": "all file hashes, source/service inputs, no private PDFs/attachments/node_modules; production frontend target restored"
     },
@@ -266,7 +266,10 @@
         "GitHub CLI read-only repo API retried with inherited proxy outside sandbox: Forbidden; GH_TOKEN name exists but valid API access not established",
         "identity manifest contains zero connections; no Supabase deployment credential configured; desktop control tools absent"
       ],
-      "nextAction": "Connect a publishing/management-capable execution environment; run read-only production inspection before selecting missing migrations; verify actual input/storage/AI/edit/publish; finalize the user guide using the live site"
+      "nextAction": "Connect a publishing/management-capable execution environment; run read-only production inspection before selecting missing migrations; verify actual input/storage/AI/edit/publish; finalize the user guide using the live site",
+      "handoffCommit": "6304de75e838fae6976781cae340a956a8ff9765",
+      "handoffPackageFiles": 287,
+      "handoffPackageSha256": "6fda5e91a8c3599d15d24d0177964344c4ea43cf40e0ae3d51f65d7592debc5c"
     }
   }
 }
