@@ -429,3 +429,11 @@
 - 외부 차단 증거: current environment running/connected/revision1, secret/runtime variable/outbound identity 없음, desktop enabled/unknown이나 제어 JS/게시/Supabase 관리 도구 없음. GitHub push만 가능하며 운영 연결로 간주하지 않음. 자세한 ID/상태는 docs/ADMIN_WEB_RELEASE_STATUS.md 기록.
 - Git: bc66252까지 기능 브랜치 push 완료. 이번 최종 단위는 검증 후 다음 commit/push로 저장. main merge/운영 게시/승인 snapshot 변경 없음.
 - 다음: 최종 소스/기록 commit·push 및 로컬 배포 묶음 준비. 외부 연결 후 W7 실제 시험 배포→W8 pilot→W9 전환. 추가 권한 재확인 질문 없이 진행 가능한 로컬 작업을 마쳤으며 완료 기능 중복 개발 금지.
+
+## 2026-11-07T15:14:37.345569+09:00 — 최종 소스 GitHub 저장 / 배포 묶음 검증
+
+- 소스 commit `a34f3e50ecb09e633df9f1e7dd50f2fb70516d85`를 `feature/spacepick-v2-1`에 push 완료. `bc66252` 중간 단위와 이후 최종 코드·계약·계획·완료/잔여 상태가 모두 GitHub에 있다.
+- 배포 준비: 284파일/3,818,104바이트, clean source commit 기준 ZIP. 모든 SHA-256·필수 worker/service/migration 포함·고객 PDF/첨부/node_modules 제외·운영용 frontend 호스팅 대상 복원을 검사했다. ZIP SHA-256 `98b51d755ea08da6c4710e7f958995b60f665f2b3d5b6ba2ff486950ad607b52`. 파일은 showroom-web/test-results/release/SpacePick-v2-release.zip; 실제 게시 아님.
+- 마지막 빌드 브라우저도7그룹 통과(매물 목록의 결과 검토 단계 포함), readiness46 전부 통과. 원문/승인본·회수·예산 보존, source 선택·owner/환경 guard 및 실패 복구 검증 완료.
+- 최종 단계 상태: W1~W6 로컬 완료, W7 로컬 검사/합성 staging 완료·실제 시험 배포 미완료, W8/W9 준비 완료·실제 inventory/pilot/운영 전환/관측·복구 미실행. 실제 AI·Telegram·운영 변경0.
+- 재개: docs/ADMIN_WEB_RELEASE_STATUS.md와 RUN_STATE 확인 → 실제 관리 연결/별도 프로젝트/본인 ID/worker 호스트 확인 → W7 실제 시험 → W8 선택 매물 pilot → W9 전환. 이미 완료한 기능을 다시 개발하거나 운영 게시 완료로 표시하지 않는다.

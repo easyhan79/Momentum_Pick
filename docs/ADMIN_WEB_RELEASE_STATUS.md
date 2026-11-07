@@ -35,3 +35,5 @@ cloud-environment-runtime 및 cloud-desktop 절차로 현재 환경을 조회하
 연결 후 [운영 절차](ADMIN_WEB_OPERATIONS.md) 순서로 실제 대상/배포 버전·본인 ID·격리 프로젝트를 확인한다. 먼저 읽기 전용 inventory를 기록하고 시험 환경에서 설치·실제 AI 1건·오류 복구를 검증한다. 그 뒤 W8/W9를 실행한다. DB 열/작업/승인 snapshot 삭제·큐 attempt/budget 초기화·필터 없는 이전 worker 복원은 수행하지 않는다.
 
 실제 대상 값이 없는 `.env.example`과 systemd 파일은 준비 예시다. 합성 staging ref/호스팅 ID는 로컬 검증 전용이며 실제 생성한 프로젝트가 아니다. 최종 배포용 산출물은 기존 운영 프로젝트 설정으로 다시 빌드하되 게시하지 않았다.
+
+최종 소스: `a34f3e50ecb09e633df9f1e7dd50f2fb70516d85` (GitHub feature 브랜치 push 완료). 배포 준비 ZIP은284파일이며 모든 해시/필수 파일/비공개 첨부 제외를 검사했다. archive SHA-256: `98b51d755ea08da6c4710e7f958995b60f665f2b3d5b6ba2ff486950ad607b52`. 원본 code commit은 clean 상태로 포장했으며 이후 체크포인트 기록 commit과 구분한다. 실제 게시·운영 DB 변경은 없다.
