@@ -176,9 +176,9 @@ BEGIN
  RETURN jsonb_build_object('cancelled',true);
 END $$;
 
-CREATE FUNCTION public.web_apply_processing(p_property uuid,p_actor uuid,p_run uuid,p_revision integer,p_content jsonb,p_slots text[]) RETURNS jsonb
+CREATE FUNCTION public.web_apply_processing(p_property uuid,p_actor uuid,p_run uuid,p_revision integer,p_content jsonb,p_slots text[],p_evidence boolean DEFAULT true) RETURNS jsonb
 LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $$
-DECLARE intake public.property_web_intakes;room public.property_showrooms;run public.property_processing_runs;saved jsonb;old_ai jsonb;
+DECLARE intake public.property_web_intakes;room public.property_showrooms;run public.property_processing_runs;saved jsonb;old_ai jsonb;installed jsonb;
 BEGIN
  IF cardinality(p_slots)>0 THEN
   -- Same ordering as the existing concept editor/image worker: budgets/jobs
@@ -205,10 +205,15 @@ BEGIN
   saved:=to_jsonb(room);
  END IF;
  SELECT ai_contents INTO old_ai FROM public.properties WHERE id=p_property FOR UPDATE;
- UPDATE public.properties SET ai_contents=run.result,status='analyzed' WHERE id=p_property;
+ installed:=run.result;
+ IF p_evidence IS DISTINCT FROM true THEN
+  installed:=installed-ARRAY['document_facts','_document_checks','_document_sources','_document_inspections'];
+  installed:=installed||COALESCE((SELECT jsonb_object_agg(key,value) FROM jsonb_each(COALESCE(old_ai,'{}'::jsonb)) WHERE key=ANY(ARRAY['document_facts','_document_checks','_document_sources','_document_inspections'])),'{}'::jsonb);
+ END IF;
+ UPDATE public.properties SET ai_contents=installed,status='analyzed' WHERE id=p_property;
  UPDATE public.property_processing_runs SET state='applied',phase='applied',previous_ai_contents=old_ai,applied_revision=(saved->>'revision')::integer,updated_at=now() WHERE id=p_run;
  RETURN saved;
 END $$;
-REVOKE ALL ON FUNCTION public.web_worker_heartbeat(uuid,text,text,text[],uuid),public.web_processing_receipt(uuid,uuid,uuid,jsonb),public.web_queue_processing(uuid,uuid,uuid,integer,integer,jsonb,text,jsonb),public.web_analysis_claim(uuid),public.web_analysis_progress(uuid,uuid,text,jsonb),public.web_analysis_complete(uuid,uuid,jsonb,text,boolean),public.web_cancel_processing(uuid,uuid,uuid),public.web_apply_processing(uuid,uuid,uuid,integer,jsonb,text[]) FROM PUBLIC,anon,authenticated;
-GRANT EXECUTE ON FUNCTION public.web_worker_heartbeat(uuid,text,text,text[],uuid),public.web_processing_receipt(uuid,uuid,uuid,jsonb),public.web_queue_processing(uuid,uuid,uuid,integer,integer,jsonb,text,jsonb),public.web_analysis_claim(uuid),public.web_analysis_progress(uuid,uuid,text,jsonb),public.web_analysis_complete(uuid,uuid,jsonb,text,boolean),public.web_cancel_processing(uuid,uuid,uuid),public.web_apply_processing(uuid,uuid,uuid,integer,jsonb,text[]) TO service_role;
+REVOKE ALL ON FUNCTION public.web_worker_heartbeat(uuid,text,text,text[],uuid),public.web_processing_receipt(uuid,uuid,uuid,jsonb),public.web_queue_processing(uuid,uuid,uuid,integer,integer,jsonb,text,jsonb),public.web_analysis_claim(uuid),public.web_analysis_progress(uuid,uuid,text,jsonb),public.web_analysis_complete(uuid,uuid,jsonb,text,boolean),public.web_cancel_processing(uuid,uuid,uuid),public.web_apply_processing(uuid,uuid,uuid,integer,jsonb,text[],boolean) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.web_worker_heartbeat(uuid,text,text,text[],uuid),public.web_processing_receipt(uuid,uuid,uuid,jsonb),public.web_queue_processing(uuid,uuid,uuid,integer,integer,jsonb,text,jsonb),public.web_analysis_claim(uuid),public.web_analysis_progress(uuid,uuid,text,jsonb),public.web_analysis_complete(uuid,uuid,jsonb,text,boolean),public.web_cancel_processing(uuid,uuid,uuid),public.web_apply_processing(uuid,uuid,uuid,integer,jsonb,text[],boolean) TO service_role;
 COMMIT;

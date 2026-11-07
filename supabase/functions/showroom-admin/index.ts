@@ -1,3 +1,4 @@
+import {previewConfigured,previewOriginAllowed,previewOwnerAllowed,previewEnvironment} from '../_shared/deployment.ts';
 import {publicDecision} from '../_shared/customer-decision.ts';
 import {documentCandidates,documentReviewVersion,checkedDocumentCandidates,documentInspectionSummaries,documentAnalysisState,documentIssues,importDocumentCandidates} from '../_shared/document-review.ts';
 import {validateImageSettings,imageSettingsReady,imageSettingSlots,ImageSettingsError} from '../_shared/image-settings.ts';
@@ -44,8 +45,11 @@ export function marketingContent(ai:unknown,saved:unknown={}) {
   const source=object(ai), edits=object(saved);
   return Object.fromEntries(marketingFields.map(field=>[field,text(Object.hasOwn(edits,field)?edits[field]:source[field],18000)]));
 }
-type Config = {url:string;key:string;fetcher?:typeof fetch;githubTokens?:string[];copyRewriteEnabled?:boolean;adminWebEnabled?:boolean;webProcessingEnabled?:boolean;apiImagesEnabled?:boolean;workerEnvironment?:string};
-export function createHandler({url,key,fetcher=fetch,githubTokens=[],copyRewriteEnabled=false,adminWebEnabled=false,webProcessingEnabled=false,apiImagesEnabled=false,workerEnvironment='production'}:Config) {
+type Config = {url:string;key:string;fetcher?:typeof fetch;githubTokens?:string[];copyRewriteEnabled?:boolean;adminWebEnabled?:boolean;webProcessingEnabled?:boolean;apiImagesEnabled?:boolean;workerEnvironment?:string;privatePreview?:boolean;previewOwnerId?:string;previewOrigin?:string};
+export function createHandler({url,key,fetcher=fetch,githubTokens=[],copyRewriteEnabled=false,adminWebEnabled=false,webProcessingEnabled=false,apiImagesEnabled=false,workerEnvironment='production',privatePreview=false,previewOwnerId='',previewOrigin=''}:Config) {
+  const previewConfig={url,privatePreview,previewOwnerId,previewOrigin};
+  const allowed=(origin:string|null)=>privatePreview?previewOriginAllowed(previewConfig,origin):originAllowed(origin);
+  const cors=(origin:string|null)=>privatePreview?(allowed(origin)?origin:undefined):corsOrigin(origin);
   async function db(path:string, options:RequestInit={}) {
     const response=await fetcher(`${url}/rest/v1/${path}`,{...options,redirect:'error',headers:{apikey:key,Authorization:`Bearer ${key}`,'Content-Type':'application/json',...options.headers},signal:AbortSignal.timeout(15000)});
     if(!response.ok){const e=await response.json().catch(()=>({}));const code=e.code==='23505'?'slug_taken':e.message;if(['manual_image_selected','manual_image_already_selected','processing_pending','processing_stale','processing_request_conflict','processing_not_ready'].includes(code))throw new ApiError(409,code);if(code==='processing_rate_limited')throw new ApiError(429,code);if(code==='processing_missing')throw new ApiError(404,code);if(['invalid_processing_request','invalid_processing_result','web_source_required'].includes(code))throw new ApiError(400,code);if(['web_write_conflict','web_form_closed','web_form_open'].includes(code))throw new ApiError(409,code);if(code==='web_source_invalid')throw new ApiError(400,code);if(code==='rewrite_rate_limited')throw new ApiError(429,code);if(['rewrite_busy','rewrite_stale','rewrite_not_ready','rewrite_request_conflict'].includes(code))throw new ApiError(409,code);if(code==='rewrite_missing')throw new ApiError(404,code);if(code==='rewrite_invalid')throw new ApiError(400,code);if(['source_missing','draft_missing','concept_missing','invalid_slot','invalid_registration','web_intake_missing'].includes(code))throw new ApiError(400,code);if(['slug_taken','revision_conflict','invalid_slug','invalid_listing_state','registration_request_conflict','analysis_already_running','concept_image_busy'].includes(code))throw new ApiError(code.startsWith('invalid_')?400:409,code);throw new ApiError(502,'database_unavailable');}
@@ -58,9 +62,10 @@ export function createHandler({url,key,fetcher=fetch,githubTokens=[],copyRewrite
   }
   return async function handler(req:Request):Promise<Response> {
     const headers:Record<string,string>={'Content-Type':'application/json','Cache-Control':'no-store','Vary':'Origin','X-Content-Type-Options':'nosniff'};
-    if(corsOrigin(req.headers.get('Origin'))) Object.assign(headers,{'Access-Control-Allow-Origin':corsOrigin(req.headers.get('Origin'))!,'Access-Control-Allow-Headers':'authorization, apikey, content-type, x-client-info','Access-Control-Allow-Methods':'GET, POST, PATCH, OPTIONS'});
+    if(cors(req.headers.get('Origin'))) Object.assign(headers,{'Access-Control-Allow-Origin':cors(req.headers.get('Origin'))!,'Access-Control-Allow-Headers':'authorization, apikey, content-type, x-client-info','Access-Control-Allow-Methods':'GET, POST, PATCH, OPTIONS'});
     const reply=(data:unknown,status=200)=>new Response(JSON.stringify(data),{status,headers});
-    if(!originAllowed(req.headers.get('Origin'))) return reply({error:'origin_denied'},403);
+    if(!previewConfigured(previewConfig))return reply({error:'preview_configuration_required'},503);
+    if(!allowed(req.headers.get('Origin'))) return reply({error:'origin_denied'},403);
     if(req.method==='OPTIONS') return new Response(null,{status:204,headers});
     try {
       if(!['GET','POST','PATCH'].includes(req.method)) throw new ApiError(405,'method_not_allowed');
@@ -70,6 +75,7 @@ export function createHandler({url,key,fetcher=fetch,githubTokens=[],copyRewrite
       if(!auth.ok) throw new ApiError(401,'login_required');
       const user=await auth.json();
       if(!user.id||user.is_anonymous||object(user.app_metadata).showroom_admin!==true) throw new ApiError(403,'admin_required');
+      if(!previewOwnerAllowed(previewConfig,user.id))return reply({error:'owner_required'},403);
       const query=new URL(req.url).searchParams;
       if(req.method==='GET'&&query.get('action')==='web-intake-config')return reply({enabled:adminWebEnabled,processingEnabled:webProcessingEnabled,manualImagesEnabled:adminWebEnabled,apiImagesEnabled});
       if(req.method==='GET'&&query.get('action')==='processing-status'){
@@ -86,7 +92,7 @@ export function createHandler({url,key,fetcher=fetch,githubTokens=[],copyRewrite
       if(req.method==='GET'&&query.get('action')==='list') {
         const rows=await db('properties?status=neq.merged&select=id,address,status,created_at&order=created_at.desc&limit=100');
         if(query.get('includeWeb')==='1'){
-          try{const ids=rows.map((p:Json)=>p.id).filter((id:string)=>UUID.test(id));const intakes=ids.length?await db(`property_web_intakes?property_id=in.(${ids.join(',')})&select=property_id,state`):[];return reply({properties:rows.map((p:Json)=>({...p,web_state:intakes.find((w:Json)=>w.property_id===p.id)?.state})),registration_available:true});}
+          try{const ids=rows.map((p:Json)=>p.id).filter((id:string)=>UUID.test(id));const intakes=ids.length?await db(`property_web_intakes?property_id=in.(${ids.join(',')})&select=property_id,state`):[];const details=adminWebEnabled&&webProcessingEnabled&&ids.length?await db('rpc/web_intake_listing',{method:'POST',body:JSON.stringify({p_actor:user.id,p_ids:ids})}):[];return reply({properties:rows.map((p:Json)=>({...p,web_state:intakes.find((w:Json)=>w.property_id===p.id)?.state,...details.find((d:Json)=>d.property_id===p.id)})),registration_available:true});}
           catch{return reply({properties:rows,registration_available:false});}
         }
         return reply({properties:rows});
@@ -419,4 +425,4 @@ export function createHandler({url,key,fetcher=fetch,githubTokens=[],copyRewrite
 }
 // Supabase injects existing server credentials. They never enter browser code.
 declare const Deno: {env:{get(name:string):string|undefined};serve(handler:(req:Request)=>Promise<Response>):void};
-if(typeof Deno!=='undefined') Deno.serve(createHandler({url:Deno.env.get('SUPABASE_URL')!,key:Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,copyRewriteEnabled:Deno.env.get('COPY_REWRITE_ENABLED')==='true',adminWebEnabled:Deno.env.get('ADMIN_WEB_ENABLED')==='true',webProcessingEnabled:Deno.env.get('WEB_PROCESSING_ENABLED')==='true',apiImagesEnabled:Deno.env.get('WEB_API_IMAGES_ENABLED')==='true',workerEnvironment:Deno.env.get('WORKER_ENVIRONMENT')||'production',githubTokens:['GITHUB_TOKEN','GH_PAT','GITHUB_PAT','GITHUB_PAT_TOKEN'].map(name=>Deno.env.get(name)||'')}));
+if(typeof Deno!=='undefined') Deno.serve(createHandler({...previewEnvironment(Deno.env),url:Deno.env.get('SUPABASE_URL')!,key:Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,copyRewriteEnabled:Deno.env.get('COPY_REWRITE_ENABLED')==='true',adminWebEnabled:Deno.env.get('ADMIN_WEB_ENABLED')==='true',webProcessingEnabled:Deno.env.get('WEB_PROCESSING_ENABLED')==='true',apiImagesEnabled:Deno.env.get('WEB_API_IMAGES_ENABLED')==='true',workerEnvironment:Deno.env.get('WORKER_ENVIRONMENT')||'production',githubTokens:['GITHUB_TOKEN','GH_PAT','GITHUB_PAT','GITHUB_PAT_TOKEN'].map(name=>Deno.env.get(name)||'')}));

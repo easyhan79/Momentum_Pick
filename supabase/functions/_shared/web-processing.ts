@@ -64,5 +64,5 @@ export async function applyWebProcessing(db:Db,id:string,actor:string,body:Json,
  if(fields.includes('concepts')){
   const {changedConceptSlots}=await import('./concept-edits.ts');content.concepts=generated.concepts;content.unknowns=[...new Set([...(draft.unknowns||[]),...(generated.unknowns||[])])];slots=changedConceptSlots(draft.concepts||[],generated.concepts);
  }
- return {showroom:await rpc(db,'web_apply_processing',{p_property:id,p_actor:actor,p_run:body.runId,p_revision:body.revision,p_content:content,p_slots:slots})};
+ return {showroom:await rpc(db,'web_apply_processing',{p_property:id,p_actor:actor,p_run:body.runId,p_revision:body.revision,p_content:content,p_slots:slots,p_evidence:fields.includes('evidence')})};
 }

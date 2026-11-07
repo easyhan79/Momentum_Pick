@@ -21,6 +21,7 @@ paths.update(ROOT.glob('requirements*.txt'))
 paths.update(ROOT.glob('SPACEPICK_V2_1_*.md'))
 paths.update(ROOT.glob('SPACEPICK_*_PLAN.md'))
 paths.update(ROOT.glob('SPACEPICK_V2_1_RUN_STATE.json'))
+paths.update(p for p in (ROOT/'deploy').rglob('*') if p.is_file() and (p.suffix=='.service' or p.name.endswith('.env.example')))
 for filename in ['README.md','showroom-web/package.json','showroom-web/pnpm-lock.yaml','showroom-web/tsconfig.json','showroom-web/vite.config.ts','showroom-web/index.html','showroom-web/.openai/hosting.json','showroom-web/public/favicon.svg','showroom-web/public/spacepick-share.png','showroom-web/public/supabase-public.json']:
     paths.add(ROOT/filename)
 files={f'source/{p.relative_to(ROOT).as_posix()}':p for p in paths}

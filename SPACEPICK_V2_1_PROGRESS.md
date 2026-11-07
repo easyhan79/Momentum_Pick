@@ -417,3 +417,15 @@
 - 검증: readiness 44항목 전체 통과(Python72, 신규 이미지 API3, 실행 API5, 격리 SQL10 포함). 레거시 이미지 단위7개는 새 쿼리 순서에 mock 경로가 맞지 않아 실패했으며, 동등한 executor filter를 유지하면서 조회 조건 순서를 정리해 Python72 재통과. SQL fixture UUID cast/SQL NULL 바인딩을 바로잡아 재통과.
 - 브라우저: 원문 복구/새 실행 접수/오래된 결과 적용 차단/취소/새 결과 명시 적용 통과. 새 수동 AI 업로드 완료 안내를 기다리다 실패하여 원인 진단 중이며 W6 브라우저 완료로 표시하지 않음.
 - 운영: DB/함수/사이트/worker 설치·AI 호출·알림 모두 미실행. flags OFF. 다음: 이미지 브라우저 문제 해결, 본인 전용/환경 분리 설정과 5유형 QA, inventory/pilot/rollback 준비.
+
+## 2026-11-07T15:13:27.798548+09:00 — W1~W6 로컬 완료 / W7 로컬 검증 완료 / W8~W9 운영 준비
+
+- 구현: 원문/접수/자동저장 복구, 실행 snapshot/라우팅/lease/candidate/취소, 공유 분석/provider/editorial·보조 단계 분리와 상시 worker, 목록/작업 상태·원인별 PDF 오류·결과 비교/선택 적용, Gemini 웹 AI 결과 upload/provenance/비교/대표·콘셉트 선택·manual override·API 유료 한 장 opt-in.
+- 보완: 선택하지 않은 자료 추출 후보 보존, 원문 수량/단위 확인 후보(자동 확정 없음), 수동 선택과 queued 이미지 경합 취소 및 만료 이미지 token 거절, actor-scoped 목록의 실제 단계/저장시각/이미지·공개 상태 표시.
+- 검증: 고정 worker 의존성 가상환경에서 readiness46 전부 통과(Python75/Node176/격리 SQL10/빌드·Edge 타입). 개발/배포용/합성 staging 관리자 각7그룹, 고객5유형×자료20+문의CRM1/PDF5, 기존관리자6그룹 통과. staging은 예상 시험 URL 외 Supabase 요청을 거절하는 QA에서 통과. 실제 AI/Telegram/호스팅/운영 DB 호출0.
+- 장애 수정 기록: local QA multipart Origin 차이로 수동 업로드403→기존 admin QA와 같은 모의 호출로 수정 후 통과. 별도 runtime 전체 검사에서 reportlab 누락2모듈→기존 validation 요구사항 설치 후75 통과. build-worker 문자열 수정 중 구문 오류→template literal로 정리하고 빌드·타입·회귀 재통과. 승인/권한 보호 규칙 완화 없음.
+- W7/P2·P3: 별도 project URL/public key/Auth redirect/호스팅 대상과 exact owner/origin guard, public DTO·이미지·문의/Telegram 우회 차단 및 누락/운영 혼용 거절 구현. 합성 프로젝트는 로컬 시험용이며 실제 생성/배포 아님.
+- W8/W9: 읽기 전용 inventory RPC/CLI와 승인 digest·예산/라우팅 보존 검사, service/env 예시, pilot·정상 종료·관측·fenced rollback 절차 준비. 실제 inventory/pilot/운영 전환/롤백·Telegram 종료 미실행.
+- 외부 차단 증거: current environment running/connected/revision1, secret/runtime variable/outbound identity 없음, desktop enabled/unknown이나 제어 JS/게시/Supabase 관리 도구 없음. GitHub push만 가능하며 운영 연결로 간주하지 않음. 자세한 ID/상태는 docs/ADMIN_WEB_RELEASE_STATUS.md 기록.
+- Git: bc66252까지 기능 브랜치 push 완료. 이번 최종 단위는 검증 후 다음 commit/push로 저장. main merge/운영 게시/승인 snapshot 변경 없음.
+- 다음: 최종 소스/기록 commit·push 및 로컬 배포 묶음 준비. 외부 연결 후 W7 실제 시험 배포→W8 pilot→W9 전환. 추가 권한 재확인 질문 없이 진행 가능한 로컬 작업을 마쳤으며 완료 기능 중복 개발 금지.

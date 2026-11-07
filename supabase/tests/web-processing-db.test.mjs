@@ -30,9 +30,10 @@ try{
  assert.equal((await db.query('SELECT ai_contents FROM properties WHERE id=$1',[id])).rows[0].ai_contents,null);
  assert.equal((await db.query('SELECT revision FROM property_showrooms WHERE property_id=$1',[id])).rows[0].revision,2);
  // Result only enters current content when explicitly applied; public stays frozen.
- const applied=await rpc('web_apply_processing',[id,actor,request,2,{...content,summary:'new copy'},'{}']);assert.equal(applied.revision,3);assert.equal(applied.published_content.summary,'edited copy');
+ await db.query("UPDATE properties SET ai_contents='{\"document_facts\":[{\"label\":\"preserved evidence\"}]}' WHERE id=$1",[id]);
+ const applied=await rpc('web_apply_processing',[id,actor,request,2,{...content,summary:'new copy'},'{}',false]);assert.equal(applied.revision,3);assert.equal(applied.published_content.summary,'edited copy');
  assert.equal((await rpc('web_apply_processing',[id,actor,request,2,{},'{}'])).revision,3);
- assert.deepEqual((await db.query('SELECT ai_contents FROM properties WHERE id=$1',[id])).rows[0].ai_contents,result);
+ assert.deepEqual((await db.query('SELECT ai_contents FROM properties WHERE id=$1',[id])).rows[0].ai_contents,{...result,document_facts:[{label:'preserved evidence'}]});
  const r2=crypto.randomUUID();await rpc('web_queue_processing',[id,actor,r2,3,1,{draftRevision:3,sourceRevision:1},'second original',[]]);job=await rpc('web_analysis_claim',[worker]);
  await rpc('web_analysis_progress',[id,job.token,'generating',null]);await db.query("UPDATE property_analysis_jobs SET lease_until=now()-interval '1 second' WHERE property_id=$1",[id]);assert.equal(await rpc('web_analysis_claim',[worker]),null);
  assert.equal((await db.query('SELECT last_error_code FROM property_processing_runs WHERE id=$1',[r2])).rows[0].last_error_code,'outcome_unknown');

@@ -126,3 +126,17 @@ T04는 공장형 필드 편집→저장→승인→공개 DTO 연결을 작은 �
 - POST `apply-copy-rewrite`: propertyId/requestId/revision. DB가 현재 revision과 base_revision을 동시에 확인하고 선택 필드만 draft_content에 원자 적용한다. published_content, properties.ai_contents, 자료/콘셉트/사실정보는 보존한다.
 - POST `discard-copy-rewrite`: propertyId/requestId. 작업 취소/폐기만 수행하며 기존 글을 유지한다. state는 queued/running/done/failed/applied/discarded, DB lease/attempt 최대3회/시간당 신규 요청3회/동일 요청 재전송 규칙을 유지한다.
 - 추가 SQL `20261107020000_copy_rewrites.sql`, worker/workflow·기능 활성화·배포 순서는 `COPY_REWRITE.md` 참조. 로컬 완료와 운영 적용 완료를 구분한다.
+# 관리자 웹 전환 추가 계약 — 2026-11-07
+
+기존 공개 DTO·published snapshot 계약은 유지한다. 추가 migration은 `20261107040000`~`20261107080000`이며 로컬 검증과 운영 적용은 별개다.
+
+- `property_web_intakes.input_payload`와 append-only `property_web_input_versions`는 원문이다. 초안 summary/AI 결과를 원문으로 자동 채우지 않는다. 같은 저장 request ID는 원문+표준화 입력과 일치해야 한다. replay는 현재 초안과 다시 합치기 전에 확인한다.
+- `property_processing_runs`는 요청 UUID, actor, 초안/source revision, 선택 PDF의 ID/생성 시각/존재하는 SHA-256·크기, 고정 입력, 단계/회수/candidate/result/이전 AI 결과를 비공개로 보관한다. 후보/result는 완료만으로 현재 문안에 설치하지 않는다.
+- 분석 작업의 `executor_kind`는 기존 행에 `legacy_actions`, 새 웹 요청에 `web_worker`다. native job과 run의 epoch/token/lease가 일치해야 진행/완료할 수 있다. legacy `analysis_claim`은 web 행을 가져오지 않는다. 재작성/이미지에도 실행자 필터를 적용하고 도면 요청에 executor marker와 request cap을 둔다.
+- 취소/구버전/lease 만료 뒤 늦은 결과는 거절한다. generating 중 유실·공급자 응답 불명은 `outcome_unknown`으로 멈춘다. DB에 candidate가 있으면 유료 호출 없이 완료 저장을 재개한다. 외부 호출 자체의 exactly-once는 보장하지 않는다.
+- `GET processing-status`는 접수·단계·회수·안전 오류 코드·완료 preview와 heartbeat 연결 여부만 돌려준다. 원문·actor·token·candidate·Storage 경로를 포함하지 않는다. 원문은 별도 actor-scoped intake-receipt에서만 제공한다.
+- queue-web-analysis는 requestId/revision/sourceRevision/선택 documentIds로 접수한다. apply-web-processing은 runId/revision/선택 fields로 비공개 초안만 바꾼다. 선택하지 않은 문안·자료 추출 후보와 기존 승인본을 보존한다. PDF 추출값은 별도 원문 대조 후 사실정보로 가져온다.
+- `property_assets.sha256/byte_size`는 새 웹 업로드 때 계산한다. 기존 파일에 해시를 추정해서 넣지 않는다. Gemini 수동 결과는 kind=concept, source_type=ai_generated, is_approved=false 및 private ai_metadata(provider/prompt/referenceIds/imageType/권한/등록 actor·시각)를 갖는다.
+- `draft_content.imagePolicy.manualSlots`는 대표/콘셉트 수동 선택이다. 자동 sync가 보호하며, 콘셉트 변경 시 해당 연결을 해제한다. 수동 선택 중 API 재생성은 거절한다. 파일 원본·과거 예산/회수·공개 snapshot은 삭제하지 않는다.
+- 모든 신규 테이블/RPC는 service_role 전용이다. 브라우저는 검증된 관리자 API를 사용한다. PRIVATE_PREVIEW_ENABLED에서는 별도 Supabase 프로젝트·정확한 owner ID·preview origin이 모두 맞아야 하며 공개 조회/문의/Telegram intake는 닫힌다. trial 설정 누락 또는 운영 URL 혼용은 차단한다.
+- `web_transition_inventory`는 읽기 전용 집계와 승인 snapshot digest를 반환한다. 원문·개인정보·파일 경로·token은 포함하지 않는다. inventory 실행만으로 큐 소유권·상태·예산을 변경하지 않는다.

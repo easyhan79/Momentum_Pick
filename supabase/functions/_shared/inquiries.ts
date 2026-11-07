@@ -1,3 +1,4 @@
+import {previewConfigured,previewOwnerAllowed,type PreviewConfig} from './deployment.ts';
 import {PRIMARY_ORIGIN,LEGACY_ORIGIN,originAllowed,corsOrigin} from './site.ts';
 export {originAllowed};
 export const ORIGIN=PRIMARY_ORIGIN;
@@ -5,7 +6,7 @@ export const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[
 export const STAGES=['new','contacted','free_consulting','proposal','paid','lost'];
 export const SOURCES=['showroom','telegram','blog','instagram','referral','manual','other'];
 export const POLICY={version:'spacepick-inquiry-20261104-v2',operator:'Spacepick',contact:'forestasset@naver.com',retentionDays:90};
-export type Config={url:string;key:string;telegramToken?:string;telegramChat?:string;fetcher?:typeof fetch;defer?:(work:Promise<unknown>)=>void};
+export type Config=PreviewConfig&{url:string;key:string;telegramToken?:string;telegramChat?:string;fetcher?:typeof fetch;defer?:(work:Promise<unknown>)=>void};
 export class InquiryError extends Error{status:number;code:string;constructor(status:number,code:string){super(code);this.status=status;this.code=code;}}
 export const obj=(v:unknown):Record<string,any>=>v&&typeof v==='object'&&!Array.isArray(v)?v as Record<string,any>:{};
 export function text(v:unknown,max:number,required=false){if(typeof v!=='string'||v.length>max||(required&&!v.trim()))throw new InquiryError(400,'invalid_input');return v.trim();}
@@ -22,8 +23,8 @@ export function backend(config:Config){const fetcher=config.fetcher||fetch;
   if(!r.ok){let code='';try{code=(await r.json()).message||'';}catch{}const map:Record<string,number>={rate_limited:429,request_conflict:409,context_revision_conflict:409,context_property_mismatch:400,revision_conflict:409,showroom_unavailable:404,inquiry_not_found:404,retention_expired:409,paid_stage_required:400,invalid_edits:400};if(Object.hasOwn(map,code))throw new InquiryError(map[code],code);throw new InquiryError(503,'service_unavailable');}const raw=await r.text();return raw.trim()?JSON.parse(raw):null;
  }
  const rpc=(name:string,args:unknown)=>db(`rpc/${name}`,{method:'POST',body:JSON.stringify(args)});
- async function admin(req:Request){const token=req.headers.get('Authorization')||'';if(!/^Bearer \S+$/.test(token))throw new InquiryError(401,'login_required');const r=await fetcher(`${config.url}/auth/v1/user`,{headers:{apikey:config.key,Authorization:token},redirect:'error',signal:AbortSignal.timeout(10000)});if(!r.ok)throw new InquiryError(401,'login_required');const user=await r.json();if(!user.id||user.is_anonymous||user.app_metadata?.showroom_admin!==true)throw new InquiryError(403,'admin_required');return user;}
- async function notify(id:string){if(!config.telegramToken||!config.telegramChat)return;
+ async function admin(req:Request){if(!previewConfigured(config))throw new InquiryError(503,'preview_configuration_required');const token=req.headers.get('Authorization')||'';if(!/^Bearer \S+$/.test(token))throw new InquiryError(401,'login_required');const r=await fetcher(`${config.url}/auth/v1/user`,{headers:{apikey:config.key,Authorization:token},redirect:'error',signal:AbortSignal.timeout(10000)});if(!r.ok)throw new InquiryError(401,'login_required');const user=await r.json();if(!user.id||user.is_anonymous||user.app_metadata?.showroom_admin!==true)throw new InquiryError(403,'admin_required');if(!previewOwnerAllowed(config,user.id))throw new InquiryError(403,'owner_required');return user;}
+ async function notify(id:string){if(config.privatePreview||!config.telegramToken||!config.telegramChat)return;
   let claims;try{claims=await rpc('crm_claim_notifications',{p_limit:1,p_id:id});}catch{return;}
   for(const row of claims||[]){let sent=false;try{const r=await fetcher(`https://api.telegram.org/bot${config.telegramToken}/sendMessage`,{method:'POST',headers:{'Content-Type':'application/json'},redirect:'error',signal:AbortSignal.timeout(7000),body:JSON.stringify({chat_id:config.telegramChat,text:`[Spacepick 새 문의]\n접수 ID: ${row.id}\n상세 내용·상담 관리: ${LEGACY_ORIGIN}/admin`})});sent=r.ok&&(await r.json()).ok===true;}catch{}try{await rpc('crm_complete_notification',{p_id:row.id,p_attempt:row.notification_attempts,p_success:sent});}catch{/* Persisted lease allows later retry. */}}
  }

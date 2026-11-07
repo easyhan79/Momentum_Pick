@@ -26,8 +26,8 @@
     "운영 배포 연결 미제공",
     "실제 AI/실매물/외부 데이터 검증 미수행"
   ],
-  "nextAction": "W3/W4 보조 실행자 분리 및 W6 수동 AI 이미지→W7 전체 로컬검증→W8/W9 전환/되돌리기 준비. 운영 연결은 별도 증거 필요.",
-  "updatedAt": "2026-11-07T14:26:34.577393+09:00",
+  "nextAction": "완료한 W1~W6 반복 개발 금지. 실제 관리 연결·본인 계정·격리 프로젝트·worker 호스트 확인 후 W7 시험 배포→W8 읽기 전용 inventory/선택 매물 pilot→W9 관측·복구·운영 전환. docs/ADMIN_WEB_RELEASE_STATUS.md 및 ADMIN_WEB_OPERATIONS.md 참조.",
+  "updatedAt": "2026-11-07T15:13:27.798548+09:00",
   "stages": {
     "S0": {
       "status": "local_complete",
@@ -132,13 +132,13 @@
     "plan": "SPACEPICK_ADMIN_WEB_TRANSITION_PLAN.md",
     "scope": "implementation",
     "planStatus": "complete",
-    "status": "in_progress",
-    "currentUnit": "W7: owner-only environment isolation and full browser QA",
-    "nextUnit": "W3/W4 then W6, W7-W9",
+    "status": "local_complete_pending_external",
+    "currentUnit": "W7 actual private deployment connection; W8/W9 live pilot and cutover pending",
+    "nextUnit": "W7 deploy -> W8 live inventory/pilot -> W9 observe/rollback/cutover",
     "implementationStarted": true,
     "deployed": false,
     "baselineCommit": "320d53e9a1d8ef67b7d93340251fd94993342a41",
-    "updatedAt": "2026-11-07T14:53:16.143371+09:00",
+    "updatedAt": "2026-11-07T15:13:27.798548+09:00",
     "planningChecks": [
       "기존 등록/API/queue/worker/media/재작성/프롬프트·배포/권한 코드 및 문서 대조",
       "문서 내부 연결 38개 유효, W0-W9/A01-A21 누락 없음, Markdown fence/diff 확인",
@@ -174,21 +174,23 @@
       },
       "W5": {
         "status": "local_complete",
-        "localUnit": "web queue/status/cancel/stale-result block/preview/selective apply browser verified"
+        "localUnit": "list and workspace status, cancel/retry/delay, result preview/selection, stale result guard, selected evidence preservation"
       },
       "W6": {
-        "status": "in_progress",
-        "localUnit": "AI result upload/provenance/private classification/manual slot overrides/sync/concept invalidation SQL and API passed; browser upload investigation"
+        "status": "local_complete",
+        "localUnit": "Gemini web upload/provenance/private classification/compare/hero/concept/manual sync protection; explicit paid single-image opt-in"
       },
       "W7": {
-        "status": "in_progress",
-        "localUnit": "44 readiness checks passed, browser new flow 5 groups passed then manual-upload failure under investigation"
+        "status": "local_complete_pending_deploy",
+        "localUnit": "46 checks, pinned worker runtime, dev/built/staging UI, 5-type material/PDF, owner/config guards verified; real environment not connected"
       },
       "W8": {
-        "status": "not_started"
+        "status": "prepared_pending_live_pilot",
+        "localUnit": "readonly inventory RPC/CLI, published digest and budget/route evidence, pilot/ownership procedure; live inventory/pilot not run"
       },
       "W9": {
-        "status": "not_started"
+        "status": "prepared_pending_live_cutover",
+        "localUnit": "install/observation/graceful stop/fenced rollback procedure; live cutover/rollback/Telegram retirement not run"
       }
     },
     "openDecisions": [
@@ -199,16 +201,40 @@
     "planCommit": "17a821ddeb0648157bfd75bd4c9f4759f4e7eb4d",
     "lastPushedPlanCommit": "17a821ddeb0648157bfd75bd4c9f4759f4e7eb4d",
     "branch": "feature/spacepick-v2-1",
-    "sourceCommit": "d0ad0b2",
-    "lastPushedSourceCommit": "d0ad0b2",
+    "sourceCommit": "bc66252",
+    "lastPushedSourceCommit": "bc66252",
     "localChecks": {
-      "readiness": 44,
-      "newApi": 5,
-      "workerPython": 7,
-      "SQL": 10,
-      "browserDevGroups": 5,
-      "productionCalls": 0,
-      "python": 72
-    }
+      "readiness": 46,
+      "python": 75,
+      "node": 176,
+      "isolatedSQL": 10,
+      "adminWebDevGroups": 7,
+      "adminWebBuiltGroups": 7,
+      "adminWebSyntheticStagingGroups": 7,
+      "customerMaterialsGroups": 21,
+      "customerPdfGroups": 5,
+      "existingAdminGroups": 6,
+      "privatePreviewTests": 7,
+      "queueTypeMaterialCombinations": 20,
+      "providerCalls": 0,
+      "pinnedRuntime": "google-genai2.34.0/requests2.34.2/pydantic2.14.2/pypdf6.10.0"
+    },
+    "lastLocalStage": "W7_local",
+    "operationalStatus": "not_deployed",
+    "realProviderCalls": 0,
+    "productionDataModified": false,
+    "externalValidation": [
+      "real hosting/DB deployment tools and ready credentials are absent",
+      "desktop enabled/unknown but cua_repl.js/open_in_codex unavailable",
+      "real owner ID, isolated project and worker host/cost unverified",
+      "real provider output/cost and storage trial unrun",
+      "actual W7 private deployment, W8 inventory/pilot and W9 cutover/rollback/Telegram-input decision unrun"
+    ],
+    "documents": [
+      "docs/ADMIN_WEB_RELEASE_STATUS.md",
+      "docs/ADMIN_WEB_OPERATIONS.md",
+      "docs/ADMIN_WEB_IMPLEMENTATION.md"
+    ],
+    "release": "pending final source commit and local package; not deployed"
   }
 }

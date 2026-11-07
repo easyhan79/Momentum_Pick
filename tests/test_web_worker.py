@@ -68,6 +68,12 @@ class WebWorkerTests(unittest.TestCase):
         db=Db();execute_analysis(db,'worker',failed,json.loads,emit=lambda *a,**k:None)
         self.assertEqual(db.calls[-1][1]['p_retryable'],False)
 
+    def test_analysis_failure_does_not_block_independent_auxiliary_stage(self):
+        db=Db();aux=[]
+        with patch('web_worker.execute_analysis',side_effect=RuntimeError('database unavailable')):
+            with self.assertRaises(RuntimeError):serve(db,'worker','test',lambda _:None,json.loads,once=True,auxiliary=lambda:aux.append('called'),emit=lambda *a,**k:None)
+        self.assertEqual(aux,['called'])
+
     def test_service_once_reports_heartbeat_and_exits_without_notifications(self):
         db=Db();db.job=None;serve(db,'worker','test',lambda _:self.fail(),json.loads,once=True,emit=lambda *a,**k:None)
         self.assertEqual(db.calls[0][0],'web_worker_heartbeat')

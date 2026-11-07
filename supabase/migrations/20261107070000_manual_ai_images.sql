@@ -29,6 +29,7 @@ ALTER FUNCTION public.image_enqueue(uuid,text,boolean) RENAME TO image_enqueue_b
 CREATE FUNCTION public.image_enqueue(p_property uuid,p_slot text DEFAULT 'hero',p_retry boolean DEFAULT false) RETURNS jsonb
 LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $$
 BEGIN
+ PERFORM pg_advisory_xact_lock(hashtextextended('manual-image:'||p_property,0));
  IF EXISTS(SELECT 1 FROM public.property_showrooms WHERE property_id=p_property AND draft_content->'imagePolicy'->'manualSlots' ? p_slot) THEN RAISE EXCEPTION 'manual_image_selected'; END IF;
  RETURN public.image_enqueue_before_manual(p_property,p_slot,p_retry);
 END $$;
@@ -47,6 +48,7 @@ LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $$
 DECLARE room public.property_showrooms;slots jsonb;
 BEGIN
  IF p_slot IS NULL OR p_slot NOT IN ('hero','concept-1','concept-2','concept-3') OR p_revision IS NULL THEN RAISE EXCEPTION 'invalid_slot'; END IF;
+ PERFORM pg_advisory_xact_lock(hashtextextended('manual-image:'||p_property,0));
  PERFORM 1 FROM public.property_image_budgets WHERE property_id=p_property FOR UPDATE;
  PERFORM 1 FROM public.property_image_jobs WHERE property_id=p_property AND slot=p_slot FOR UPDATE;
  IF EXISTS(SELECT 1 FROM public.property_image_jobs WHERE property_id=p_property AND slot=p_slot AND state='running') THEN RAISE EXCEPTION 'concept_image_busy'; END IF;
@@ -59,12 +61,24 @@ BEGIN
  IF p_asset IS NOT NULL THEN
   IF EXISTS(SELECT 1 FROM jsonb_each_text(slots) s WHERE s.value=p_asset::text) THEN RAISE EXCEPTION 'manual_image_already_selected'; END IF;
   slots:=slots||jsonb_build_object(p_slot,p_asset);
+  UPDATE public.property_image_jobs SET state='failed',claim_token=NULL,lease_until=NULL,last_error_code='manual_selected',updated_at=now() WHERE property_id=p_property AND slot=p_slot AND state='queued';
  END IF;
  UPDATE public.property_showrooms SET draft_content=jsonb_set(draft_content,'{imagePolicy}',COALESCE(draft_content->'imagePolicy','{"version":1,"mode":"manual_web"}'::jsonb)||jsonb_build_object('manualSlots',slots)),revision=revision+1 WHERE property_id=p_property;
  PERFORM public.image_sync_assets(p_property);
  SELECT * INTO room FROM public.property_showrooms WHERE property_id=p_property;
  RETURN to_jsonb(room);
 END $$;
+ALTER FUNCTION public.image_complete(uuid,uuid,uuid,jsonb,text) RENAME TO image_complete_before_web;
+CREATE FUNCTION public.image_complete(p_job uuid,p_token uuid,p_asset uuid DEFAULT NULL,p_usage jsonb DEFAULT '{}'::jsonb,p_error text DEFAULT '') RETURNS boolean
+LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $$
+DECLARE job public.property_image_jobs;
+BEGIN
+ SELECT * INTO job FROM public.property_image_jobs WHERE id=p_job FOR UPDATE;
+ IF NOT FOUND OR job.state<>'running' OR job.claim_token IS DISTINCT FROM p_token OR job.lease_until<now() THEN RETURN false; END IF;
+ RETURN public.image_complete_before_web(p_job,p_token,p_asset,p_usage,p_error);
+END $$;
+REVOKE ALL ON FUNCTION public.image_complete_before_web(uuid,uuid,uuid,jsonb,text),public.image_complete(uuid,uuid,uuid,jsonb,text) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.image_complete_before_web(uuid,uuid,uuid,jsonb,text),public.image_complete(uuid,uuid,uuid,jsonb,text) TO service_role;
 REVOKE ALL ON FUNCTION public.image_sync_assets_before_manual(uuid),public.image_sync_assets(uuid),public.image_enqueue_before_manual(uuid,text,boolean),public.image_enqueue(uuid,text,boolean),public.showroom_save_concept_before_manual(uuid,integer,jsonb,text[]),public.showroom_save_concept_draft(uuid,integer,jsonb,text[]),public.web_select_manual_image(uuid,integer,text,uuid) FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.image_sync_assets_before_manual(uuid),public.image_sync_assets(uuid),public.image_enqueue_before_manual(uuid,text,boolean),public.image_enqueue(uuid,text,boolean),public.showroom_save_concept_before_manual(uuid,integer,jsonb,text[]),public.showroom_save_concept_draft(uuid,integer,jsonb,text[]),public.web_select_manual_image(uuid,integer,text,uuid) TO service_role;
 COMMIT;

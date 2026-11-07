@@ -29,3 +29,19 @@
 이 단위는 원문·접수·저장 복구이며, 실행 경로의 GitHub 의존 제거·분석 실행 이력·전용 worker·통합 상태판은 다음 단위다. 최초 분석 결과/단위 변환 후보와 전체 자료 흐름의 완료는 W5 통합 검증 때 함께 확인한다. 실제 운영 활성화·AI 결과 품질·배포는 미완료다.
 
 최종 확인: 통합40항목(Python65/Node158/격리 SQL8/build/Edge타입) 통과. 신규 개발/빌드 브라우저 각각5그룹과 기존 관리자6그룹(합계16) 통과. 캡처/로그는 web-intake/·web-intake-built/와 v21-admin-journey/에 저장했다. 실제 운영 배포는 수행하지 않았다.
+
+## W2~W6 및 W7 로컬 완료 — 2026-11-07
+
+첫 단위 이후의 구현/검증을 완료했다. 원문·자료 선택을 고정한 실행 이력, legacy/web claim 분리와 lease/cancel/candidate 복구, 공유 분석/provider/editorial 분리, 독립 상시 worker와 문안/도면/명시 이미지 실행, 웹 상태/결과 비교·선택 적용, Gemini 웹 결과 업로드/출처/비교/slot 및 수동 선택 보호를 구현했다. 단위가 명시된 원문 수량은 확인용 환산 후보만 표시하며 사실정보를 자동 수정하지 않는다.
+
+추가 migration은 050000 실행 이력, 060000 보조 실행자, 070000 수동 AI 이미지, 080000 읽기 전용 inventory다. 모두 운영 미적용이다. 데이터/API의 확정 계약은 SPACEPICK_V2_DATA_CONTRACT.md를 따른다.
+
+- 고정 worker 의존성 환경에서 통합46항목 전체 통과: Python75, Node176, 격리 SQL10, 빌드/Edge 타입. SDK/schema/editorial adapters import와 worker 기본 OFF 확인, 실제 provider 호출0.
+- 개발·배포용·별도 합성 staging에서 관리자 전체 여정 각각7그룹 통과. 응답 유실 복구, 현재 원문 보존, stale 결과 차단, 새 결과 선택 적용, AI 파일 보관·대표 지정, image job/과금0 확인.
+- 고객 5유형×최소/도면/사진/혼합20 + 문의/CRM1 + PDF5조합 및 기존 관리자6그룹 통과.
+- 실제 owner/staging 연결이 없어도 가능한 URL·공개키·owner/origin/공개 우회 차단 코드와7검사를 완료했다. 실제 본인 전용 시험 배포는 별도다.
+- 재작성 candidate 복구/DB 저장 실패 무재생성, 분석 실패 시 보조 단계 독립, 예산 보존, 수동 선택/queued 이미지 경합·만료 image token 거절을 보강했다.
+- 브라우저 수동 업로드403은 로컬 QA의 Origin 전달 차이였다. 모의 호출을 기존 admin QA와 동일하게 정리하여 실제 보호 규칙을 완화하지 않고 재통과했다.
+- 고정 가상환경의 첫 전체 Python 시도에서 PDF fixture용 reportlab이 없어2개 모듈이 로드되지 않았다. 기존 requirements-validation.txt를 별도 설치한 뒤75개 통과했다. 런타임 의존성에 테스트 도구를 추가하지 않았다.
+
+운영 연결 점검/제한·실행 항목은 ADMIN_WEB_RELEASE_STATUS.md, 사용법·설치·migration 순서·pilot·롤백은 ADMIN_WEB_OPERATIONS.md에 기록했다. W8/W9는 준비물과 합성 inventory/snapshot/예산 보존 검사까지 완료했으며 실제 inventory/pilot/전환/복구 관측은 미실행이다. 완료한 W1~W6를 재개 시 중복 개발하지 않는다.

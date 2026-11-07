@@ -1,3 +1,4 @@
+import {publicClient,PROJECT_URL} from '../lib/adminApi';
 import {useEffect,useState} from 'react';
 import type {Showroom} from '../types/showroom';
 import {ShowroomPage} from './ShowroomPage';
@@ -6,7 +7,7 @@ export function PublicShowroomPage({slug}:{slug:string}){
  const [data,setData]=useState<Showroom|null>(null),[message,setMessage]=useState('승인된 매물을 불러오는 중입니다.');
  useEffect(()=>{let active=true;let pending:AbortController|null=null;
  async function load(){pending?.abort();const controller=new AbortController();pending=controller;setClosed(false);setMessage('승인된 매물을 불러오는 중입니다.');
- try{const config=await fetch('/supabase-public.json',{cache:'no-store',signal:controller.signal}).then(r=>r.json());const r=await fetch(`https://aklcylhqslgntkgloqpi.supabase.co/functions/v1/public-showroom?slug=${encodeURIComponent(slug)}`,{headers:{apikey:config.publishableKey},cache:'no-store',signal:controller.signal});if(!active||controller.signal.aborted)return;if(!r.ok){setData(null);setMessage(r.status===404?'현재 볼 수 없는 매물입니다.':'매물을 불러오지 못했습니다. 잠시 후 다시 확인해 주세요.');return;}const result=await r.json();if(active&&!controller.signal.aborted){setClosed(result.closed===true);setCanonical(result.canonical_slug||slug);setData(result.showroom||null);document.title=result.closed?'거래 완료 | Spacepick':`${result.showroom?.title||'매물 안내'} | Spacepick`;}
+ try{const config=await publicClient();const r=await fetch(`${PROJECT_URL}/functions/v1/public-showroom?slug=${encodeURIComponent(slug)}`,{headers:{apikey:config.publishableKey},cache:'no-store',signal:controller.signal});if(!active||controller.signal.aborted)return;if(!r.ok){setData(null);setMessage(r.status===404?'현재 볼 수 없는 매물입니다.':'매물을 불러오지 못했습니다. 잠시 후 다시 확인해 주세요.');return;}const result=await r.json();if(active&&!controller.signal.aborted){setClosed(result.closed===true);setCanonical(result.canonical_slug||slug);setData(result.showroom||null);document.title=result.closed?'거래 완료 | Spacepick':`${result.showroom?.title||'매물 안내'} | Spacepick`;}
  }catch{if(active&&!controller.signal.aborted){setData(null);setMessage('매물을 불러오지 못했습니다. 잠시 후 다시 확인해 주세요.');}}}
  void load();const timer=setInterval(()=>{if(!document.hidden)void load()},30000);const focus=()=>{if(!document.hidden)void load()};window.addEventListener('focus',focus);document.addEventListener('visibilitychange',focus);return()=>{active=false;pending?.abort();clearInterval(timer);window.removeEventListener('focus',focus);document.removeEventListener('visibilitychange',focus)};
  },[slug]);

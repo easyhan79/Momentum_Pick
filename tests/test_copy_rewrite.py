@@ -43,6 +43,18 @@ class CopyRewrite(unittest.TestCase):
         stats=run(api,generate,Mock(),limit=2);self.assertEqual(stats['failed'],2);self.assertEqual(generate.call_count,2)
         self.assertEqual(api.call_args_list[1].args[1]['p_error'],'invalid_input_or_response')
 
+    def test_durable_candidate_resumes_without_generation_or_resaving_candidate(self):
+        job={**self.job(),'candidate':{'summary':'saved candidate'},'candidate_generation':{'provider':'synthetic'}}
+        api=Mock(side_effect=[job,True,None]);generate=Mock(side_effect=AssertionError('must not generate'));persist=Mock()
+        self.assertEqual(run(api,generate,Mock(),persist=persist)['done'],1)
+        generate.assert_not_called();persist.assert_not_called()
+        self.assertEqual(api.call_args_list[1].args[1]['p_result'],job['candidate'])
+
+    def test_failed_candidate_persistence_cannot_trigger_paid_retry(self):
+        api=Mock(side_effect=[self.job()]);generate=Mock(return_value='{"summary":"candidate"}');persist=Mock(side_effect=RuntimeError('DB unavailable'))
+        with self.assertRaises(RuntimeError):run(api,generate,Mock(),persist=persist)
+        self.assertEqual(generate.call_count,1);self.assertEqual(api.call_count,1)
+
     def test_default_off_without_credentials_or_network(self):
         from unittest.mock import patch
         from copy_rewrite_worker import main

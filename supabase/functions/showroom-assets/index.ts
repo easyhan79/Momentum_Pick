@@ -1,3 +1,4 @@
+import {previewConfigured,previewOriginAllowed,previewOwnerAllowed,previewEnvironment} from '../_shared/deployment.ts';
 import {originAllowed,corsOrigin} from '../_shared/site.ts';
 import {queuePlan,dispatchPlan} from '../_shared/plan-queue.ts';
 // Private media API: no public URLs, signed URLs, or browser database/storage grants.
@@ -19,7 +20,10 @@ async function boundedBody(req:Request){
   while(true){const {done,value}=await reader.read();if(done)break;total+=value.length;if(total>MAX_BODY){await reader.cancel();throw new MediaError(413,'file_too_large');}parts.push(value);}
   const data=new Uint8Array(total);let offset=0;for(const part of parts){data.set(part,offset);offset+=part.length;}return data;
 }
-export function createAssetsHandler({url,key,fetcher=fetch,githubTokens=[],adminWebEnabled=false}:{url:string;key:string;fetcher?:typeof fetch;githubTokens?:string[];adminWebEnabled?:boolean}){
+export function createAssetsHandler({url,key,fetcher=fetch,githubTokens=[],adminWebEnabled=false,privatePreview=false,previewOwnerId='',previewOrigin=''}:{url:string;key:string;fetcher?:typeof fetch;githubTokens?:string[];adminWebEnabled?:boolean;privatePreview?:boolean;previewOwnerId?:string;previewOrigin?:string}){
+  const previewConfig={url,privatePreview,previewOwnerId,previewOrigin};
+  const allowed=(origin:string|null)=>privatePreview?previewOriginAllowed(previewConfig,origin):originAllowed(origin);
+  const cors=(origin:string|null)=>privatePreview?(allowed(origin)?origin:undefined):corsOrigin(origin);
   async function upstream(path:string,init:RequestInit={}){return fetcher(`${url}/${path}`,{...init,redirect:'error',headers:{apikey:key,Authorization:`Bearer ${key}`,...init.headers},signal:AbortSignal.timeout(20000)});}
   async function db(path:string,init:RequestInit={}){const r=await upstream(`rest/v1/${path}`,{...init,headers:{'Content-Type':'application/json',...init.headers}});if(!r.ok)throw new MediaError(502,'media_unavailable');const body=await r.text();return body?JSON.parse(body):null;}
   async function privateBucket(){
@@ -29,15 +33,17 @@ export function createAssetsHandler({url,key,fetcher=fetch,githubTokens=[],admin
   }
   return async(req:Request)=>{
     const headers:Record<string,string>={'Content-Type':'application/json','Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Vary':'Origin'};
-    if(corsOrigin(req.headers.get('Origin')))Object.assign(headers,{'Access-Control-Allow-Origin':corsOrigin(req.headers.get('Origin'))!,'Access-Control-Allow-Headers':'authorization,apikey,content-type','Access-Control-Allow-Methods':'GET,POST,OPTIONS'});
+    if(cors(req.headers.get('Origin')))Object.assign(headers,{'Access-Control-Allow-Origin':cors(req.headers.get('Origin'))!,'Access-Control-Allow-Headers':'authorization,apikey,content-type','Access-Control-Allow-Methods':'GET,POST,OPTIONS'});
     const reply=(data:unknown,status=200)=>new Response(JSON.stringify(data),{status,headers});
-    if(!originAllowed(req.headers.get('Origin')))return reply({error:'origin_denied'},403);
+    if(!previewConfigured(previewConfig))return reply({error:'preview_configuration_required'},503);
+    if(!allowed(req.headers.get('Origin')))return reply({error:'origin_denied'},403);
     if(req.method==='OPTIONS')return new Response(null,{status:204,headers});
     try{
       if(!['GET','POST'].includes(req.method))throw new MediaError(405,'method_not_allowed');
       const bearer=req.headers.get('Authorization')||'';if(!/^Bearer \S+$/.test(bearer))throw new MediaError(401,'login_required');
       const auth=await fetcher(`${url}/auth/v1/user`,{headers:{apikey:key,Authorization:bearer},redirect:'error',signal:AbortSignal.timeout(10000)});if(!auth.ok)throw new MediaError(401,'login_required');
       const user=await auth.json();if(!user.id||user.is_anonymous||user.app_metadata?.showroom_admin!==true)throw new MediaError(403,'admin_required');
+      if(!previewOwnerAllowed(previewConfig,user.id))return reply({error:'owner_required'},403);
       const query=new URL(req.url).searchParams,id=query.get('propertyId')||'',action=query.get('action');if(!UUID.test(id))throw new MediaError(400,'invalid_property_id');
       const properties=await db(`properties?id=eq.${id}&select=id`);if(!properties.length)throw new MediaError(404,'property_not_found');
       if(req.method==='GET'&&action==='documents'){
@@ -99,4 +105,4 @@ export function createAssetsHandler({url,key,fetcher=fetch,githubTokens=[],admin
   };
 }
 declare const Deno:{env:{get(name:string):string|undefined};serve(handler:(req:Request)=>Promise<Response>):void};
-if(typeof Deno!=='undefined')Deno.serve(createAssetsHandler({url:Deno.env.get('SUPABASE_URL')!,key:Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,adminWebEnabled:Deno.env.get('ADMIN_WEB_ENABLED')==='true',githubTokens:[Deno.env.get('GITHUB_TOKEN')||'',Deno.env.get('GH_PAT')||'']}));
+if(typeof Deno!=='undefined')Deno.serve(createAssetsHandler({...previewEnvironment(Deno.env),url:Deno.env.get('SUPABASE_URL')!,key:Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,adminWebEnabled:Deno.env.get('ADMIN_WEB_ENABLED')==='true',githubTokens:[Deno.env.get('GITHUB_TOKEN')||'',Deno.env.get('GH_PAT')||'']}));

@@ -18,7 +18,7 @@ PRODUCTION_REF = 'aklcylhqslgntkgloqpi'
 VERSION = 'web-worker-v1'
 
 
-def configuration(env):
+def configuration(env, require_ai=True):
     if env.get('WEB_WORKER_ENABLED') != 'true':
         return None
     environment, ref = env.get('WORKER_ENVIRONMENT'), env.get('WORKER_PROJECT_REF', '')
@@ -36,7 +36,7 @@ def configuration(env):
                 raise ValueError()
         except Exception:
             raise ValueError('server_credential_required') from None
-    if not key or not env.get('GEMINI_API_KEY'):
+    if not key or require_ai and not env.get('GEMINI_API_KEY'):
         raise ValueError('worker_credentials_required')
     return {'environment': environment, 'url': 'https://' + ref + '.supabase.co', 'key': key}
 

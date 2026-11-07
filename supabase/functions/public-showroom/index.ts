@@ -4,9 +4,10 @@ type Json=Record<string,any>;
 const obj=(v:unknown):Json=>v&&typeof v==='object'&&!Array.isArray(v)?v as Json:{};
 const str=(v:unknown,n=2000)=>typeof v==='string'?v.slice(0,n):'';
 const list=(v:unknown)=>Array.isArray(v)?v:[];
-export function createPublicHandler(url:string,key:string,fetcher:typeof fetch=fetch){return async(req:Request)=>{
+export function createPublicHandler(url:string,key:string,fetcher:typeof fetch=fetch,privatePreview=false){return async(req:Request)=>{
  const headers={'Content-Type':'application/json','Cache-Control':'no-store, max-age=0','Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'apikey, authorization, content-type','Access-Control-Allow-Methods':'GET, OPTIONS','X-Content-Type-Options':'nosniff'};
  const reply=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status,headers});
+ if(privatePreview)return reply({error:'not_found'},404);
  if(req.method==='OPTIONS')return new Response(null,{status:204,headers});
  if(req.method!=='GET')return reply({error:'method_not_allowed'},405);
  const slug=new URL(req.url).searchParams.get('slug')||'';
@@ -56,4 +57,4 @@ export function createPublicHandler(url:string,key:string,fetcher:typeof fetch=f
  }catch{return reply({error:'service_unavailable'},503);}
 };}
 declare const Deno:{env:{get(n:string):string|undefined};serve(h:(r:Request)=>Promise<Response>):void};
-if(typeof Deno!=='undefined')Deno.serve(createPublicHandler(Deno.env.get('SUPABASE_URL')!,Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!));
+if(typeof Deno!=='undefined')Deno.serve(createPublicHandler(Deno.env.get('SUPABASE_URL')!,Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,fetch,Deno.env.get('PRIVATE_PREVIEW_ENABLED')==='true'));

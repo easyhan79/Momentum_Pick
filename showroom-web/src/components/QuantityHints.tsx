@@ -1,0 +1,2 @@
+import {sourceQuantities} from '../../../supabase/functions/_shared/source-quantities.ts';
+export function QuantityHints({text}:{text:string}){const items=sourceQuantities(text);if(!items.length)return null;return <details className="quantity-hints"><summary>원문 수량·단위 확인 후보 {items.length}개</summary><p>단위가 명시된 표현만 환산한 참고값입니다. 어느 면적·가격인지, 범위·추정 표현과 원문을 대조한 뒤 사실정보에 입력하세요. 자동으로 저장·검증하지 않습니다. 평 환산은 반올림한 근삿값입니다.</p>{items.map((c,i)=><p key={i}><strong>{c.original} → {c.approximate?'약 ':''}{c.value}{c.unit}</strong><br/><small>원문 주변: {c.context}</small></p>)}</details>;}

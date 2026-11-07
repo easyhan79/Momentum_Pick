@@ -1,17 +1,20 @@
-export const PROJECT_URL='https://aklcylhqslgntkgloqpi.supabase.co';
+import {clientDeployment} from './deployment';
+const deployment=clientDeployment({environment:import.meta.env.VITE_SPACEPICK_ENV,url:import.meta.env.VITE_SUPABASE_URL,publishableKey:import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,privatePreview:import.meta.env.VITE_PRIVATE_PREVIEW});
+export const PROJECT_URL=deployment.url;
 // Public client configuration only. Never put server secrets here.
-let publicKey='';
+let publicKey=deployment.publishableKey;
 type Session={access_token:string;refresh_token:string;expires_at:number};
 let session:Session|null=null;
 let refreshing:Promise<void>|null=null;
 export class AdminApiError extends Error{status:number;code:string;constructor(message:string,status:number,code=''){super(message);this.status=status;this.code=code;}}
 async function key(){if(!publicKey){const r=await fetch('/supabase-public.json',{cache:'no-store'});if(!r.ok)throw Error('로그인 설정을 불러오지 못했습니다.');const data=await r.json();if(typeof data.publishableKey!=='string'||!data.publishableKey)throw Error('관리자 로그인 설정이 준비 중입니다.');publicKey=data.publishableKey;}return publicKey;}
+export async function publicClient(){return {projectUrl:PROJECT_URL,publishableKey:await key()};}
 async function tokenRequest(path:string,body:unknown){const response=await fetch(`${PROJECT_URL}/auth/v1/${path}`,{method:'POST',headers:{apikey:await key(),'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.timeout(15000)});if(!response.ok)throw Error('로그인 정보를 확인해 주세요. 계정이 없으면 관리자 등록이 필요합니다.');const result=await response.json();session={access_token:result.access_token,refresh_token:result.refresh_token,expires_at:Date.now()+result.expires_in*1000};}
 export async function login(email:string,password:string){await tokenRequest('token?grant_type=password',{email,password});}
 export async function requestPasswordReset(email:string){
   if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))throw Error('이메일을 먼저 입력해 주세요.');
   const configuration:{recoveryRedirect?:string}=await fetch('/site-config.json',{cache:'no-store'}).then(r=>r.ok?r.json():{}).catch(()=>({}));
-  const redirect=configuration.recoveryRedirect||'https://momentum-pick-showroom-20261102.ljc3534.chatgpt.site/?admin=1&reset=1';
+  const redirect=configuration.recoveryRedirect||(deployment.privatePreview?window.location.origin+'/admin/reset':undefined)||'https://momentum-pick-showroom-20261102.ljc3534.chatgpt.site/?admin=1&reset=1';
   const response=await fetch(`${PROJECT_URL}/auth/v1/recover?redirect_to=${encodeURIComponent(redirect)}`,{method:'POST',headers:{apikey:await key(),'Content-Type':'application/json'},body:JSON.stringify({email}),signal:AbortSignal.timeout(15000)});
   if(!response.ok)throw Error('재설정 메일을 요청하지 못했습니다. 잠시 후 다시 시도해 주세요.');
 }

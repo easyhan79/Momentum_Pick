@@ -26,7 +26,7 @@
 ## migration/함수/사이트 순서
 
 1. 읽기 전용 inventory·현재 migration 목록·배포 commit·승인 snapshot digest·queue 예산/회수·롤백 기준을 기록한다. 민감한 원문·연락처를 운영 로그에 복사하지 않는다.
-2. 기존 migration 전체 적용 여부를 대조한 뒤 새 `20261107040000`~`20261107070000`을 순서대로 적용한다. 기존 열/작업/승인본을 삭제하거나 기존 원문을 AI 문안으로 채우지 않는다. 060000은 기존 copy/image 함수와 050000, 070000은 기존 concept 함수와 060000에 의존한다.
+2. 기존 migration 전체 적용 여부를 대조한 뒤 새 `20261107040000`~`20261107080000`을 순서대로 적용한다. 기존 열/작업/승인본을 삭제하거나 기존 원문을 AI 문안으로 채우지 않는다. 060000은 기존 copy/image 함수와 050000, 070000은 기존 concept 함수와 060000에 의존한다.
 3. 새 Edge 함수와 새 필터가 있는 legacy Python을 배포하되 flags OFF. **migration만 먼저 적용하고 오래된 이미지/도면 worker를 계속 실행하면 안전한 전환으로 볼 수 없다.** 새 legacy worker는 명시적인 web 작업을 건너뛴다.
 4. 격리 프로젝트에서 본인 접근 제한과 환경별 URL/키/리다이렉트 검사를 통과한다. 본인 전용 frontend·owner guard·worker를 같은 릴리스로 연결한다.
 5. synthetic 5유형과 PDF/자료 없는 경우, 실패/응답 유실/재로그인/취소/동시 실행을 검증한다. 실제 AI 1건은 공급자·비용·출력 품질·권리 조건을 기록한다. 모의 AI 통과를 실제 품질/비용 검증으로 쓰지 않는다.
@@ -49,3 +49,11 @@
 3. 프런트/Edge를 이전 안전 버전으로 되돌려도 **실행자 필터가 있는 DB 함수/worker는 유지**한다. 필터 없는 오래된 `analysis_claim`을 복원하면 web 큐를 훔칠 수 있다. additive migration은 삭제하지 않는다.
 4. 공개 쇼룸은 기존 published snapshot을 계속 사용한다. 새 분석/선택 이미지가 공개 snapshot을 변경하지 않았는지 digest를 대조한다. 되돌리기를 이유로 기존 승인본을 재게시하지 않는다.
 5. 수정 버전으로 web 실행자를 재개해 candidate 저장/미실행 작업부터 처리한다. 실제 복구 시각·버전·처리 전후 수치가 없으면 복구 완료로 기록하지 않는다.
+
+## 본인 전용 시험 설정
+
+- 프런트 빌드: `VITE_SPACEPICK_ENV=staging`, 별도 `VITE_SUPABASE_URL`, 해당 프로젝트의 `VITE_SUPABASE_PUBLISHABLE_KEY`, `VITE_PRIVATE_PREVIEW=true`, 별도 `SPACEPICK_PREVIEW_PROJECT_ID`. 기존 운영 호스팅 프로젝트 ID를 preview 대상으로 사용하면 빌드를 거절한다. 공개 키에 서버 secret/service_role을 넣으면 거절한다.
+- Edge: `PRIVATE_PREVIEW_ENABLED=true`, 확인한 본인 `PRIVATE_PREVIEW_OWNER_ID`, 정확한 HTTPS `PRIVATE_PREVIEW_ORIGIN`. 운영 Supabase URL·누락 owner·다른 관리자/Origin을 거절한다. trial의 public-showroom/문의/Telegram intake는 닫히고 CRM 알림은 전송하지 않는다.
+- worker: 환경별 ref/URL/server key와 staging을 일치시킨다. 실제 provider key는 서버의 안전한 설정에만 연결한다. 검증 전에는 worker/웹 처리 flags를 켜지 않는다.
+- 합성 ref/호스팅 ID/공개 키로 만든 로컬 staging 검사는 별도 시험 로그이며 실제 프로젝트를 생성한 기록이 아니다.
+- 읽기 전용 inventory: `python scripts/web_transition_inventory.py --live --output /안전한경로/before.json`. 실제 바인딩된 프로젝트의 service credential만 사용하고 AI 키는 필요 없다. 이후 `--before /안전한경로/before.json`으로 승인 digest·건수·예산 감소/route 위반을 비교한다. `--input`은 저장한 합성/기존 JSON을 읽는 무네트워크 모드다. 이 명령은 큐를 이전하거나 서버 설정을 변경하지 않는다.
