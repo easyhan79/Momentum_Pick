@@ -1,10 +1,13 @@
 name: SpacePick v2 synthetic AI pilot
 on:
+  push:
+    branches: [codex/spacepick-v2-pilot-20261108]
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
   evaluate:
+    if: github.event_name == 'workflow_dispatch' || github.event.head_commit.message == 'Run corrected synthetic AI pilot'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
