@@ -94,6 +94,7 @@ def run():
     if start < 0 or limit < 1 or start + limit > len(CASES):
         raise ValueError('invalid_pilot_case_range')
     report['caseRange'] = [start, start + limit]
+    failed = False
     for name,raw in CASES[start:start + limit]:
         property_id=str(uuid.uuid4());version=f'{property_id}:1';doc_id=str(uuid.uuid4());documents=[{'assetId':doc_id}] if name=='logistics-rich' else []
         sources={'inputVersionId':version,'pdfs':[doc_id] if documents else [],'images':[]}
@@ -109,8 +110,15 @@ def run():
         except Exception as exc:
             safe=str(exc) if isinstance(exc,ValueError) and re.fullmatch(r'v2_[a-z_]+',str(exc)) else type(exc).__name__
             code=exc.safe_code if isinstance(exc,ProviderError) else safe
-            record.update({'status':'failed','error':code});report['error']='pilot_stopped_on_first_failure';save();print(name,'failed',code,flush=True);return 1
-    save();return 0
+            failed=True
+            record.update({'status':'failed','error':code});save();print(name,'failed',code,flush=True)
+            # A response received but rejected can be diagnosed offline while
+            # independent cases proceed. Unknown provider outcomes stop calls.
+            if isinstance(exc,ProviderError) and 'raw' not in record and 'rawFormat' not in record:
+                report['error']='pilot_stopped_on_provider_failure';save();return 1
+            if not isinstance(exc,(ProviderError,ValueError)):
+                report['error']='pilot_stopped_on_unexpected_error';save();return 1
+    save();return 1 if failed else 0
 
 
 if __name__ == '__main__':

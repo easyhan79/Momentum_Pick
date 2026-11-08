@@ -96,7 +96,11 @@ def validate_v2_candidates(result, input_version_id, documents, images):
     claims.extend(str(result.get(key) or '') for key in ('usp_summary','landing_copy','target_1_blog','target_2_blog','insta_caption'))
     for claim in claims:
         for sentence in re.split(r'[\n.!?。]',claim):
-            if re.search(r'(?:즉시|즉각|바로).{0,35}(?:입주|입점|운영|사용|영업).{0,20}(?:가능|할 수 있)',sentence) or re.search(r'(?:명도|권리금).{0,35}(?:협의|분쟁|문제).{0,15}없이',sentence):
+            immediate=re.search(r'(?:즉시|즉각|바로).{0,35}(?:입주|입점|운영|사용|영업).{0,20}(?:가능|할 수 있)',sentence)
+            negated=re.search(r'(?:가능|할 수 있).{0,20}(?:단정.{0,10}(?:안|없|금|어렵)|볼 수 없)',sentence)
+            clearance=re.search(r'(?:명도|권리금).{0,55}(?:협의|합의|분쟁|문제|승계|절차).{0,20}없이',sentence)
+            outdoor=re.search(r'(?:외부|여유).{0,20}공간.{0,30}(?:확보|가능)',sentence)
+            if (immediate and not negated) or clearance or outdoor:
                 raise ValueError('v2_unverified_claim')
     doc_ids = {d['assetId'] for d in documents}
     inspections = result.get('_document_inspections', [])
@@ -156,4 +160,5 @@ V2_PROMPT = '''추가로 listing_bundle과 sales_strategy를 반환하세요. �
 AI는 verified 상태를 만들지 않습니다. inputVersionId와 assetId는 입력에 명시된 값만 사용하세요.
 sales_strategy는 자료가 뒷받침하는 장점과 구매자 이익, 전제 조건이 있는 활용 장면을 자신감 있고 자연스러운 문장으로 제안하세요.
 공실이라는 정보만으로 즉시 입주·운영 가능, 명도 협의나 권리금 분쟁이 없다는 결론을 내리지 마세요. 소유권·건축물 상태·용도·임대차가 미확인이면 자율적 이용이나 직영 운영을 확정하지 말고 확인할 조건으로 제시하세요.
+건물 한 동이라는 정보로 필지 수를 단정하지 마세요. 대지면적과 건축면적의 차이를 실제로 사용할 수 있는 외부 공간이나 주차 공간으로 단정하지 마세요.
 없는 수익률·인허가·도로 조건·가격 상승·긴급성을 만들거나 알려진 제약을 숨기지 마세요.'''
