@@ -37,6 +37,7 @@ class Recovery(unittest.TestCase):
         self.assertEqual(worker.failure(RemoteProtocolError()),('provider_transport',True))
         for code in (400,401,403,404):
             self.assertEqual(worker.failure(type('E',(Exception,),{'code':code})()),('provider_'+str(code),False))
+        self.assertEqual(worker.failure(ValueError('v2_unverified_claim')),('v2_unverified_claim',False))
     def test_exhausted_attempt_is_terminal_notice(self):
         E=type('E',(Exception,),{'code':503})
         stats,c,n,_=self.execute([self.job(5)],Mock(side_effect=E()))
@@ -59,6 +60,18 @@ class Recovery(unittest.TestCase):
         worker.run(api,lambda _:'{}',Mock(),json.loads,notify,Mock(),edit=edit)
         self.assertEqual(edit.call_args.args[1],'offline private input');self.assertEqual(api.call_args_list[1].args[1]['p_result']['_editorial']['status'],'needs_revision')
         self.assertNotIn('자동 편집 완료',''.join(c.args[0] for c in notify.call_args_list))
+    def test_v2_candidate_rejection_does_not_call_editorial_provider(self):
+        edit=Mock();check=Mock(side_effect=ValueError('v2_unverified_claim'))
+        with self.assertRaisesRegex(ValueError,'v2_unverified_claim'):
+            worker.analyze_job(self.job(),lambda _:'{}',Mock(),json.loads,edit=edit,candidate_check=check)
+        edit.assert_not_called()
+    def test_only_a_single_unambiguous_json_object_closure_is_repaired(self):
+        good='{"items":[{"list":[1,2]}]}'
+        missing='{"items":[{"list":[1,2]]}'
+        self.assertEqual(worker.repair_single_missing_object_close(good),good)
+        self.assertEqual(worker.repair_single_missing_object_close(missing),good)
+        unsafe='{"items":[{"key":"value"]}'
+        self.assertEqual(worker.repair_single_missing_object_close(unsafe),unsafe)
     def test_stale_completion_raises_and_does_not_notify_success(self):
         api=Mock(side_effect=[self.job(),False]);notify=Mock()
         with self.assertRaisesRegex(RuntimeError,'claim_lost'):

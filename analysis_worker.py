@@ -47,7 +47,7 @@ def failure(exc):
     return 'invalid_input_or_response', False
 
 
-def analyze_job(job, generate, attachment, validate, edit=None, document_attachment=None, before_generate=None, prompt=PROMPT, inspection_cache=None):
+def analyze_job(job, generate, attachment, validate, edit=None, document_attachment=None, before_generate=None, prompt=PROMPT, inspection_cache=None, candidate_check=None):
     """Shared pure analysis unit; persistence, routing and notifications belong to the caller."""
     raw = job.get('raw_input') or ''
     tags = re.findall(r'\[FILE_ID:([^\]]+)\]', raw)
@@ -80,13 +80,17 @@ def analyze_job(job, generate, attachment, validate, edit=None, document_attachm
         before_generate()
     generated = generate(parts)
     result = validate(generated.text if isinstance(generated, Generation) else generated)
-    if edit is not None:
+    if edit is not None and candidate_check is None:
         result = edit(result,clean)
     if reports or result.get('document_facts'):
         result['_document_checks']=citation_checks(result.get('document_facts',[]),reports)
         result['_document_inspections']=document_summaries(reports)
     if documents:
         result['_document_sources'] = [{'source_index':len(tags)+i+1,'asset_id':document,'property_id':job['id']} for i,document in enumerate(documents)]
+    if candidate_check is not None:
+        result = candidate_check(result)
+        if edit is not None:
+            result = edit(result,clean)
     if isinstance(generated, Generation):
         result['_generation'] = {'provider': generated.provider, 'model': generated.model, 'at': datetime.now(timezone.utc).isoformat()}
     return result
@@ -208,6 +212,32 @@ class EditorialCopy(BaseModel):
     insta_caption:str
 
 
+def repair_single_missing_object_close(value):
+    """Repair one unambiguous object close after a final array field.
+
+    Only inserts `}` immediately before an enclosing array's `]`; it never
+    changes string contents or values. The full schema is still validated.
+    """
+    if not isinstance(value,str):return value
+    stack=[];quoted=False;escaped=False;prior='';insert_at=None
+    for index,char in enumerate(value):
+        if quoted:
+            if escaped:escaped=False
+            elif char=='\\':escaped=True
+            elif char=='"':quoted=False
+            continue
+        if char=='"':quoted=True;prior=char;continue
+        if char in '{[':stack.append(char)
+        elif char in '}]':
+            if char==']' and len(stack)>=2 and stack[-1]=='{' and stack[-2]=='[' and prior==']' and insert_at is None:
+                insert_at=index;stack.pop()
+            if not stack or stack[-1]!=('{' if char=='}' else '['):return value
+            stack.pop()
+        if not char.isspace():prior=char
+    if quoted or stack or insert_at is None:return value
+    return value[:insert_at]+'}'+value[insert_at:]
+
+
 def generation_services(environment, requests, use_v2=False, observe_output=None):
     """Shared provider/schema/editorial adapters, with no persistence or messaging."""
     from google import genai
@@ -241,6 +271,8 @@ def generation_services(environment, requests, use_v2=False, observe_output=None
     def validate(value):
         if not value:
             raise ValueError('empty_response')
+        if use_v2:
+            value=repair_single_missing_object_close(value)
         return schema.model_validate_json(value).model_dump()
 
     def generate(parts):

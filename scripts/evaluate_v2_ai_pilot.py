@@ -108,7 +108,7 @@ def run():
         record={'name':name,'status':'started','inputVersionId':version,'documents':documents}
         report['cases'].append(record);save()
         try:
-            result=analyze_job(job,generate,lambda _:None,validate,edit,lambda *_:{'data':pdf,'mime_type':'application/pdf'},prompt=PROMPT+V2_PROMPT)
+            result=analyze_job(job,generate,lambda _:None,validate,edit,lambda *_:{'data':pdf,'mime_type':'application/pdf'},prompt=PROMPT+V2_PROMPT,candidate_check=lambda candidate:validate_v2_candidates(candidate,version,documents,[]))
             record['processed']=scrub(result);save()
             result=validate_v2_candidates(result,version,documents,[])
             bundle=result['listing_bundle'];strategy=result['sales_strategy']
