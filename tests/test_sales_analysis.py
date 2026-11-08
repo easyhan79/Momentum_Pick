@@ -61,6 +61,11 @@ class SalesAnalysisTests(unittest.TestCase):
         with self.assertRaises(ValueError):validate_v2_candidates(item,'p:1',[{'assetId':'doc'}],[])
         item=fixture();item['listing_bundle']['parcels'][0]['measurements']*=61
         with self.assertRaises(ValueError):validate_v2_candidates(item,'p:1',[{'assetId':'doc'}],[])
+    def test_building_footprint_does_not_imply_first_floor_area(self):
+        item=fixture();item['landing_copy']='건축면적 200㎡는 단일 층 기준의 규모입니다.'
+        with self.assertRaisesRegex(ValueError,'v2_unverified_claim'):
+            validate_v2_candidates(item,'p:1',[],[],input_text='건축면적 200㎡, 1층은 공실')
+        validate_v2_candidates(item,'p:1',[{'assetId':'doc'}],[],input_text='건축면적 200㎡, 1층은 공실')
     def test_only_schema_version_two_is_accepted(self):
         for version in (1,3):
             item=fixture();item['listing_bundle']['schemaVersion']=version
