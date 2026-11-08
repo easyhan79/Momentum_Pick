@@ -34,6 +34,15 @@ def excerpt(value, limit=500):
     return re.sub(r'(?<!\d)(?:\+?82[- ]?)?0?1[016789][ -]?\d{3,4}[ -]?\d{4}(?!\d)', '[연락처 생략]', value)
 
 
+def scrub(value):
+    if isinstance(value,dict): return {k:scrub(v) for k,v in value.items()}
+    if isinstance(value,list): return [scrub(v) for v in value]
+    if isinstance(value,str):
+        value=re.sub(r'[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}', '[이메일 생략]',value)
+        return re.sub(r'(?<!\d)(?:\+?82[- ]?)?0?1[016789][ -]?\d{3,4}[ -]?\d{4}(?!\d)', '[연락처 생략]',value)
+    return value
+
+
 def sample_pdf():
     from pypdf import PdfWriter
     from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
@@ -55,7 +64,7 @@ def run():
         report['error']='provider_not_configured'; save(); print('provider_not_configured'); return 2
     import requests
     from PIL import Image, ImageDraw
-    from ai_providers import ProviderError
+    from ai_providers import Generation,ProviderError
     from analysis_worker import PROMPT, analyze_job, generation_services
     from sales_analysis import V2_PROMPT, validate_v2_candidates
     from vision_analysis import vision_service
@@ -71,19 +80,33 @@ def run():
             report['error']=exc.safe_code if isinstance(exc,ProviderError) else type(exc).__name__;save();print('vision_failed',report['error']);return 1
     generate,validate,edit=generation_services(environment,requests,use_v2=True)
     pdf=sample_pdf()
-    for name,raw in CASES:
+    start = int(os.environ.get('PILOT_START_INDEX', '0'))
+    limit = int(os.environ.get('PILOT_CASE_LIMIT', str(len(CASES) - start)))
+    if start < 0 or limit < 1 or start + limit > len(CASES):
+        raise ValueError('invalid_pilot_case_range')
+    report['caseRange'] = [start, start + limit]
+    for name,raw in CASES[start:start + limit]:
         property_id=str(uuid.uuid4());version=f'{property_id}:1';doc_id=str(uuid.uuid4());documents=[{'assetId':doc_id}] if name=='logistics-rich' else []
         sources={'inputVersionId':version,'pdfs':[doc_id] if documents else [],'images':[]}
         job={'id':property_id,'raw_input':raw+'\n허용된 출처 ID: '+json.dumps(sources,ensure_ascii=False)+('\n[DOCUMENT_ID:'+doc_id+']' if documents else '')}
+        record={'name':name,'status':'started','inputVersionId':version,'documents':documents}
+        report['cases'].append(record);save()
+        def capture(parts):
+            output=generate(parts)
+            # Synthetic output is checkpointed before later checks so a failure
+            # can be diagnosed offline without paying for the same call again.
+            record['raw']=scrub(json.loads(output.text if isinstance(output,Generation) else output));record['status']='generated';save()
+            return output
         try:
-            result=analyze_job(job,generate,lambda _:None,validate,edit,lambda *_:{'data':pdf,'mime_type':'application/pdf'},prompt=PROMPT+V2_PROMPT)
+            result=analyze_job(job,capture,lambda _:None,validate,edit,lambda *_:{'data':pdf,'mime_type':'application/pdf'},prompt=PROMPT+V2_PROMPT)
             result=validate_v2_candidates(result,version,documents,[])
             bundle=result['listing_bundle'];strategy=result['sales_strategy']
-            report['cases'].append({'name':name,'status':'ok','headline':excerpt(result.get('landing_copy')),'summary':excerpt(result.get('usp_summary')),'positioning':excerpt(strategy.get('positioning')),'sellingPoints':[{'fact':excerpt(p.get('fact'),250),'benefit':excerpt(p.get('buyerBenefit'),250)} for p in strategy.get('sellingPoints',[])], 'constraints':[excerpt(x.get('description'),250) for x in strategy.get('materialConstraints',[])], 'parcels':len(bundle['parcels']),'buildings':len(bundle['buildings']),'conflicts':len(bundle['conflicts']),'priceClaims':len(bundle['priceClaims']),'cardMarkers':len(re.findall(r'\[카드\s*[1-5]\]',result.get('insta_caption',''))),'blogLengths':[len(result.get('target_1_blog','')),len(result.get('target_2_blog',''))]})
+            record.update({'status':'ok','headline':excerpt(result.get('landing_copy')),'summary':excerpt(result.get('usp_summary')),'positioning':excerpt(strategy.get('positioning')),'sellingPoints':[{'fact':excerpt(p.get('fact'),250),'benefit':excerpt(p.get('buyerBenefit'),250)} for p in strategy.get('sellingPoints',[])], 'constraints':[excerpt(x.get('description'),250) for x in strategy.get('materialConstraints',[])], 'parcels':len(bundle['parcels']),'buildings':len(bundle['buildings']),'conflicts':len(bundle['conflicts']),'priceClaims':len(bundle['priceClaims']),'cardMarkers':len(re.findall(r'\[카드\s*[1-5]\]',result.get('insta_caption',''))),'blogLengths':[len(result.get('target_1_blog','')),len(result.get('target_2_blog',''))],'editorial':result.get('_editorial',{})})
             print(name,'ok',flush=True);save()
         except Exception as exc:
-            code=exc.safe_code if isinstance(exc,ProviderError) else type(exc).__name__
-            report['cases'].append({'name':name,'status':'failed','error':code});report['error']='pilot_stopped_on_first_failure';save();print(name,'failed',code,flush=True);return 1
+            safe=str(exc) if isinstance(exc,ValueError) and re.fullmatch(r'v2_[a-z_]+',str(exc)) else type(exc).__name__
+            code=exc.safe_code if isinstance(exc,ProviderError) else safe
+            record.update({'status':'failed','error':code});report['error']='pilot_stopped_on_first_failure';save();print(name,'failed',code,flush=True);return 1
     save();return 0
 
 
