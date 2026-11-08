@@ -54,6 +54,8 @@ class SalesAnalysisTests(unittest.TestCase):
         validate_v2_candidates(item,'p:1',[{'assetId':'doc'}],[])
         item=fixture();item['sales_strategy']['sellingPoints'][0]['buyerBenefit']='즉각적인 운영 기획을 검토할 수 있으나 사용승인 여부를 확인해야 합니다.'
         validate_v2_candidates(item,'p:1',[{'assetId':'doc'}],[])
+        item=fixture();item['sales_strategy']['buyerSegments'][0]['rationale']='명도 일정 협의 부담이 상대적으로 적어 입주 준비에 유리합니다.'
+        with self.assertRaisesRegex(ValueError,'v2_unverified_claim'):validate_v2_candidates(item,'p:1',[{'assetId':'doc'}],[])
     def test_rejects_over_limit_and_unknown_parcel_reference(self):
         item=fixture();item['listing_bundle']['buildings'][0]['parcelIds']=['missing']
         with self.assertRaises(ValueError):validate_v2_candidates(item,'p:1',[{'assetId':'doc'}],[])

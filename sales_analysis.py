@@ -90,7 +90,8 @@ def validate_v2_candidates(result, input_version_id, documents, images):
     # Catch a few especially consequential assurances seen in provider output.
     # Source IDs prove only where a candidate points, not that its implications
     # are supported. Human review is still required for all generated copy.
-    claims=[sales.positioning,*sales.headlineVariants]
+    claims=[sales.positioning,sales.callToAction,*sales.headlineVariants]
+    claims.extend(value for item in sales.buyerSegments for value in (item.label,item.rationale))
     claims.extend(value for item in sales.sellingPoints for value in (item.fact,item.buyerBenefit))
     claims.extend(item.description for item in sales.useScenarios)
     claims.extend(str(result.get(key) or '') for key in ('usp_summary','landing_copy','target_1_blog','target_2_blog','insta_caption'))
@@ -100,11 +101,12 @@ def validate_v2_candidates(result, input_version_id, documents, images):
             negated=re.search(r'(?:가능|할 수 있).{0,20}(?:단정.{0,10}(?:안|없|금|어렵)|볼 수 없)',sentence) or re.search(r'(?:가능|할 수 있)(?:한)?\s*(?:상태인지|여부|한지|는지)',sentence)
             planning=immediate and re.search(r'운영\s*(?:기획|계획).{0,15}(?:검토|구상)',immediate.group())
             clearance=re.search(r'(?:명도|권리금).{0,55}(?:협의|합의|분쟁|문제|승계|절차|갈등|조율).{0,20}없이',sentence)
+            clearance_relief=re.search(r'(?:명도|권리금).{0,35}(?:부담|비용|일정).{0,20}(?:적어|줄일|절감|없어)',sentence)
             outdoor=re.search(r'(?:외부|여유).{0,20}공간.{0,30}(?:확보|가능)',sentence)
             permit=re.search(r'(?:인허가|허가|승인).{0,25}(?:절차|검토|확인).{0,12}(?:없이|불필요)',sentence)
             if permit and re.search(r'(?:없이|불필요).{0,35}(?:단정.{0,10}(?:안|없|금|어렵)|볼 수 없|아닙니다)',sentence):permit=None
             permit_saving=re.search(r'(?:인허가|허가).{0,35}(?:시간|기간|비용|일정).{0,25}(?:절감|줄이|줄이고|단축)',sentence)
-            if (immediate and not negated and not planning) or clearance or outdoor or permit or permit_saving:
+            if (immediate and not negated and not planning) or clearance or clearance_relief or outdoor or permit or permit_saving:
                 raise ValueError('v2_unverified_claim')
     doc_ids = {d['assetId'] for d in documents}
     inspections = result.get('_document_inspections', [])
