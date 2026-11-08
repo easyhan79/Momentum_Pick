@@ -96,7 +96,7 @@ def http_generate(provider, model, key, parts, schema, post, timeout):
     return text
 
 
-def generate_with_fallback(parts, schema, validate, env, post, gemini_generate, emit=print, clock=time.monotonic):
+def generate_with_fallback(parts, schema, validate, env, post, gemini_generate, emit=print, clock=time.monotonic, stop_on_schema_error=False):
     """One call per configured provider, shared 240s budget; stop after first valid result.
 
     Refusals stop rather than trying another provider to evade their protections.
@@ -136,6 +136,8 @@ def generate_with_fallback(parts, schema, validate, env, post, gemini_generate, 
             try:
                 validate(text)
             except Exception:
+                if stop_on_schema_error:
+                    raise ProviderError(provider + '_schema_invalid', allow_fallback=False) from None
                 raise ProviderError(provider + '_schema_invalid', True) from None
         except ProviderError as exc:
             emit(f'ai provider={provider} failed={exc.safe_code}', flush=True)

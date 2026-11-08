@@ -20,9 +20,12 @@ class GeminiSchemaTests(unittest.TestCase):
         client=MagicMock()
         client.__enter__.return_value.models.generate_content.return_value=SimpleNamespace(prompt_feedback=None,candidates=[],text='{"invalid":true}')
         observed=[]
-        with patch('google.genai.Client',return_value=client):
-            generate,_,_=generation_services({'GEMINI_API_KEY':'synthetic-key','AI_PROVIDER_ORDER':'gemini'},requests,use_v2=True,observe_output=observed.append)
-            with self.assertRaises(ProviderError):generate(['synthetic'])
+        with patch('google.genai.Client',return_value=client),patch.object(requests,'post') as fallback:
+            generate,_,_=generation_services({'GEMINI_API_KEY':'synthetic-key','OPENAI_API_KEY':'synthetic-key','AI_PROVIDER_ORDER':'gemini,openai'},requests,use_v2=True,observe_output=observed.append)
+            with self.assertRaises(ProviderError) as caught:generate(['synthetic'])
+            self.assertEqual(caught.exception.safe_code,'gemini_schema_invalid')
+            self.assertFalse(caught.exception.retryable)
+            fallback.assert_not_called()
         self.assertEqual(observed,['{"invalid":true}'])
 
     def test_v2_schema_serializes_before_network(self):

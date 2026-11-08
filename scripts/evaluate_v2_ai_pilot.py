@@ -86,16 +86,22 @@ def run():
                 record['status']='generated'
             except (ValueError,TypeError):
                 record['rawFormat']='invalid_json'
+                if isinstance(value,str):record['rawText']=scrub(value[:100000])
             save()
     generate,validate,edit=generation_services(environment,requests,use_v2=True,observe_output=capture_output)
     pdf=sample_pdf()
-    start = int(os.environ.get('PILOT_START_INDEX', '0'))
-    limit = int(os.environ.get('PILOT_CASE_LIMIT', str(len(CASES) - start)))
-    if start < 0 or limit < 1 or start + limit > len(CASES):
-        raise ValueError('invalid_pilot_case_range')
-    report['caseRange'] = [start, start + limit]
+    names = [x for x in os.environ.get('PILOT_CASE_NAMES','').split(',') if x]
+    if names:
+        selected=[case for case in CASES if case[0] in names]
+        if len(names)!=len(set(names)) or len(selected)!=len(names):raise ValueError('invalid_pilot_case_names')
+        report['caseNames']=[name for name,_ in selected]
+    else:
+        start = int(os.environ.get('PILOT_START_INDEX', '0'))
+        limit = int(os.environ.get('PILOT_CASE_LIMIT', str(len(CASES) - start)))
+        if start < 0 or limit < 1 or start + limit > len(CASES):raise ValueError('invalid_pilot_case_range')
+        selected=CASES[start:start + limit];report['caseRange']=[start,start + limit]
     failed = False
-    for name,raw in CASES[start:start + limit]:
+    for name,raw in selected:
         property_id=str(uuid.uuid4());version=f'{property_id}:1';doc_id=str(uuid.uuid4());documents=[{'assetId':doc_id}] if name=='logistics-rich' else []
         sources={'inputVersionId':version,'pdfs':[doc_id] if documents else [],'images':[]}
         job={'id':property_id,'raw_input':raw+'\n허용된 출처 ID: '+json.dumps(sources,ensure_ascii=False)+('\n[DOCUMENT_ID:'+doc_id+']' if documents else '')}
@@ -103,6 +109,7 @@ def run():
         report['cases'].append(record);save()
         try:
             result=analyze_job(job,generate,lambda _:None,validate,edit,lambda *_:{'data':pdf,'mime_type':'application/pdf'},prompt=PROMPT+V2_PROMPT)
+            record['processed']=scrub(result);save()
             result=validate_v2_candidates(result,version,documents,[])
             bundle=result['listing_bundle'];strategy=result['sales_strategy']
             record.update({'status':'ok','headline':excerpt(result.get('landing_copy')),'summary':excerpt(result.get('usp_summary')),'positioning':excerpt(strategy.get('positioning')),'sellingPoints':[{'fact':excerpt(p.get('fact'),250),'benefit':excerpt(p.get('buyerBenefit'),250)} for p in strategy.get('sellingPoints',[])], 'constraints':[excerpt(x.get('description'),250) for x in strategy.get('materialConstraints',[])], 'parcels':len(bundle['parcels']),'buildings':len(bundle['buildings']),'conflicts':len(bundle['conflicts']),'priceClaims':len(bundle['priceClaims']),'cardMarkers':len(re.findall(r'\[카드\s*[1-5]\]',result.get('insta_caption',''))),'blogLengths':[len(result.get('target_1_blog','')),len(result.get('target_2_blog',''))],'editorial':result.get('_editorial',{})})
