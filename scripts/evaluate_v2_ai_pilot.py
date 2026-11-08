@@ -64,7 +64,7 @@ def run():
         report['error']='provider_not_configured'; save(); print('provider_not_configured'); return 2
     import requests
     from PIL import Image, ImageDraw
-    from ai_providers import Generation,ProviderError
+    from ai_providers import ProviderError
     from analysis_worker import PROMPT, analyze_job, generation_services
     from sales_analysis import V2_PROMPT, validate_v2_candidates
     from vision_analysis import vision_service
@@ -78,7 +78,16 @@ def run():
             report['vision']={'classification':v['classification'],'observations':[excerpt(x,180) for x in v['observations'][:3]],'limitations':[excerpt(x,180) for x in v['limitations'][:3]]}
         except Exception as exc:
             report['error']=exc.safe_code if isinstance(exc,ProviderError) else type(exc).__name__;save();print('vision_failed',report['error']);return 1
-    generate,validate,edit=generation_services(environment,requests,use_v2=True)
+    record = None
+    def capture_output(value):
+        if record is not None:
+            try:
+                record['raw']=scrub(json.loads(value))
+                record['status']='generated'
+            except (ValueError,TypeError):
+                record['rawFormat']='invalid_json'
+            save()
+    generate,validate,edit=generation_services(environment,requests,use_v2=True,observe_output=capture_output)
     pdf=sample_pdf()
     start = int(os.environ.get('PILOT_START_INDEX', '0'))
     limit = int(os.environ.get('PILOT_CASE_LIMIT', str(len(CASES) - start)))
@@ -91,14 +100,8 @@ def run():
         job={'id':property_id,'raw_input':raw+'\n허용된 출처 ID: '+json.dumps(sources,ensure_ascii=False)+('\n[DOCUMENT_ID:'+doc_id+']' if documents else '')}
         record={'name':name,'status':'started','inputVersionId':version,'documents':documents}
         report['cases'].append(record);save()
-        def capture(parts):
-            output=generate(parts)
-            # Synthetic output is checkpointed before later checks so a failure
-            # can be diagnosed offline without paying for the same call again.
-            record['raw']=scrub(json.loads(output.text if isinstance(output,Generation) else output));record['status']='generated';save()
-            return output
         try:
-            result=analyze_job(job,capture,lambda _:None,validate,edit,lambda *_:{'data':pdf,'mime_type':'application/pdf'},prompt=PROMPT+V2_PROMPT)
+            result=analyze_job(job,generate,lambda _:None,validate,edit,lambda *_:{'data':pdf,'mime_type':'application/pdf'},prompt=PROMPT+V2_PROMPT)
             result=validate_v2_candidates(result,version,documents,[])
             bundle=result['listing_bundle'];strategy=result['sales_strategy']
             record.update({'status':'ok','headline':excerpt(result.get('landing_copy')),'summary':excerpt(result.get('usp_summary')),'positioning':excerpt(strategy.get('positioning')),'sellingPoints':[{'fact':excerpt(p.get('fact'),250),'benefit':excerpt(p.get('buyerBenefit'),250)} for p in strategy.get('sellingPoints',[])], 'constraints':[excerpt(x.get('description'),250) for x in strategy.get('materialConstraints',[])], 'parcels':len(bundle['parcels']),'buildings':len(bundle['buildings']),'conflicts':len(bundle['conflicts']),'priceClaims':len(bundle['priceClaims']),'cardMarkers':len(re.findall(r'\[카드\s*[1-5]\]',result.get('insta_caption',''))),'blogLengths':[len(result.get('target_1_blog','')),len(result.get('target_2_blog',''))],'editorial':result.get('_editorial',{})})

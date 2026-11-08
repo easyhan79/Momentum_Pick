@@ -11,6 +11,20 @@ except ModuleNotFoundError:
 
 @unittest.skipUnless(GENAI_AVAILABLE, 'google-genai SDK is not installed')
 class GeminiSchemaTests(unittest.TestCase):
+    def test_synthetic_observer_receives_response_before_schema_rejection(self):
+        from analysis_worker import generation_services
+        from ai_providers import ProviderError
+        from unittest.mock import MagicMock
+        from types import SimpleNamespace
+        import requests
+        client=MagicMock()
+        client.__enter__.return_value.models.generate_content.return_value=SimpleNamespace(prompt_feedback=None,candidates=[],text='{"invalid":true}')
+        observed=[]
+        with patch('google.genai.Client',return_value=client):
+            generate,_,_=generation_services({'GEMINI_API_KEY':'synthetic-key','AI_PROVIDER_ORDER':'gemini'},requests,use_v2=True,observe_output=observed.append)
+            with self.assertRaises(ProviderError):generate(['synthetic'])
+        self.assertEqual(observed,['{"invalid":true}'])
+
     def test_v2_schema_serializes_before_network(self):
         from analysis_worker import generation_services
         import json

@@ -206,7 +206,7 @@ class EditorialCopy(BaseModel):
     insta_caption:str
 
 
-def generation_services(environment, requests, use_v2=False):
+def generation_services(environment, requests, use_v2=False, observe_output=None):
     """Shared provider/schema/editorial adapters, with no persistence or messaging."""
     from google import genai
     from google.genai import types
@@ -229,7 +229,12 @@ def generation_services(environment, requests, use_v2=False):
                     raise ProviderError('gemini_refusal', allow_fallback=False)
                 if reason == 'MAX_TOKENS':
                     raise ProviderError('gemini_incomplete', True)
-            return response.text
+            output=response.text
+            # Optional synthetic-pilot checkpoint, before schema validation.
+            # Production callers do not supply this observer or retain raw text.
+            if use_v2 and observe_output is not None:
+                observe_output(output)
+            return output
 
     def validate(value):
         if not value:
