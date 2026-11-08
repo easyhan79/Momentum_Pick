@@ -205,6 +205,15 @@ class EditorialCopy(BaseModel):
     target_2_blog:str
     insta_caption:str
 
+
+def gemini_compatible_schema(model):
+    """Omit unsupported transport keywords; local validation remains strict."""
+    def clean(value):
+        if isinstance(value,dict):return {k:clean(v) for k,v in value.items() if k not in ('additionalProperties','additional_properties')}
+        if isinstance(value,list):return [clean(v) for v in value]
+        return value
+    return clean(model.model_json_schema())
+
 def generation_services(environment, requests, use_v2=False):
     """Shared provider/schema/editorial adapters, with no persistence or messaging."""
     from google import genai
@@ -212,7 +221,7 @@ def generation_services(environment, requests, use_v2=False):
     schema = UniversalMarketingPackageV2 if use_v2 else UniversalMarketingPackage
     def gemini_generate(parts, model, timeout):
         with genai.Client(api_key=environment['GEMINI_API_KEY'], http_options=types.HttpOptions(timeout=int(timeout*1000), retry_options=types.HttpRetryOptions(attempts=1))) as client:
-            response = client.models.generate_content(model=model, contents=[types.Part.from_bytes(data=p['data'], mime_type=p['mime_type']) if isinstance(p, dict) else p for p in parts], config=types.GenerateContentConfig(response_mime_type='application/json', response_schema=schema, temperature=0.7))
+            response = client.models.generate_content(model=model, contents=[types.Part.from_bytes(data=p['data'], mime_type=p['mime_type']) if isinstance(p, dict) else p for p in parts], config=types.GenerateContentConfig(response_mime_type='application/json', response_schema=gemini_compatible_schema(schema) if use_v2 else schema, temperature=0.7))
             if getattr(getattr(response, 'prompt_feedback', None), 'block_reason', None) not in (None, 0, 'BLOCK_REASON_UNSPECIFIED'):
                 raise ProviderError('gemini_refusal', allow_fallback=False)
             for candidate in response.candidates or []:

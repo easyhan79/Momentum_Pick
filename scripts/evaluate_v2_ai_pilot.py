@@ -63,10 +63,10 @@ def run():
     if os.environ.get('PILOT_DIAGNOSE_SCHEMA')=='true':
         from google import genai
         from google.genai import types
-        from analysis_worker import UniversalMarketingPackageV2
+        from analysis_worker import UniversalMarketingPackageV2,gemini_compatible_schema
         try:
             with genai.Client(api_key=environment['GEMINI_API_KEY'],http_options=types.HttpOptions(timeout=90000,retry_options=types.HttpRetryOptions(attempts=1))) as client:
-                client.models.generate_content(model=environment.get('GEMINI_MODEL','gemini-3.8-flash'),contents=['Synthetic schema diagnostic: return an example.'],config=types.GenerateContentConfig(response_mime_type='application/json',response_schema=UniversalMarketingPackageV2,temperature=0.1,max_output_tokens=2048))
+                client.models.generate_content(model=environment.get('GEMINI_MODEL','gemini-3.8-flash'),contents=['Synthetic schema diagnostic: return an example.'],config=types.GenerateContentConfig(response_mime_type='application/json',response_schema=gemini_compatible_schema(UniversalMarketingPackageV2),temperature=0.1,max_output_tokens=2048))
             report['diagnostic']={'status':'accepted'};save();print('schema_diagnostic accepted');return 0
         except Exception as exc:
             message=str(getattr(exc,'message',''))[:1500].replace(environment['GEMINI_API_KEY'],'[redacted]')

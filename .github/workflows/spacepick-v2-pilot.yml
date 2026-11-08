@@ -1,7 +1,5 @@
 name: SpacePick v2 synthetic AI pilot
 on:
-  push:
-    branches: [codex/spacepick-v2-pilot-20261108]
   workflow_dispatch:
 permissions:
   contents: read
@@ -20,7 +18,6 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           PILOT_REPORT: v2-pilot-report.json
           PILOT_SKIP_VISION: 'true'
-          PILOT_DIAGNOSE_SCHEMA: 'true'
         run: python scripts/evaluate_v2_ai_pilot.py
       - name: Save synthetic evaluation report
         if: always()
