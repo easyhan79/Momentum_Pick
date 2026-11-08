@@ -1,0 +1,30 @@
+name: SpacePick v2 synthetic AI pilot
+on:
+  push:
+    branches: [codex/spacepick-v2-pilot-20261108]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements-web-worker.txt
+      - name: Evaluate bounded synthetic examples
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          PILOT_REPORT: v2-pilot-report.json
+        run: python scripts/evaluate_v2_ai_pilot.py
+      - name: Save synthetic evaluation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: spacepick-v2-synthetic-report
+          path: v2-pilot-report.json
+          if-no-files-found: ignore
+          retention-days: 7
