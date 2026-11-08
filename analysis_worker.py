@@ -213,11 +213,14 @@ def generation_services(environment, requests, use_v2=False):
     schema = UniversalMarketingPackageV2 if use_v2 else UniversalMarketingPackage
     def gemini_generate(parts, model, timeout):
         with genai.Client(api_key=environment['GEMINI_API_KEY'], http_options=types.HttpOptions(timeout=int(timeout*1000), retry_options=types.HttpRetryOptions(attempts=1))) as client:
-            # The SDK's legacy response_schema conversion emits unsupported
-            # nested snake_case keys. JSON Schema preserves supported keys and
-            # the full model is still strictly validated after generation.
-            schema_config={'response_json_schema':schema.model_json_schema()} if use_v2 else {'response_schema':schema}
-            response = client.models.generate_content(model=model, contents=[types.Part.from_bytes(data=p['data'], mime_type=p['mime_type']) if isinstance(p, dict) else p for p in parts], config=types.GenerateContentConfig(response_mime_type='application/json',temperature=0.7,**schema_config))
+            # The provider rejects this large nested schema in structured mode.
+            # Request JSON and include the contract in the prompt; the same
+            # strict Pydantic and source checks still run before persistence.
+            content=[types.Part.from_bytes(data=p['data'], mime_type=p['mime_type']) if isinstance(p, dict) else p for p in parts]
+            if use_v2:
+                content.append('출력은 다음 JSON Schema를 정확히 따르는 JSON 객체여야 합니다. 자료에 없는 값을 만들지 마세요.\n'+json.dumps(schema.model_json_schema(),ensure_ascii=False,separators=(',',':')))
+            schema_config={} if use_v2 else {'response_schema':schema}
+            response = client.models.generate_content(model=model, contents=content, config=types.GenerateContentConfig(response_mime_type='application/json',temperature=0.7,**schema_config))
             if getattr(getattr(response, 'prompt_feedback', None), 'block_reason', None) not in (None, 0, 'BLOCK_REASON_UNSPECIFIED'):
                 raise ProviderError('gemini_refusal', allow_fallback=False)
             for candidate in response.candidates or []:

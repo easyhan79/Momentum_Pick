@@ -60,18 +60,6 @@ def run():
     from sales_analysis import V2_PROMPT, validate_v2_candidates
     from vision_analysis import vision_service
     environment = {**os.environ,'AI_PROVIDER_ORDER':'gemini','AI_STOP_ON_UNCERTAIN':'true'}
-    if os.environ.get('PILOT_DIAGNOSE_SCHEMA')=='true':
-        from google import genai
-        from google.genai import types
-        from analysis_worker import UniversalMarketingPackageV2
-        try:
-            with genai.Client(api_key=environment['GEMINI_API_KEY'],http_options=types.HttpOptions(timeout=90000,retry_options=types.HttpRetryOptions(attempts=1))) as client:
-                client.models.generate_content(model=environment.get('GEMINI_MODEL','gemini-3.8-flash'),contents=['Synthetic schema diagnostic: return an example.'],config=types.GenerateContentConfig(response_mime_type='application/json',response_json_schema=UniversalMarketingPackageV2.model_json_schema(),temperature=0.1,max_output_tokens=2048))
-            report['diagnostic']={'status':'accepted'};save();print('schema_diagnostic accepted');return 0
-        except Exception as exc:
-            message=str(getattr(exc,'message',''))[:1500].replace(environment['GEMINI_API_KEY'],'[redacted]')
-            message=re.sub(r'https?://\S+','[url]',message)
-            report['diagnostic']={'status':'rejected','code':getattr(exc,'code',None),'message':message};save();print('schema_diagnostic',json.dumps(report['diagnostic'],ensure_ascii=False));return 1
     if os.environ.get('PILOT_SKIP_VISION')=='true':
         report['vision']={'status':'skipped','reason':'validated_in_separate_run'}
     else:

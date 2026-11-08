@@ -12,18 +12,20 @@ except ModuleNotFoundError:
 @unittest.skipUnless(GENAI_AVAILABLE, 'google-genai SDK is not installed')
 class GeminiSchemaTests(unittest.TestCase):
     def test_v2_schema_serializes_before_network(self):
-        from google import genai
-        from google.genai import types
-        from analysis_worker import UniversalMarketingPackageV2
+        from analysis_worker import generation_services
         import json
-        client=genai.Client(api_key='synthetic-key')
+        import requests
+        from ai_providers import ProviderError
+        captured=[]
         def inspect_request(*args,**kwargs):
-            config=args[2]['generationConfig']
-            self.assertIn('responseJsonSchema',config)
-            self.assertNotIn('responseSchema',config)
-            for unsupported in ('additional_properties','max_length','min_length','min_items','max_items','property_ordering','any_of'):
-                self.assertNotIn(unsupported,json.dumps(config))
+            captured.append(args[2])
             raise RuntimeError('NETWORK_REACHED')
-        with patch.object(client._api_client,'request',side_effect=inspect_request):
-            with self.assertRaisesRegex(RuntimeError,'NETWORK_REACHED'):
-                client.models.generate_content(model='gemini-3.8-flash',contents=['synthetic'],config=types.GenerateContentConfig(response_mime_type='application/json',response_json_schema=UniversalMarketingPackageV2.model_json_schema(),temperature=0.7))
+        from google.genai import _api_client
+        with patch.object(_api_client.BaseApiClient,'request',side_effect=inspect_request):
+            generate,_,_=generation_services({'GEMINI_API_KEY':'synthetic-key','AI_PROVIDER_ORDER':'gemini'},requests,use_v2=True)
+            with self.assertRaises(ProviderError):generate(['synthetic'])
+        self.assertEqual(len(captured),1)
+        config=captured[0]['generationConfig']
+        self.assertNotIn('responseSchema',config)
+        self.assertNotIn('responseJsonSchema',config)
+        self.assertIn('listing_bundle',json.dumps(captured[0]))
