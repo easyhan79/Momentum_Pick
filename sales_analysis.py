@@ -1,5 +1,6 @@
 """Private v2 analysis schema; model claims remain unverified candidates."""
 import math
+import re
 from typing import Literal, Annotated
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -86,6 +87,17 @@ def validate_v2_candidates(result, input_version_id, documents, images):
     """Check source ownership and identity without promoting AI claims to facts."""
     bundle = ListingBundle.model_validate(result.get('listing_bundle'))
     sales = SalesStrategy.model_validate(result.get('sales_strategy'))
+    # Catch a few especially consequential assurances seen in provider output.
+    # Source IDs prove only where a candidate points, not that its implications
+    # are supported. Human review is still required for all generated copy.
+    claims=[sales.positioning,*sales.headlineVariants]
+    claims.extend(value for item in sales.sellingPoints for value in (item.fact,item.buyerBenefit))
+    claims.extend(item.description for item in sales.useScenarios)
+    claims.extend(str(result.get(key) or '') for key in ('usp_summary','landing_copy','target_1_blog','target_2_blog','insta_caption'))
+    for claim in claims:
+        for sentence in re.split(r'[\n.!?。]',claim):
+            if re.search(r'(?:즉시|즉각|바로).{0,35}(?:입주|입점|운영|사용|영업).{0,20}(?:가능|할 수 있)',sentence) or re.search(r'(?:명도|권리금).{0,35}(?:협의|분쟁|문제).{0,15}없이',sentence):
+                raise ValueError('v2_unverified_claim')
     doc_ids = {d['assetId'] for d in documents}
     inspections = result.get('_document_inspections', [])
     pages = {documents[i['source_index']-1]['assetId']:i['page_count'] for i in inspections if isinstance(i,dict) and isinstance(i.get('source_index'),int) and 1<=i['source_index']<=len(documents) and isinstance(i.get('page_count'),int)}
@@ -111,6 +123,12 @@ def validate_v2_candidates(result, input_version_id, documents, images):
     if count>60:raise ValueError('v2_quantity_limit')
     for claim in bundle.priceClaims:
         refs(claim.sourceRefs)
+        # Some models redundantly enumerate every known parcel and building
+        # for a listing-wide price. This means the same as an empty target
+        # list only when the enumeration is complete and contains no repeats.
+        targets=set(claim.targetIds)
+        if claim.scope=='listing' and targets and len(targets)==len(claim.targetIds) and targets==parcels|buildings:
+            claim.targetIds=[]
         if not claim.rawText.strip() or len(set(claim.targetIds))!=len(claim.targetIds) or (claim.scope=='listing' and claim.targetIds) or (claim.scope!='listing' and (not claim.targetIds or any(x not in (parcels if claim.scope=='parcel' else buildings) for x in claim.targetIds))) or (claim.amountWon is not None and not claim.sourceRefs):raise ValueError('v2_price_invalid')
     for conflict in bundle.conflicts:
         for candidate in conflict.candidates:
@@ -133,7 +151,9 @@ def validate_v2_candidates(result, input_version_id, documents, images):
 
 V2_PROMPT = '''추가로 listing_bundle과 sales_strategy를 반환하세요. 여러 필지와 건물은 내부 ID로 분리하고,
 건물과 필지의 연결을 모르면 parcelIds를 비워 두세요. 면적 종류와 원 단위는 보존하며 총가격을 안분하거나 합계를 임의로 계산하지 마세요.
+전체 매물 가격은 scope를 listing, targetIds를 빈 배열로 하고, 필지별·건물별 가격만 해당 대상 ID를 적으세요.
 서로 다른 값은 conflicts에 각각의 후보와 출처로 남기세요. 모든 금액·면적 후보와 판매 장점은 허용된 sourceRefs에 연결하고,
 AI는 verified 상태를 만들지 않습니다. inputVersionId와 assetId는 입력에 명시된 값만 사용하세요.
 sales_strategy는 자료가 뒷받침하는 장점과 구매자 이익, 전제 조건이 있는 활용 장면을 자신감 있고 자연스러운 문장으로 제안하세요.
+공실이라는 정보만으로 즉시 입주·운영 가능, 명도 협의나 권리금 분쟁이 없다는 결론을 내리지 마세요. 소유권·건축물 상태·용도·임대차가 미확인이면 자율적 이용이나 직영 운영을 확정하지 말고 확인할 조건으로 제시하세요.
 없는 수익률·인허가·도로 조건·가격 상승·긴급성을 만들거나 알려진 제약을 숨기지 마세요.'''

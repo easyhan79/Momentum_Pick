@@ -31,6 +31,21 @@ class SalesAnalysisTests(unittest.TestCase):
         self.assertEqual(validate_v2_candidates(item,'p:1',[{'assetId':'doc'}],[])['listing_bundle']['buildings'][0]['parcelIds'],[])
         item=fixture();item['listing_bundle']['priceClaims'][0]['targetIds']=['p1']
         with self.assertRaises(ValueError):validate_v2_candidates(item,'p:1',[{'assetId':'doc'}],[])
+    def test_listing_price_normalizes_only_complete_unique_targets(self):
+        item=fixture();item['listing_bundle']['priceClaims'][0]['targetIds']=['p1','p2','b1']
+        result=validate_v2_candidates(item,'p:1',[{'assetId':'doc'}],[])
+        self.assertEqual(result['listing_bundle']['priceClaims'][0]['targetIds'],[])
+        for targets in (['p1','b1'],['p1','p2','b1','b1']):
+            item=fixture();item['listing_bundle']['priceClaims'][0]['targetIds']=targets
+            with self.subTest(targets=targets),self.assertRaises(ValueError):
+                validate_v2_candidates(item,'p:1',[{'assetId':'doc'}],[])
+    def test_rejects_unverified_operational_assurances(self):
+        for claim in ('즉각적인 공간 기획과 직영 운영이 가능합니다', '명도 협의나 권리금 분쟁 없이 입주할 수 있습니다'):
+            item=fixture();item['sales_strategy']['sellingPoints'][0]['buyerBenefit']=claim
+            with self.subTest(claim=claim),self.assertRaisesRegex(ValueError,'v2_unverified_claim'):
+                validate_v2_candidates(item,'p:1',[{'assetId':'doc'}],[])
+        item=fixture();item['sales_strategy']['sellingPoints'][0]['buyerBenefit']='입주 가능 여부는 계약과 인허가 확인 후 검토할 수 있습니다.'
+        validate_v2_candidates(item,'p:1',[{'assetId':'doc'}],[])
     def test_rejects_over_limit_and_unknown_parcel_reference(self):
         item=fixture();item['listing_bundle']['buildings'][0]['parcelIds']=['missing']
         with self.assertRaises(ValueError):validate_v2_candidates(item,'p:1',[{'assetId':'doc'}],[])
