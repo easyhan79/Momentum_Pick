@@ -98,12 +98,13 @@ def validate_v2_candidates(result, input_version_id, documents, images):
         for sentence in re.split(r'[\n.!?。]',claim):
             immediate=re.search(r'(?:즉시|즉각|바로).{0,35}(?:입주|입점|운영|사용|영업).{0,20}(?:가능|할 수 있)',sentence)
             negated=re.search(r'(?:가능|할 수 있).{0,20}(?:단정.{0,10}(?:안|없|금|어렵)|볼 수 없)',sentence) or re.search(r'(?:가능|할 수 있)(?:한)?\s*(?:상태인지|여부|한지|는지)',sentence)
-            clearance=re.search(r'(?:명도|권리금).{0,55}(?:협의|합의|분쟁|문제|승계|절차).{0,20}없이',sentence)
+            planning=immediate and re.search(r'운영\s*(?:기획|계획).{0,15}(?:검토|구상)',immediate.group())
+            clearance=re.search(r'(?:명도|권리금).{0,55}(?:협의|합의|분쟁|문제|승계|절차|갈등|조율).{0,20}없이',sentence)
             outdoor=re.search(r'(?:외부|여유).{0,20}공간.{0,30}(?:확보|가능)',sentence)
             permit=re.search(r'(?:인허가|허가|승인).{0,25}(?:절차|검토|확인).{0,12}(?:없이|불필요)',sentence)
             if permit and re.search(r'(?:없이|불필요).{0,35}(?:단정.{0,10}(?:안|없|금|어렵)|볼 수 없|아닙니다)',sentence):permit=None
-            permit_saving=re.search(r'(?:인허가|허가).{0,35}(?:시간|기간|비용).{0,25}(?:절감|줄이|줄이고|단축)',sentence)
-            if (immediate and not negated) or clearance or outdoor or permit or permit_saving:
+            permit_saving=re.search(r'(?:인허가|허가).{0,35}(?:시간|기간|비용|일정).{0,25}(?:절감|줄이|줄이고|단축)',sentence)
+            if (immediate and not negated and not planning) or clearance or outdoor or permit or permit_saving:
                 raise ValueError('v2_unverified_claim')
     doc_ids = {d['assetId'] for d in documents}
     inspections = result.get('_document_inspections', [])
@@ -167,4 +168,5 @@ sales_strategy는 자료가 뒷받침하는 장점과 구매자 이익, 전제 �
 기존 건물이 있다는 이유만으로 신축·용도변경·운영에 필요한 인허가 절차가 불필요하다고 말하지 마세요. 원문에 없는 면적 합계는 계산하거나 고객 문안에 추가하지 마세요.
 인허가 시간이나 비용 절감, 필지·공간의 특정 용도 배치 가능성은 현황과 법적 조건이 확인되지 않았다면 장점으로 확정하지 말고 확인할 조건이 있는 가설로 제시하세요.
 자료에 구분소유·필지 수·층별 구조·주차 여건이 없다면 단독 필지, 단독 소유, 층별 분할 또는 주차가 가능하다고 쓰지 마세요. 구매자 이익이 제공 사실에서 직접 보장되지 않으면 판단에 필요한 확인 조건을 문장에 함께 적으세요. '검토'라는 단어만 붙여 확인되지 않은 조건을 사실처럼 제시하지 마세요.
+건축면적은 건물의 바닥 면적 정보이며, 층별 면적이 명시되지 않았다면 이를 특정 층의 면적으로 바꾸지 마세요. 공실이라는 사실만으로 명도 갈등이나 퇴거 일정 조율이 없다고 단정하지 마세요.
 없는 수익률·인허가·도로 조건·가격 상승·긴급성을 만들거나 알려진 제약을 숨기지 마세요.'''

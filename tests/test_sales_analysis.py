@@ -40,7 +40,7 @@ class SalesAnalysisTests(unittest.TestCase):
             with self.subTest(targets=targets),self.assertRaises(ValueError):
                 validate_v2_candidates(item,'p:1',[{'assetId':'doc'}],[])
     def test_rejects_unverified_operational_assurances(self):
-        for claim in ('즉각적인 공간 기획과 직영 운영이 가능합니다', '명도 협의나 권리금 분쟁 없이 입주할 수 있습니다','명도 합의나 권리금 승계 절차 없이 기획을 진행합니다','외부 여유 공간 확보 가능','신축 인허가 절차 없이 사업장 배치를 기획할 수 있습니다','신축 인허가에 소요되는 시간적 불확실성을 줄이고 검토할 수 있습니다'):
+        for claim in ('즉각적인 공간 기획과 직영 운영이 가능합니다', '명도 협의나 권리금 분쟁 없이 입주할 수 있습니다','명도 합의나 권리금 승계 절차 없이 기획을 진행합니다','명도 갈등이나 퇴거 일정 조율 없이 기획을 진행합니다','외부 여유 공간 확보 가능','신축 인허가 절차 없이 사업장 배치를 기획할 수 있습니다','신축 인허가에 소요되는 시간적 불확실성을 줄이고 검토할 수 있습니다','인허가 및 공사 일정을 단축할 가능성이 있습니다'):
             item=fixture();item['sales_strategy']['sellingPoints'][0]['buyerBenefit']=claim
             with self.subTest(claim=claim),self.assertRaisesRegex(ValueError,'v2_unverified_claim'):
                 validate_v2_candidates(item,'p:1',[{'assetId':'doc'}],[])
@@ -51,6 +51,8 @@ class SalesAnalysisTests(unittest.TestCase):
         item=fixture();item['sales_strategy']['sellingPoints'][0]['buyerBenefit']='즉시 입주가 가능한 상태인지 확인이 필요합니다.'
         validate_v2_candidates(item,'p:1',[{'assetId':'doc'}],[])
         item=fixture();item['sales_strategy']['sellingPoints'][0]['buyerBenefit']='인허가 절차 없이 이용할 수 있다고 단정해서는 안 됩니다.'
+        validate_v2_candidates(item,'p:1',[{'assetId':'doc'}],[])
+        item=fixture();item['sales_strategy']['sellingPoints'][0]['buyerBenefit']='즉각적인 운영 기획을 검토할 수 있으나 사용승인 여부를 확인해야 합니다.'
         validate_v2_candidates(item,'p:1',[{'assetId':'doc'}],[])
     def test_rejects_over_limit_and_unknown_parcel_reference(self):
         item=fixture();item['listing_bundle']['buildings'][0]['parcelIds']=['missing']

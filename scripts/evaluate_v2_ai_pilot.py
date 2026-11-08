@@ -113,7 +113,10 @@ def run():
             result=validate_v2_candidates(result,version,documents,[])
             bundle=result['listing_bundle'];strategy=result['sales_strategy']
             record.update({'status':'ok','headline':excerpt(result.get('landing_copy')),'summary':excerpt(result.get('usp_summary')),'positioning':excerpt(strategy.get('positioning')),'sellingPoints':[{'fact':excerpt(p.get('fact'),250),'benefit':excerpt(p.get('buyerBenefit'),250)} for p in strategy.get('sellingPoints',[])], 'constraints':[excerpt(x.get('description'),250) for x in strategy.get('materialConstraints',[])], 'parcels':len(bundle['parcels']),'buildings':len(bundle['buildings']),'conflicts':len(bundle['conflicts']),'priceClaims':len(bundle['priceClaims']),'cardMarkers':len(re.findall(r'\[카드\s*[1-5]\]',result.get('insta_caption',''))),'blogLengths':[len(result.get('target_1_blog','')),len(result.get('target_2_blog',''))],'editorial':result.get('_editorial',{})})
-            print(name,'ok',flush=True);save()
+            if result.get('_editorial',{}).get('status')!='ready':
+                failed=True;record['status']='needs_revision';print(name,'needs_revision',flush=True)
+            else:print(name,'ok',flush=True)
+            save()
         except Exception as exc:
             safe=str(exc) if isinstance(exc,ValueError) and re.fullmatch(r'v2_[a-z_]+',str(exc)) else type(exc).__name__
             code=exc.safe_code if isinstance(exc,ProviderError) else safe
