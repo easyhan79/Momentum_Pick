@@ -48,7 +48,9 @@ class Conflict(V2Model):
     fieldPath: str = Field(min_length=1,max_length=500)
     candidates: list[ConflictCandidate] = Field(min_length=2,max_length=20)
 class ListingBundle(V2Model):
-    schemaVersion: Literal[2]
+    # Gemini's SDK rejects non-string Literal enums before any HTTP request.
+    # Keep the same v2-only contract using numeric bounds instead.
+    schemaVersion: int = Field(ge=2,le=2)
     parcels: list[Parcel] = Field(max_length=60)
     buildings: list[Building] = Field(max_length=60)
     saleScope: Literal['bundle','individual','negotiable','unknown']

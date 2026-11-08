@@ -60,12 +60,15 @@ def run():
     from sales_analysis import V2_PROMPT, validate_v2_candidates
     from vision_analysis import vision_service
     environment = {**os.environ,'AI_PROVIDER_ORDER':'gemini','AI_STOP_ON_UNCERTAIN':'true'}
-    try:
-        img=Image.new('RGB',(600,400),'white');draw=ImageDraw.Draw(img);draw.rectangle((90,120,510,320),outline='black',width=8);draw.rectangle((180,170,280,320),fill='gray');draw.text((110,70),'SYNTHETIC SAMPLE',fill='black')
-        image=io.BytesIO();img.save(image,format='PNG');v=vision_service(environment,requests)(image.getvalue())
-        report['vision']={'classification':v['classification'],'observations':[excerpt(x,180) for x in v['observations'][:3]],'limitations':[excerpt(x,180) for x in v['limitations'][:3]]}
-    except Exception as exc:
-        report['error']=exc.safe_code if isinstance(exc,ProviderError) else type(exc).__name__;save();print('vision_failed',report['error']);return 1
+    if os.environ.get('PILOT_SKIP_VISION')=='true':
+        report['vision']={'status':'skipped','reason':'validated_in_separate_run'}
+    else:
+        try:
+            img=Image.new('RGB',(600,400),'white');draw=ImageDraw.Draw(img);draw.rectangle((90,120,510,320),outline='black',width=8);draw.rectangle((180,170,280,320),fill='gray');draw.text((110,70),'SYNTHETIC SAMPLE',fill='black')
+            image=io.BytesIO();img.save(image,format='PNG');v=vision_service(environment,requests)(image.getvalue())
+            report['vision']={'classification':v['classification'],'observations':[excerpt(x,180) for x in v['observations'][:3]],'limitations':[excerpt(x,180) for x in v['limitations'][:3]]}
+        except Exception as exc:
+            report['error']=exc.safe_code if isinstance(exc,ProviderError) else type(exc).__name__;save();print('vision_failed',report['error']);return 1
     generate,validate,edit=generation_services(environment,requests,use_v2=True)
     pdf=sample_pdf()
     for name,raw in CASES:
