@@ -284,7 +284,7 @@ def generation_services(environment, requests, use_v2=False, observe_output=None
             response=client.models.generate_content(model=environment.get('GEMINI_MODEL',MODEL),contents=prompt,config=types.GenerateContentConfig(response_mime_type='application/json',response_schema=EditorialCopy,temperature=0.45,max_output_tokens=16384))
         return EditorialCopy.model_validate_json(response.text).model_dump()
 
-    return generate, validate, lambda result,source:finalize_copy(result,source,revise_copy)
+    return generate, validate, lambda result,source:finalize_copy(result,source,revise_copy,space_blog_headings=use_v2)
 
 
 def main():

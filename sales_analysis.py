@@ -102,6 +102,7 @@ def validate_v2_candidates(result, input_version_id, documents, images, input_te
             planning=immediate and re.search(r'운영\s*(?:기획|계획).{0,15}(?:검토|구상)',immediate.group())
             clearance=re.search(r'(?:명도|권리금).{0,55}(?:협의|합의|분쟁|문제|승계|절차|갈등|조율).{0,20}없이',sentence)
             clearance_relief=re.search(r'(?:명도|권리금).{0,35}(?:부담|비용|일정).{0,20}(?:적어|줄일|줄이|줄어|덜|절감|없어)',sentence)
+            unchecked_occupancy=re.search(r'(?:점유자|임차인).{0,18}확인\s*없이.{0,30}(?:가능|할 수 있)',sentence)
             outdoor=re.search(r'(?:외부|여유).{0,20}공간.{0,30}(?:확보|가능)',sentence)
             permit=re.search(r'(?:인허가|허가|승인).{0,25}(?:절차|검토|확인).{0,12}(?:없이|불필요)',sentence)
             if permit and re.search(r'(?:없이|불필요).{0,35}(?:단정.{0,10}(?:안|없|금|어렵)|볼 수 없|아닙니다)',sentence):permit=None
@@ -109,7 +110,7 @@ def validate_v2_candidates(result, input_version_id, documents, images, input_te
             floor_claim=re.search(r'건축\s*면적.{0,40}(?:단일|한|1)\s*층\s*(?:기준|면적)',sentence)
             explicit_floor=isinstance(input_text,str) and re.search(r'(?:단일|한|1)\s*층\s*(?:의\s*)?(?:면적|바닥\s*면적|전용\s*면적)',input_text)
             unsupported_floor=floor_claim and isinstance(input_text,str) and not documents and not images and not explicit_floor
-            if (immediate and not negated and not planning) or clearance or clearance_relief or outdoor or permit or permit_saving or unsupported_floor:
+            if (immediate and not negated and not planning) or clearance or clearance_relief or unchecked_occupancy or outdoor or permit or permit_saving or unsupported_floor:
                 raise ValueError('v2_unverified_claim')
     doc_ids = {d['assetId'] for d in documents}
     inspections = result.get('_document_inspections', [])
@@ -174,5 +175,5 @@ sales_strategy는 자료가 뒷받침하는 장점과 구매자 이익, 전제 �
 인허가 시간이나 비용 절감, 필지·공간의 특정 용도 배치 가능성은 현황과 법적 조건이 확인되지 않았다면 장점으로 확정하지 말고 확인할 조건이 있는 가설로 제시하세요.
 자료에 구분소유·필지 수·층별 구조·주차 여건이 없다면 단독 필지, 단독 소유, 층별 분할 또는 주차가 가능하다고 쓰지 마세요. 구매자 이익이 제공 사실에서 직접 보장되지 않으면 판단에 필요한 확인 조건을 문장에 함께 적으세요. '검토'라는 단어만 붙여 확인되지 않은 조건을 사실처럼 제시하지 마세요.
 건축면적은 건물의 바닥 면적 정보이며, 층별 면적이 명시되지 않았다면 이를 특정 층의 면적으로 바꾸지 마세요. 공실이라는 사실만으로 명도 갈등이나 퇴거 일정 조율이 없다고 단정하지 마세요.
-상가 예시: 원문이 ‘1층은 공실, 사용승인 확인 중’이면 사실은 ‘제공자료상 1층은 공실입니다’, 구매자 이익은 ‘직영 매장을 검토하는 매수자가 현장에서 동선과 설비를 점검할 후보입니다’, 제약은 ‘사용승인과 계획 업종의 용도를 먼저 확인해야 합니다’로 구분하세요. 명도·권리금의 부담 감소, 조기 공사 착수 등으로 바꾸지 마세요. 이 예시를 제목·블로그·카드와 판매 전략에 동일하게 적용하고, 원문에 없는 면적 환산이나 건폐율 계산은 생략하세요.
+상가 예시: 원문이 ‘1층은 공실, 사용승인 확인 중’이면 사실은 ‘제공자료상 1층은 공실입니다’, 구매자 이익은 ‘직영 매장을 검토하는 매수자가 현장에서 동선과 설비를 점검할 후보입니다’, 제약은 ‘사용승인과 계획 업종의 용도를 먼저 확인해야 합니다’로 구분하세요. 명도·권리금의 부담 감소, 점유자 확인을 생략한 현장 출입, 조기 공사 착수 등으로 바꾸지 마세요. 이 예시를 제목·블로그·카드와 판매 전략에 동일하게 적용하고, 원문에 없는 면적 환산이나 건폐율 계산은 생략하세요.
 없는 수익률·인허가·도로 조건·가격 상승·긴급성을 만들거나 알려진 제약을 숨기지 마세요.'''
