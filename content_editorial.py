@@ -77,16 +77,23 @@ def audit_copy(content):
     if re.search(r'독점|급매|수익률\s*보장|확정\s*수익|완벽한|매머드급|무조건|상위\s*1\s*%',all_text):issues.append('copy:unsupported_superlative')
     return issues
 
-def finalize_copy(package,source,revise=None):
+def finalize_copy(package,source,revise=None,*,space_blog_headings=False):
+    def format_copy(key,value):
+        text=normalize(value)
+        if space_blog_headings and key in COPY_KEYS[:2]:
+            # A Markdown heading ends at the newline, even if the model omits
+            # the blank line before the body. Keep that body in the audit.
+            text=re.sub(r'^(#{1,6}[ \t]+[^\n]+)\n(?=\S)',r'\1\n\n',text,flags=re.M)
+        return text
     result=prepare_customer_copy(package)
-    for key in COPY_KEYS:result[key]=normalize(result.get(key))
+    for key in COPY_KEYS:result[key]=format_copy(key,result.get(key))
     issues=audit_copy(result);revised=False
     if issues and revise:
         # Exactly one text-only revision; never repeat image analysis or loop until success.
         try:
             correction=revise({key:result[key] for key in COPY_KEYS},source[:18000],issues)
             if not all(isinstance(correction.get(key),str) for key in COPY_KEYS):raise ValueError('invalid_copy')
-            result.update({key:normalize(correction[key]) for key in COPY_KEYS});revised=True
+            result.update({key:format_copy(key,correction[key]) for key in COPY_KEYS});revised=True
             issues=audit_copy(result)
         except Exception:issues=issues+['copy:automatic_revision_unavailable']
     result=prepare_customer_copy(result)

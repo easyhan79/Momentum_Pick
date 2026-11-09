@@ -3,7 +3,8 @@ name: SpacePick web worker
 # Each run serves the queue for up to ~50 minutes and then stops gracefully
 # (SIGTERM -> current job result is saved). The schedule keeps one run queued
 # so the next run starts as soon as the previous one ends.
-# Disabled unless the repository variable WEB_WORKER_ENABLED is 'true'.
+# The legacy worker runs unless WEB_WORKER_ENABLED is explicitly 'false'.
+# V2 queue processing remains off unless INTAKE_V2_ENABLED is 'true'.
 on:
   schedule:
     - cron: '*/10 * * * *'
@@ -30,6 +31,8 @@ jobs:
       - name: Serve web queue (values are never printed)
         env:
           WEB_WORKER_ENABLED: 'true'
+          INTAKE_V2_ENABLED: ${{ vars.INTAKE_V2_ENABLED || 'false' }}
+          INTAKE_V2_ONLY: ${{ vars.INTAKE_V2_ONLY || 'false' }}
           WORKER_ENVIRONMENT: production
           WORKER_PROJECT_REF: aklcylhqslgntkgloqpi
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
