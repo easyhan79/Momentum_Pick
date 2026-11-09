@@ -8,6 +8,7 @@ Short = Annotated[str, Field(min_length=1,max_length=1000)]
 Label = Annotated[str, Field(min_length=1,max_length=200)]
 Condition = Annotated[str, Field(min_length=1,max_length=500)]
 Identifier = Annotated[str, Field(pattern=r'^[a-zA-Z0-9][a-zA-Z0-9_-]{0,99}$')]
+CLEARANCE_RELIEF = re.compile(r'(?:명도|권리금).{0,35}(?:부담|비용|일정).{0,20}(?:적어|적을|적다는|줄일|줄이|줄어|덜|절감|없어)')
 class V2Model(BaseModel):
     model_config = ConfigDict(extra='forbid',allow_inf_nan=False)
 class SourceRef(V2Model):
@@ -83,6 +84,23 @@ class SalesStrategy(V2Model):
     callToAction: Annotated[str,Field(min_length=1,max_length=500)]
 
 
+def prepare_v2_candidate(result, input_version_id, documents, images, input_text=None):
+    """Replace optional tenant-relief speculation in blog prose with a check."""
+    draft = dict(result)
+    for key in ('target_1_blog', 'target_2_blog'):
+        if not isinstance(draft.get(key), str):
+            continue
+        sentences = re.split(r'(?<=[.!?。])(?=\s)|(?=\n)|(?<=\n)', draft[key])
+        for index, sentence in enumerate(sentences):
+            if sentence.lstrip().startswith('#') or not CLEARANCE_RELIEF.search(sentence):
+                continue
+            if re.search(r'(?:적을|줄일|덜 수 있).{0,35}(?:가설|추정)', sentence):
+                leading = sentence[:len(sentence) - len(sentence.lstrip())]
+                sentences[index] = leading + '실제 점유 상태와 임대차 관계를 확인한 뒤 매입 조건을 검토하세요.'
+        draft[key] = ''.join(sentences)
+    return validate_v2_candidates(draft, input_version_id, documents, images, input_text)
+
+
 def validate_v2_candidates(result, input_version_id, documents, images, input_text=None):
     """Check source ownership and identity without promoting AI claims to facts."""
     bundle = ListingBundle.model_validate(result.get('listing_bundle'))
@@ -98,10 +116,10 @@ def validate_v2_candidates(result, input_version_id, documents, images, input_te
     for claim in claims:
         for sentence in re.split(r'[\n.!?。]',claim):
             immediate=re.search(r'(?:즉시|즉각|바로).{0,35}(?:입주|입점|운영|사용|영업).{0,20}(?:가능|할 수 있)',sentence)
-            negated=re.search(r'(?:가능|할 수 있).{0,20}(?:단정.{0,10}(?:안|없|금|어렵)|볼 수 없)',sentence) or re.search(r'(?:가능|할 수 있)(?:한)?\s*(?:상태인지|여부|한지|는지)',sentence)
+            negated=re.search(r'(?:가능|할 수 있).{0,20}(?:단정.{0,10}(?:안|없|금|어렵)|볼 수 없|뜻하지(?:는)?\s*않)',sentence) or re.search(r'(?:가능|할 수 있)(?:한)?\s*(?:상태인지|여부|한지|는지)',sentence)
             planning=immediate and re.search(r'운영\s*(?:기획|계획).{0,15}(?:검토|구상)',immediate.group())
             clearance=re.search(r'(?:명도|권리금).{0,55}(?:협의|합의|분쟁|문제|승계|절차|갈등|조율).{0,20}없이',sentence)
-            clearance_relief=re.search(r'(?:명도|권리금).{0,35}(?:부담|비용|일정).{0,20}(?:적어|줄일|줄이|줄어|덜|절감|없어)',sentence)
+            clearance_relief=CLEARANCE_RELIEF.search(sentence)
             unchecked_occupancy=re.search(r'(?:점유자|임차인).{0,18}확인\s*없이.{0,30}(?:가능|할 수 있)',sentence)
             outdoor=re.search(r'(?:외부|여유).{0,20}공간.{0,30}(?:확보|가능)',sentence)
             permit=re.search(r'(?:인허가|허가|승인).{0,25}(?:절차|검토|확인).{0,12}(?:없이|불필요)',sentence)

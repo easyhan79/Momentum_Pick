@@ -66,7 +66,7 @@ def run():
     from PIL import Image, ImageDraw
     from ai_providers import ProviderError
     from analysis_worker import PROMPT, analyze_job, generation_services
-    from sales_analysis import V2_PROMPT, validate_v2_candidates
+    from sales_analysis import V2_PROMPT, prepare_v2_candidate, validate_v2_candidates
     from vision_analysis import vision_service
     environment = {**os.environ,'AI_PROVIDER_ORDER':'gemini','AI_STOP_ON_UNCERTAIN':'true'}
     if os.environ.get('PILOT_SKIP_VISION')=='true':
@@ -108,7 +108,7 @@ def run():
         record={'name':name,'status':'started','inputVersionId':version,'documents':documents}
         report['cases'].append(record);save()
         try:
-            result=analyze_job(job,generate,lambda _:None,validate,edit,lambda *_:{'data':pdf,'mime_type':'application/pdf'},prompt=PROMPT+V2_PROMPT,candidate_check=lambda candidate:validate_v2_candidates(candidate,version,documents,[],input_text=raw))
+            result=analyze_job(job,generate,lambda _:None,validate,edit,lambda *_:{'data':pdf,'mime_type':'application/pdf'},prompt=PROMPT+V2_PROMPT,candidate_check=lambda candidate:prepare_v2_candidate(candidate,version,documents,[],input_text=raw))
             record['processed']=scrub(result);save()
             result=validate_v2_candidates(result,version,documents,[],input_text=raw)
             bundle=result['listing_bundle'];strategy=result['sales_strategy']

@@ -1,5 +1,5 @@
 import unittest
-from sales_analysis import validate_v2_candidates
+from sales_analysis import prepare_v2_candidate, validate_v2_candidates
 
 def fixture():
     source={'kind':'input_text','inputVersionId':'p:1'}
@@ -50,6 +50,14 @@ class SalesAnalysisTests(unittest.TestCase):
         validate_v2_candidates(item,'p:1',[{'assetId':'doc'}],[])
         item=fixture();item['sales_strategy']['sellingPoints'][0]['buyerBenefit']='즉시 입주가 가능한 상태인지 확인이 필요합니다.'
         validate_v2_candidates(item,'p:1',[{'assetId':'doc'}],[])
+        item=fixture();item['target_1_blog']='공실이라는 사실만으로 즉시 영업이 가능함을 뜻하지는 않습니다.'
+        validate_v2_candidates(item,'p:1',[{'assetId':'doc'}],[])
+        item['target_2_blog']='기존 임차인과의 명도 일정 조율 부담이 적을 수 있다는 가설을 세울 수 있습니다.'
+        with self.assertRaisesRegex(ValueError,'v2_unverified_claim'):
+            validate_v2_candidates(item,'p:1',[{'assetId':'doc'}],[])
+        item['target_2_blog']='제공자료상 1층은 공실입니다. '+item['target_2_blog']
+        prepared=prepare_v2_candidate(item,'p:1',[{'assetId':'doc'}],[])
+        self.assertEqual(prepared['target_2_blog'],'제공자료상 1층은 공실입니다. 실제 점유 상태와 임대차 관계를 확인한 뒤 매입 조건을 검토하세요.')
         item=fixture();item['sales_strategy']['sellingPoints'][0]['buyerBenefit']='인허가 절차 없이 이용할 수 있다고 단정해서는 안 됩니다.'
         validate_v2_candidates(item,'p:1',[{'assetId':'doc'}],[])
         item=fixture();item['sales_strategy']['sellingPoints'][0]['buyerBenefit']='즉각적인 운영 기획을 검토할 수 있으나 사용승인 여부를 확인해야 합니다.'
