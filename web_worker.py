@@ -10,8 +10,10 @@ import json
 import os
 import re
 import signal
+import subprocess
 import threading
 import uuid
+from pathlib import Path
 from analysis_worker import analyze_job, failure, generation_services, draft as generated_draft, PROMPT
 
 PRODUCTION_REF = 'aklcylhqslgntkgloqpi'
@@ -48,7 +50,6 @@ def configuration(env, require_ai=True):
 class Database:
     def __init__(self, config, requests):
         self.url, self.requests = config['url'], requests
-        self.service_key = config['key']
         self.intake_v2_enabled = config.get('intake_v2_enabled', False)
         self.intake_v2_only = config.get('intake_v2_only', False)
         self.headers = {'apikey': config['key'], 'Content-Type': 'application/json'}
@@ -65,11 +66,31 @@ class Database:
         return response.json()
 
     def prepare_automatic(self, property_id):
-        response = self.requests.post(self.url + '/functions/v1/showroom-automation',
-            headers={'Authorization': 'Bearer ' + self.service_key, 'apikey': self.service_key},
-            json={'propertyId': property_id}, timeout=90, allow_redirects=False)
-        if response.status_code != 200:
-            raise RuntimeError('automatic_preparation_unavailable')
+        if not re.fullmatch(r'[0-9a-f-]{36}', property_id, re.I):
+            raise ValueError('invalid_property_id')
+        def rows(path):
+            response = self.requests.get(self.url + '/rest/v1/' + path, headers=self.headers, timeout=20, allow_redirects=False)
+            if response.status_code != 200:
+                raise RuntimeError('automatic_preparation_unavailable')
+            return response.json()
+        room = rows('property_showrooms?property_id=eq.' + property_id + '&select=*')[0]
+        owner = rows('property_web_intakes?property_id=eq.' + property_id + '&select=created_by')[0]['created_by']
+        run = rows('property_processing_runs?property_id=eq.' + property_id + '&state=eq.applied&is_v2_submission=eq.true&select=id&order=created_at.desc&limit=1')[0]['id']
+        if room['draft_content'].get('automation', {}).get('runId') != run:
+            assets = rows('property_assets?property_id=eq.' + property_id + '&bucket_id=eq.showroom-private-media&select=id,kind,source_type,excluded_from_analysis')
+            # Reuse the exact same pure TS preparation used by the administrator
+            # API. Source data stays on stdin/stdout, captured only in memory.
+            script = Path(__file__).resolve().parent / 'scripts' / 'automatic_content.mjs'
+            result = subprocess.run(['node', '--experimental-strip-types', str(script)],
+                input=json.dumps({'draft': room['draft_content'], 'assets': assets, 'runId': run, 'actor': owner}),
+                text=True, capture_output=True, timeout=20, check=False)
+            if result.returncode != 0:
+                raise RuntimeError('automatic_content_invalid')
+            content = json.loads(result.stdout)
+            slots = [] if room['draft_content'].get('automation', {}).get('version') == 1 else ['hero'] + [c['id'] for c in room['draft_content'].get('concepts', [])[:3]]
+            room = self.rpc('web_save_editor_v2', {'p_property': property_id, 'p_actor': owner, 'p_revision': room['revision'], 'p_content': content, 'p_slots': slots})
+        for slot in ['hero'] + [c['id'] for c in room['draft_content'].get('concepts', [])[:3]]:
+            self.rpc('web_automatic_image_enqueue', {'p_property': property_id, 'p_actor': owner, 'p_run': run, 'p_slot': slot})
         return True
 
     def document(self, asset, property_id, refs):
