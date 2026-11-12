@@ -11,6 +11,8 @@ import land from './fixtures/land-minimal.fixture.json';
 import sparse from './fixtures/sparse-commercial.fixture.json';
 import edges from './fixtures/zones-edge.fixture.json';
 import untrusted from './fixtures/untrusted-text.fixture.json';
+// Self-hosted web font (no third-party requests); browsers load only the subsets a page uses.
+import 'pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css';
 import './styles.css';
 import { AdminPropertyPage } from './pages/AdminPropertyPage';
 import { PublicShowroomPage } from './pages/PublicShowroomPage';
@@ -19,7 +21,7 @@ import { lazy, Suspense } from 'react';
 const ResetPasswordPage=lazy(()=>import('./pages/ResetPasswordPage').then(m=>({default:m.ResetPasswordPage})));
 
 const fixtures = { ...informed, terrace, factory, logistics, land, sparse, edges, untrusted } as unknown as Record<string, Showroom>;
-const labels: Record<string, string> = {'factory-informed':'공장 · 정보 제공 예시 (합성)','commercial-informed':'상가 · 정보 제공 예시 (합성)','logistics-informed':'물류 · 정보 제공 예시 (합성)','land-informed':'토지 · 정보 제공 예시 (합성)', terrace: '상가 · 테라스201', factory: '공장 · 최소 자료', logistics: '물류센터 · 최소 자료', land: '토지 · 최소 자료', sparse: '상가 · 자료 누락', edges: '존 경계값 검토', untrusted: '텍스트 안전성 검토' };
+const labels: Record<string, string> = {'factory-informed':'공장 · 정보 제공 예시 (합성)','commercial-informed':'상가 · 정보 제공 예시 (합성)','logistics-informed':'물류 · 정보 제공 예시 (합성)','land-informed':'토지 · 정보 제공 예시 (합성)', terrace: '상가 · 테라스201', factory: '공장 · 최소 자료', logistics: '물류센터 · 최소 자료', land: '토지 · 최소 자료', sparse: '상가 · 자료 누락' };
 function FixturePage({initial}:{initial:string}){
   const [fixtureId,setFixtureId]=useState(Object.hasOwn(fixtures,initial)?initial:'terrace');
   const selector=<><a href="/">Spacepick 홈 →</a><label htmlFor="fixture-select">정적 예시 살펴보기</label><select id="fixture-select" value={fixtureId} onChange={e=>{const next=e.target.value;setFixtureId(next);history.replaceState(null,'','/samples/'+next);}}>{Object.entries(labels).map(([id,label])=><option key={id} value={id}>{label}</option>)}</select><span>구성 예시 · 실제 모집 매물 아님</span></>;
