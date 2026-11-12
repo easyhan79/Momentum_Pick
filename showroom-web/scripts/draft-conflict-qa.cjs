@@ -105,7 +105,24 @@ const path=require('node:path');
    assert.equal(room.draft_content.propertyProfile.fields[0].useApproved,true);
    result.passed.push('a private entered area is published with one click from the publish panel');
 
-   // 5. Publish panel: no review step, checkboxes or memo; one confirmation publishes a draft.
+   // 5. Area is entered in 평 and price in 억·만원; values are saved as ㎡ and 원.
+   const facts=page.locator('#property-facts-editor');
+   const areaInput=facts.getByLabel('값',{exact:true}).first();
+   assert.equal(await areaInput.inputValue(),'49.91');
+   await areaInput.fill('30');
+   await facts.getByText('99.17㎡ (30평)',{exact:true}).waitFor();
+   await facts.getByLabel('가격 상태',{exact:true}).selectOption('fixed');
+   await facts.getByLabel('매매가격 억',{exact:true}).fill('3');
+   await facts.getByLabel('매매가격 만원',{exact:true}).fill('5000');
+   await facts.getByText('3억 5,000만 원 (350,000,000원)',{exact:true}).waitFor();
+   await facts.screenshot({path:path.join(directory,'units-facts-editor.png')});
+   await page.getByRole('button',{name:'초안 저장',exact:true}).first().click();
+   await page.getByText('컨셉존과 쇼룸 초안을 저장했습니다.',{exact:false}).waitFor();
+   assert.equal(room.draft_content.propertyProfile.fields[0].value,99.17);
+   assert.equal(room.draft_content.propertyProfile.price.saleWon,350000000);
+   result.passed.push('area typed in 평 and price in 억·만원 are saved as ㎡ and 원');
+
+   // 6. Publish panel: no review step, checkboxes or memo; one confirmation publishes a draft.
    assert.equal(await panel.getByRole('button',{name:'저장본 검수 준비',exact:true}).count(),0);
    assert.equal(await panel.locator('input[type=checkbox], textarea').count(),0);
    await panel.getByRole('button',{name:'조건 다시 확인',exact:true}).click();

@@ -301,6 +301,7 @@ const path=require('node:path');
    await editor.getByLabel('거래방식',{exact:true}).selectOption('sale');
    await editor.getByLabel('가격 상태',{exact:true}).selectOption('negotiable');
    const area=editor.locator('.fact-editor-field').first();
+   await area.getByLabel('값 단위',{exact:true}).selectOption('sqm'); // area defaults to 평; this case enters ㎡ directly
    await area.getByLabel('값',{exact:true}).fill('100');
    await area.getByLabel('정보 상태',{exact:true}).selectOption('provided');
    await area.getByLabel('공개할 출처 설명 · 개인정보 제외',{exact:true}).fill('합성 소유자 제공자료');

@@ -4,7 +4,8 @@ import {PropertyHighlightsEditor} from './PropertyHighlightsEditor';
 import {RentalScenarioEditor} from './RentalScenarioEditor';
 import {useEffect,useState} from 'react';
 import type {PropertyProfile,ProfileField} from '../../../supabase/functions/_shared/property-profile.ts';
-import {publishCoreFacts} from '../../../supabase/functions/_shared/property-profile.ts';
+import {areaFieldKeys,publishCoreFacts} from '../../../supabase/functions/_shared/property-profile.ts';
+import {AreaInput,WonInput} from './UnitInputs';
 import type {Showroom} from '../types/showroom';
 import {mediaRequest} from '../lib/adminApi';
 
@@ -36,7 +37,7 @@ export function PropertyFactsEditor({propertyId,content,busy,onChange}:{property
         <label>거래방식<select aria-label="거래방식" value={profile.transaction} onChange={e=>update({...profile,transaction:e.target.value as PropertyProfile['transaction']})}><option value="unknown">확인 필요</option><option value="sale">매매</option><option value="lease">임대</option></select></label>
         <label>소재지<input maxLength={300} value={content.address||''} onChange={e=>onChange({...content,address:e.target.value})}/></label>
         <label>가격 상태<select aria-label="가격 상태" value={profile.price.status} onChange={e=>update({...profile,price:{...profile.price,status:e.target.value as PropertyProfile['price']['status']}})}><option value="unknown">확인 필요</option><option value="negotiable">가격 협의</option><option value="fixed">금액 입력</option></select></label>
-        {profile.price.status==='fixed'&&(profile.transaction==='sale'?[['saleWon','매매가격']]:profile.transaction==='lease'?[['depositWon','보증금'],['monthlyWon','월세']]:[]).map(([key,label])=><label key={key}>{label} · 원<input type="number" min="0" step="1" value={profile.price[key as 'saleWon']??''} onChange={e=>update({...profile,price:{...profile.price,[key]:e.target.value===''?null:Number(e.target.value)}})}/></label>)}
+        {profile.price.status==='fixed'&&(profile.transaction==='sale'?[['saleWon','매매가격']]:profile.transaction==='lease'?[['depositWon','보증금'],['monthlyWon','월세']]:[]).map(([key,label])=><WonInput key={key} label={label} disabled={busy} value={profile.price[key as 'saleWon']??null} onChange={won=>update({...profile,price:{...profile.price,[key]:won}})}/>)}
       </fieldset>
       {content.registration&&<fieldset disabled={busy}><legend>담당자와 입력자료 사용 권한</legend>
         <label>담당자 이름<input maxLength={100} value={content.registration.contact.name} onChange={e=>onChange({...content,registration:{...content.registration!,contact:{...content.registration!.contact,name:e.target.value}}})}/></label>
@@ -48,7 +49,7 @@ export function PropertyFactsEditor({propertyId,content,busy,onChange}:{property
       {profile.fields.map((field,index)=><fieldset key={field.id} disabled={busy} className="fact-editor-field"><legend>{index+1}. {field.label}</legend>
         <div className="fact-editor-grid"><label>항목명<input maxLength={100} value={field.label} onChange={e=>editField(field.id,{label:e.target.value})}/></label>
           <label>값 형식<select aria-label="값 형식" value={valueType(field)} onChange={e=>{setValueTypes(current=>({...current,[field.id]:e.target.value}));editField(field.id,{value:null});}}><option value="text">문자</option><option value="number">숫자</option></select></label>
-          <label>값<input type={valueType(field)==='number'?'number':'text'} step="any" maxLength={2000} value={field.value??''} onChange={e=>{const raw=e.target.value;editField(field.id,{value:raw.trim()===''?null:valueType(field)==='number'?Number(raw):raw});}}/></label>
+          {areaFieldKeys.includes(field.key)&&field.unit==='㎡'&&valueType(field)==='number'?<AreaInput label="값" value={typeof field.value==='number'?field.value:null} onChange={sqm=>editField(field.id,{value:sqm})}/>:<label>값<input type={valueType(field)==='number'?'number':'text'} step="any" maxLength={2000} value={field.value??''} onChange={e=>{const raw=e.target.value;editField(field.id,{value:raw.trim()===''?null:valueType(field)==='number'?Number(raw):raw});}}/></label>}
           <label>단위<input maxLength={30} value={field.unit} onChange={e=>editField(field.id,{unit:e.target.value})}/></label></div>
         <label>정보 상태<select aria-label="정보 상태" value={field.status} onChange={e=>editField(field.id,{status:e.target.value as ProfileField['status']})}><option value="unknown">확인 필요</option><option value="provided">제공정보 · 미검증</option><option value="verified">증빙 대조 완료</option><option value="inferred">자료 기반 추론</option><option value="generated">AI 생성</option></select></label>
         <label>정보 기준일 · 선택<input type="date" value={field.asOf||''} onChange={e=>editField(field.id,{asOf:e.target.value})}/></label>

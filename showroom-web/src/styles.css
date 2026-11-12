@@ -100,3 +100,9 @@
 .publish-warnings ul{margin:8px 0 0;padding-left:18px;display:grid;gap:10px}
 .publish-warnings li div{margin-top:6px}
 .facts-default-public{display:block;margin:4px 0 12px 26px;line-height:1.7}
+.unit-input{display:grid;gap:6px;min-width:0}
+.unit-input-row{display:flex;align-items:center;gap:8px}
+.unit-input-row input{flex:1;min-width:0}
+.unit-input-row select{flex:0 0 auto;width:auto}
+.unit-input-row span{flex:0 0 auto;color:#c9d3cc}
+.unit-readout{color:#9fb3aa;line-height:1.6}
