@@ -301,6 +301,7 @@ const path=require('node:path');
    await editor.getByLabel('거래방식',{exact:true}).selectOption('sale');
    await editor.getByLabel('가격 상태',{exact:true}).selectOption('negotiable');
    const area=editor.locator('.fact-editor-field').first();
+   await area.getByLabel('값 단위',{exact:true}).selectOption('sqm'); // area defaults to 평; this case enters ㎡ directly
    await area.getByLabel('값',{exact:true}).fill('100');
    await area.getByLabel('정보 상태',{exact:true}).selectOption('provided');
    await area.getByLabel('공개할 출처 설명 · 개인정보 제외',{exact:true}).fill('합성 소유자 제공자료');
@@ -363,10 +364,9 @@ const path=require('node:path');
      await page.locator('#showroom-draft').getByRole('button',{name:'초안 저장',exact:true}).click();
      await page.waitForFunction(()=>document.querySelector('.admin-message')?.textContent?.includes('저장했습니다'));
    }
-   await page.getByRole('button',{name:'저장본 검수 준비',exact:true}).click();
-   for(const id of ['facts','rights','claims','privacy'])await page.locator('#publish-check-'+id).check();
-   await page.locator('#review-notes').fill('합성자료의 출처와 공개 범위를 확인했습니다.');
-   await page.getByRole('button',{name:'승인하고 게시하기',exact:true}).click();
+   // Publishing is one button plus one confirmation dialog (no review step, checkboxes or memo).
+   page.once('dialog',dialog=>{assert.match(dialog.message(),/주소·거래조건·가격·면적·담당자 연락처/);void dialog.accept();});
+   await page.getByRole('button',{name:'게시하기',exact:true}).click();
    await page.waitForFunction(()=>document.querySelector('.admin-message')?.textContent?.includes('게시했습니다'));
    assert.equal(room.published_content.propertyProfile.fields.length,v21Admin?3:12);
    if(v21Admin){assert.ok(room.published_content.customerDecision);assert.equal(room.published_content.customerDecision.engineVersion,'provided-rules-v1');}

@@ -5,10 +5,10 @@ import {publicDto} from '../functions/public-showroom/index.ts';
 const actor='10000000-0000-4000-8000-000000000001',property='20000000-0000-4000-8000-000000000002';
 const input=()=>({title:'공장 초안',address:'합성 소재지',summary:'제공 설명 [FILE_ID:not-a-file]',kind:'factory',transaction:'sale',area:100,price:{status:'negotiable',saleWon:null,depositWon:null,monthlyWon:null},rightsConfirmed:true,contact:{name:'합성 담당자',phone:'010-0000-0000',publicApproved:true}});
 const req=(action:string,body:Record<string,unknown>)=>new Request('https://x',{method:'POST',headers:{Authorization:'Bearer synthetic','Content-Type':'application/json'},body:JSON.stringify({action,propertyId:property,...body})});
-test('registration supports missing data without publishing it; analysis excludes contacts and attachment directives',()=>{
+test('registration keeps missing data private, publishes entered core facts once rights are confirmed; analysis excludes contacts and attachment directives',()=>{
  const empty={...input(),area:null,address:'',rightsConfirmed:false,contact:{name:'',phone:'',publicApproved:false}};
  const draft=registrationDraft(empty,actor);assert.equal(draft.propertyProfile.fields[0].value,null);assert.equal(draft.propertyProfile.fields[0].publication,'private');assert.equal(registrationIssues(draft).length,1);
- const populated=registrationDraft(input(),actor);assert.equal(registrationIssues(populated).length,0);assert.equal(populated.propertyProfile.fields[0].publication,'private','usage permission must not become field publication consent');
+ const populated=registrationDraft(input(),actor);assert.equal(registrationIssues(populated).length,0);assert.equal(populated.propertyProfile.fields[0].publication,'approved','owner decision 2026-11-12: confirmed usage rights publish the entered core area by default');
  const raw=webAnalysisInput(populated);assert.doesNotMatch(raw,/FILE_ID|010-0000|합성 담당자/);assert.match(raw,/100/);
  const dto=publicDto(populated);assert.deepEqual(dto?.publicContact,{name:'합성 담당자',phone:'010-0000-0000'});
  populated.registration.contact.publicApproved=false;assert.equal(publicDto(populated)?.publicContact,undefined);

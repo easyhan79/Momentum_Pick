@@ -96,11 +96,21 @@ test('upstream failure does not expose secrets or raw error',async()=>{
 test('headline excludes escaped linebreak briefings and bounds length',()=>{
   assert.equal(headline('짧은 제목\\n\\n■ 설명: 긴 본문'),'짧은 제목');assert.equal(headline('가'.repeat(300)).length,100);
 });
-test('publishing requires review state and explicit complete checklist',async()=>{
-  for(const state of ['draft','in_review']){
-    const h=harness({id,app_metadata:{showroom_admin:true}},()=>[{revision:2,showroom_status:state,draft_content:{title:'제목',subtitle:'제목',summary:'요약'}}]);
-    assert.equal((await h.handler(req('POST',{propertyId:id,action:'publish',revision:2,review:{}}))).status,state==='draft'?409:400);
+test('publishing requires one explicit confirmation but no separate review step',async()=>{
+  for(const state of ['draft','in_review','unpublished']){
+    const draft_content={title:'제목',subtitle:'제목',summary:'요약'};
+    const h=harness({id,app_metadata:{showroom_admin:true}},(_url,init)=>init.method==='PATCH'?[{revision:3,showroom_status:'published'}]:[{revision:2,showroom_status:state,draft_content}]);
+    assert.equal((await h.handler(req('POST',{propertyId:id,action:'publish',revision:2,review:{}}))).status,400);
+    assert.equal((await h.handler(req('POST',{propertyId:id,action:'publish',revision:2,review:{confirmed:'yes'}}))).status,400);
+    assert.equal((await h.handler(req('POST',{propertyId:id,action:'publish',revision:2,review:{confirmed:true}}))).status,200);
   }
+});
+test('publishing records the single confirmation without requiring a memo',async()=>{
+  const h=harness({id,app_metadata:{showroom_admin:true}},(_url,init)=>{
+    if(init.method==='PATCH'){const p=JSON.parse(init.body as string);assert.equal(p.published_content._review.confirmed,true);assert.equal(p.published_content._review.by,id);assert.equal(p.published_content._review.notes,'');return[{revision:3}];}
+    return[{revision:2,showroom_status:'draft',draft_content:{title:'제목',subtitle:'제목',summary:'요약'}}];
+  });
+  assert.equal((await h.handler(req('POST',{propertyId:id,action:'publish',revision:2,review:{confirmed:true}}))).status,200);
 });
 test('publishing freezes snapshot and records authenticated approver',async()=>{
   const draft={title:'검토 제목',subtitle:'짧은 제목',summary:'검토 요약'};

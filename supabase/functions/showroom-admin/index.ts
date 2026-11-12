@@ -306,9 +306,9 @@ export function createHandler({url,key,fetcher=fetch,githubTokens=[],copyRewrite
         const current=rows[0];if(current.revision!==body.revision)throw new ApiError(409,'revision_conflict');
         const patch:Json={revision:body.revision+1};
         if(body.action==='publish'){
-          if(current.showroom_status!=='in_review')throw new ApiError(409,'review_required');
+          // One explicit confirmation replaces the former review step, four checks and memo; the older payload is still accepted.
           const review=object(body.review);
-          if(!['facts','rights','claims','privacy'].every(k=>review[k]===true)||text(review.notes).length<10)throw new ApiError(400,'checklist_required');
+          if(review.confirmed!==true&&!['facts','rights','claims','privacy'].every(k=>review[k]===true))throw new ApiError(400,'checklist_required');
           const draft=object(current.draft_content);
           if(registrationIssues(draft).length)throw new ApiError(400,'registration_contact_required');
           if(draft.propertyProfile){
@@ -317,15 +317,13 @@ export function createHandler({url,key,fetcher=fetch,githubTokens=[],copyRewrite
             if(profilePublicationIssues(profile,sources,draft.address).length)throw new ApiError(400,'profile_review_required');
             draft.propertyProfile=profile;
           }
-          if(['queued','running','failed'].includes(object(draft.planAnalysis).state))throw new ApiError(409,'plan_analysis_pending');
+          // Plan analysis state, missing zone positions and running image jobs no longer block publishing:
+          // zones without a position are shown without a pin, and later results only change the draft.
           if(!text(draft.title)||!text(draft.subtitle)||!text(draft.summary)||draft.subtitle.length>100)throw new ApiError(400,'content_review_required');
           for(const c of (draft.concepts||[])){if(!c.plan)continue;
-            if(!c.zones?.length||c.zones.some((z:Json)=>!z.position))throw new ApiError(400,'plan_positions_required');
             const assets=await db(`property_assets?id=eq.${c.plan.assetId}&property_id=eq.${id}&bucket_id=eq.showroom-private-media&kind=eq.provided_plan&select=id`);
             if(!assets.length)throw new ApiError(400,'invalid_plan');
           }
-          const imageJobs=await db(`property_image_jobs?property_id=eq.${id}&select=state`);
-          if(imageJobs.some((j:Json)=>['queued','running'].includes(j.state)))throw new ApiError(409,'image_generation_pending');
           const selected=Array.isArray(draft.assets)?draft.assets:[];
           if(selected.length>24||selected.some((a:Json)=>!UUID.test(a.id||'')))throw new ApiError(400,'invalid_media');
           if(selected.length){
@@ -336,7 +334,7 @@ export function createHandler({url,key,fetcher=fetch,githubTokens=[],copyRewrite
           const decision=draft.propertyProfile?publicDecision(draft.propertyProfile,draft.propertyProfile.fields.filter((f:any)=>visibleField(f,draft.propertyProfile))):undefined;
           if(decision)draft.customerDecision=decision;else delete draft.customerDecision;
           const now=new Date().toISOString();
-          const record={notes:text(review.notes),checks:{facts:true,rights:true,claims:true,privacy:true},by:user.id,at:now,revision:body.revision+1};
+          const record={confirmed:true,notes:text(review.notes),by:user.id,at:now,revision:body.revision+1};
           const prior=object(current.published_content)._reviewHistory;
           Object.assign(patch,{showroom_status:'published',published_content:{...draft,_review:record,_reviewHistory:[...(Array.isArray(prior)?prior:[]),record]},published_revision:body.revision+1,approved_by:user.id,approved_at:now,published_at:now});
         }else patch.showroom_status=body.action==='request-review'?'in_review':'unpublished';

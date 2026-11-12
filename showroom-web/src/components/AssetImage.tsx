@@ -7,7 +7,9 @@ export function AssetImage({ asset, className = '' }: { asset?: Asset; className
   const [failed, setFailed] = useState(false);
   useEffect(()=>setFailed(false),[asset?.url]);
   const safe = asset?.approved && /^(https:\/\/|blob:)/i.test(asset.url);
-  return <div className={`asset-image ${className}`}>
+  // Plans and AI images are shown whole; only photos are cropped to fill the frame.
+  const contain=asset?.kind==='provided_plan'||asset?.imageType==='plan'||asset?.generated===true;
+  return <div className={`asset-image ${contain?'asset-contain ':''}${className}`}>
     {safe && !failed
       ? <img src={asset.url} alt={asset.alt} onError={() => setFailed(true)} />
       : <div className="image-empty"><ImageOff size={32} strokeWidth={1} /><span>이미지 준비 중</span></div>}
