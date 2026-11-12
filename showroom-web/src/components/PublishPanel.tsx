@@ -4,9 +4,9 @@ import {blockingIssues,publicationChecklist,publishConfirmMessage,warningIssues}
 import type {PublicationIssue} from '../lib/publication';
 type Room={property_id:string;slug:string;revision:number;published_revision?:number;showroom_status:string};
 type Readiness={revision:number;issues:PublicationIssue[]};
-type Props={room:Room;busy:boolean;dirty:boolean;onPublish:()=>Promise<void>;onSave:()=>void;onReload:()=>void;onUnpublish:()=>void;onUnlinkPlan:(assetId:string)=>void};
+type Props={room:Room;busy:boolean;dirty:boolean;onPublish:()=>Promise<void>;onSave:()=>void;onReload:()=>void;onUnpublish:()=>void;onUnlinkPlan:(assetId:string)=>void;onPublishCoreFacts:()=>void};
 
-export function PublishPanel({room,busy,dirty,onPublish,onSave,onReload,onUnpublish,onUnlinkPlan}:Props){
+export function PublishPanel({room,busy,dirty,onPublish,onSave,onReload,onUnpublish,onUnlinkPlan,onPublishCoreFacts}:Props){
  const [report,setReport]=useState<Readiness>(),[checking,setChecking]=useState(false),[showIssues,setShowIssues]=useState(false),[error,setError]=useState('');
  const alive=useRef(true),sequence=useRef(0),notice=useRef<HTMLDivElement>(null);
  useEffect(()=>{alive.current=true;return()=>{alive.current=false;sequence.current++;};},[]);
@@ -55,6 +55,7 @@ export function PublishPanel({room,busy,dirty,onPublish,onSave,onReload,onUnpubl
  }
  const actionFor=(issue:PublicationIssue)=>issue.code==='unsaved_changes'?<button type="button" onClick={onSave} disabled={busy||checking}>초안 저장</button>
   :issue.code==='revision_conflict'?<button type="button" onClick={onReload} disabled={busy||checking}>최신 저장본 불러오기</button>
+  :issue.code==='core_facts_private'?<button type="button" onClick={onPublishCoreFacts} disabled={busy||checking}>입력한 면적 공개</button>
   :<><button type="button" onClick={()=>move(issue.target)}>해결할 위치로 이동 →</button>{issue.code==='invalid_plan'&&issue.assetId&&<button type="button" disabled={busy||checking||dirty} onClick={()=>onUnlinkPlan(issue.assetId!)}>참고용으로 유지 · 배경 연결 해제</button>}</>;
  const heading=showIssues?(blocking.length?`먼저 처리할 작업 ${blocking.length}개`:'게시 준비가 됐습니다.'):report?(blocking.length?`게시 전 필요한 작업 ${blocking.length}개`:'게시 준비 완료'):'게시 조건을 확인하고 있습니다.';
 

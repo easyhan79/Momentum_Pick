@@ -77,6 +77,22 @@ export function visibleField(field:ProfileField,profile:PropertyProfile){
     &&field.sourceIds.every(id=>profile.sourcePermissions.some(s=>s.assetId===id&&s.useApproved===true&&s.allowDerivedPublication===true))
     &&(field.status!=='verified'||!!field.verification?.by&&!!field.verification?.at);
 }
+export const areaFieldKeys=['land_area','building_area','gross_floor_area','exclusive_area','contract_area','warehouse_area'];
+// Area fields that hold an entered value (not AI guesses); these are core facts.
+export function coreAreaFields(profile:PropertyProfile){
+  return profile.fields.filter(f=>areaFieldKeys.includes(f.key)&&typeof f.value==='number'&&f.value>0&&f.unit==='㎡'&&['provided','verified'].includes(f.status));
+}
+// Owner decision (2026-11-12): once usage rights are confirmed, entered core facts are public by default.
+// Address, transaction and price are already public; this publishes entered area fields and lets their
+// linked sources show derived values (the source files themselves stay private).
+export function publishCoreFacts(profile:PropertyProfile):PropertyProfile{
+  const core=new Set(coreAreaFields(profile).map(f=>f.id));
+  const fields=profile.fields.map(f=>core.has(f.id)?{...f,useApproved:true,publication:'approved' as const,sourceText:f.sourceText||'등록자 제공정보'}:f);
+  const sources=new Set(fields.filter(f=>core.has(f.id)).flatMap(f=>f.sourceIds));
+  const permissions=profile.sourcePermissions.map(s=>sources.has(s.assetId)?{...s,useApproved:true,allowDerivedPublication:true}:s);
+  for(const assetId of sources)if(!permissions.some(s=>s.assetId===assetId))permissions.push({assetId,useApproved:true,allowDerivedPublication:true});
+  return {...profile,fields,sourcePermissions:permissions};
+}
 export function profileFacts(profile:PropertyProfile,includePrivate=false){
   return profile.fields.filter(f=>includePrivate||visibleField(f,profile)).map(f=>({key:f.key,label:f.label,value:f.value,unit:f.unit,evidence:f.status==='verified'?'verified' as const:f.status==='provided'?'owner_provided' as const:f.status==='unknown'?'needs_review' as const:'ai_hypothesis' as const,source:f.sourceText||'출처 확인 필요',status:f.status,...(f.asOf?{asOf:f.asOf}:{}),...(includePrivate?{publication:f.publication}:{})}));
 }
@@ -97,7 +113,11 @@ export function profilePublicationIssues(profile:PropertyProfile,assets:{id:stri
   if(typeof address!=='string'||!address.trim())add('매물 소재지를 입력하고 저장해 주세요.');
   if(profile.price.status==='unknown')add('가격 또는 가격 협의 상태를 확인해 주세요.');
   if(profile.price.status==='fixed'&&(profile.transaction==='sale'?profile.price.saleWon===null:profile.transaction==='lease'?(profile.price.depositWon===null||profile.price.monthlyWon===null):true))add('거래방식에 맞는 가격을 입력해 주세요.');
-  if(!profile.fields.some(f=>['land_area','building_area','gross_floor_area','exclusive_area','contract_area','warehouse_area'].includes(f.key)&&typeof f.value==='number'&&f.value>0&&f.unit==='㎡'&&['provided','verified'].includes(f.status)&&visibleField(f,profile)))add('공개 가능한 면적과 단위·출처를 확인해 주세요.');
+  const areas=coreAreaFields(profile);
+  if(!areas.some(f=>visibleField(f,profile))){
+    if(areas.length)issues.push({code:'core_facts_private',message:'입력한 면적이 비공개로 되어 있어 고객 화면에 나오지 않습니다. 「입력한 면적 공개」를 누르면 공개로 바뀝니다.',target:'property-facts-editor'});
+    else add('면적을 ㎡ 단위 숫자로 입력하고 저장해 주세요.');
+  }
   if(profile.fields.some(f=>f.publication==='approved'&&!visibleField(f,profile)))add('공개할 정보의 값·출처·사용 권한과 근거자료 공개 범위를 확인해 주세요.');
   const sourceIds=profile.fields.flatMap(f=>f.sourceIds);
   if(sourceIds.some(id=>!assets.some(a=>a.id===id)))add('삭제되었거나 다른 매물에 속하는 근거자료를 다시 연결해 주세요.');

@@ -93,8 +93,19 @@ const path=require('node:path');
    assert.equal(await headline.inputValue(),'관리자가 고친 헤드라인');
    result.passed.push('reload with unsaved edits asks for confirmation instead of being disabled');
 
-   // 4. Publish panel: no review step, checkboxes or memo; one confirmation publishes a draft.
+   // 4. An entered but private area blocks publishing once; one click publishes it and saves.
    const panel=page.locator('#publish-review');
+   room={...room,revision:room.revision+1,draft_content:{...room.draft_content,propertyProfile:{version:1,kind:'commercial',transaction:'sale',price:{status:'negotiable',saleWon:null,depositWon:null,monthlyWon:null},fields:[{id:'initial-area',key:'exclusive_area',label:'전용면적',value:165,unit:'㎡',status:'provided',sourceText:'등록자 제공정보 · 미검증',sourceIds:[],useApproved:false,publication:'private'}],sourcePermissions:[],highlights:[]}}};
+   await page.getByRole('button',{name:'최신 저장본 불러오기',exact:true}).click();
+   await page.getByText('최신 분석 결과와 저장본을 불러왔습니다.',{exact:false}).waitFor();
+   await panel.getByRole('button',{name:'조건 다시 확인',exact:true}).click();
+   await panel.getByRole('button',{name:'입력한 면적 공개',exact:true}).click();
+   await page.getByText('입력한 면적을 공개로 바꾸고 저장했습니다.',{exact:false}).waitFor();
+   assert.equal(room.draft_content.propertyProfile.fields[0].publication,'approved');
+   assert.equal(room.draft_content.propertyProfile.fields[0].useApproved,true);
+   result.passed.push('a private entered area is published with one click from the publish panel');
+
+   // 5. Publish panel: no review step, checkboxes or memo; one confirmation publishes a draft.
    assert.equal(await panel.getByRole('button',{name:'저장본 검수 준비',exact:true}).count(),0);
    assert.equal(await panel.locator('input[type=checkbox], textarea').count(),0);
    await panel.getByRole('button',{name:'조건 다시 확인',exact:true}).click();

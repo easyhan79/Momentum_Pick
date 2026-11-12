@@ -4,6 +4,7 @@ import {PropertyHighlightsEditor} from './PropertyHighlightsEditor';
 import {RentalScenarioEditor} from './RentalScenarioEditor';
 import {useEffect,useState} from 'react';
 import type {PropertyProfile,ProfileField} from '../../../supabase/functions/_shared/property-profile.ts';
+import {publishCoreFacts} from '../../../supabase/functions/_shared/property-profile.ts';
 import type {Showroom} from '../types/showroom';
 import {mediaRequest} from '../lib/adminApi';
 
@@ -41,7 +42,7 @@ export function PropertyFactsEditor({propertyId,content,busy,onChange}:{property
         <label>담당자 이름<input maxLength={100} value={content.registration.contact.name} onChange={e=>onChange({...content,registration:{...content.registration!,contact:{...content.registration!.contact,name:e.target.value}}})}/></label>
         <label>업무용 연락처<input type="tel" maxLength={50} value={content.registration.contact.phone} onChange={e=>onChange({...content,registration:{...content.registration!,contact:{...content.registration!.contact,phone:e.target.value}}})}/></label>
         <label><input type="checkbox" checked={content.registration.contact.publicApproved} onChange={e=>onChange({...content,registration:{...content.registration!,contact:{...content.registration!.contact,publicApproved:e.target.checked}}})}/>담당자 정보의 고객 공개에 동의합니다.</label>
-        <label><input type="checkbox" checked={content.registration.rightsApproved} onChange={e=>onChange({...content,registration:{...content.registration!,rightsApproved:e.target.checked}})}/>입력 정보와 자료의 사용 권한을 확인했습니다.</label>
+        <label><input type="checkbox" checked={content.registration.rightsApproved} onChange={e=>onChange({...content,registration:{...content.registration!,rightsApproved:e.target.checked},...(e.target.checked&&profile?{propertyProfile:publishCoreFacts(profile)}:{})})}/>입력 정보와 자료의 사용 권한을 확인했습니다.</label><small className="facts-default-public">확인하면 입력한 주소·거래조건·가격·면적은 기본으로 공개됩니다. 숨길 항목만 아래에서 비공개로 바꾸세요.</small>
       </fieldset>}
       <h3>사실정보</h3>
       {profile.fields.map((field,index)=><fieldset key={field.id} disabled={busy} className="fact-editor-field"><legend>{index+1}. {field.label}</legend>
