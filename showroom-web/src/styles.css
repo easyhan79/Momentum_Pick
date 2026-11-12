@@ -118,3 +118,6 @@
 .visual-evidence h2{margin:8px 0 12px}
 .visual-evidence>p{color:#a9b6b0;font-size:13px;margin-bottom:16px}
 @media(max-width:420px){.brand{min-width:0;flex-shrink:1}.brand small{display:none}.header-cta svg{display:none}.header-actions{gap:6px}.header-cta{padding:9px 10px}}
+.naver-export{margin-top:20px;padding:18px;border:1px solid #03c75a66;border-radius:12px;background:#03c75a0d}
+.naver-export h4{font-size:16px;margin:0 0 8px}
+.naver-export ol{margin:0 0 12px;padding-left:20px;line-height:1.8;font-size:13px;color:#c9d3cc}
