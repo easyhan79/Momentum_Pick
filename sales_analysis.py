@@ -186,7 +186,9 @@ def validate_v2_candidates(result, input_version_id, documents, images, input_te
     result['sales_strategy']=clean_optional(sales.model_dump())
     return result
 
-V2_PROMPT = '''추가로 listing_bundle과 sales_strategy를 반환하세요. 여러 필지와 건물은 내부 ID로 분리하고,
+V2_PROMPT = '''등록자 입력과 제공자료는 등록자가 확인한 작성 기준으로 사용하세요. 입력된 사실에 별도 증명이나 공개 승인을 요구하지 마세요.
+원문에 없는 내용을 만들어 사실로 바꾸지는 마세요. 미래 활용안과 수익 예상은 조건부 제안으로 구분하세요.
+추가로 listing_bundle과 sales_strategy를 반환하세요. 여러 필지와 건물은 내부 ID로 분리하고,
 건물과 필지의 연결을 모르면 parcelIds를 비워 두세요. 면적 종류와 원 단위는 보존하며 총가격을 안분하거나 합계를 임의로 계산하지 마세요.
 전체 매물 가격은 scope를 listing, targetIds를 빈 배열로 하고, 필지별·건물별 가격만 해당 대상 ID를 적으세요.
 서로 다른 값은 conflicts에 각각의 후보와 출처로 남기세요. 모든 금액·면적 후보와 판매 장점은 허용된 sourceRefs에 연결하고,

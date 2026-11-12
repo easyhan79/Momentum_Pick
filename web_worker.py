@@ -48,6 +48,7 @@ def configuration(env, require_ai=True):
 class Database:
     def __init__(self, config, requests):
         self.url, self.requests = config['url'], requests
+        self.service_key = config['key']
         self.intake_v2_enabled = config.get('intake_v2_enabled', False)
         self.intake_v2_only = config.get('intake_v2_only', False)
         self.headers = {'apikey': config['key'], 'Content-Type': 'application/json'}
@@ -62,6 +63,14 @@ class Database:
         if response.status_code != 200:
             raise RuntimeError('worker_database_unavailable')
         return response.json()
+
+    def prepare_automatic(self, property_id):
+        response = self.requests.post(self.url + '/functions/v1/showroom-automation',
+            headers={'Authorization': 'Bearer ' + self.service_key, 'apikey': self.service_key},
+            json={'propertyId': property_id}, timeout=90, allow_redirects=False)
+        if response.status_code != 200:
+            raise RuntimeError('automatic_preparation_unavailable')
+        return True
 
     def document(self, asset, property_id, refs):
         from document_sources import load_private_document
@@ -154,6 +163,21 @@ def prepare_initial_draft(db):
     saved = db.rpc('web_initial_prepare', {'p_property':candidate['propertyId'],'p_run':candidate['runId'],
                                            'p_revision':candidate['revision'],'p_generated':patch})
     return bool(saved.get('prepared') or saved.get('replayed'))
+
+
+def prepare_automatic_draft(db):
+    candidate = db.rpc('web_automatic_next', {})
+    if not candidate:
+        return False
+    if candidate['state'] == 'done':
+        result = candidate['result']
+        generated = generated_draft({'id': candidate['propertyId'], 'ai_contents': result})
+        patch = {key: generated[key] for key in ('subtitle', 'summary', 'concepts', 'unknowns')}
+        patch.update(marketing={key: (result.get(key) or '').strip()[:18000] for key in ('target_1_blog', 'target_2_blog', 'insta_caption')},
+                     listingBundle=result['listing_bundle'], salesStrategy=result['sales_strategy'])
+        db.rpc('web_automatic_apply', {'p_property': candidate['propertyId'], 'p_actor': candidate['actorId'],
+            'p_run': candidate['runId'], 'p_revision': candidate['revision'], 'p_generated': patch})
+    return db.prepare_automatic(candidate['propertyId'])
 
 
 class LeaseLost(RuntimeError):
@@ -361,7 +385,7 @@ def main():
     capabilities = [] if config['intake_v2_only'] else ['analysis', 'rewrite', 'plan']
     if os.environ.get('INTAKE_V2_ENABLED') == 'true':
         capabilities.append('analysis_v2')
-    if os.environ.get('WEB_API_IMAGES_ENABLED') == 'true' and not config['intake_v2_only']:
+    if config['intake_v2_enabled'] or os.environ.get('WEB_API_IMAGES_ENABLED') == 'true' and not config['intake_v2_only']:
         capabilities.append('image')
     def auxiliary():
         def rewrite_api(name, body):
@@ -372,10 +396,10 @@ def main():
         tasks = [] if config['intake_v2_only'] else [lambda:sum(rewrite_run(rewrite_api, rewrite_generate, limit=1, persist=persist).values()),
                  lambda:analyze_uploaded_plans(db.url, db.headers, os.environ['GEMINI_API_KEY'], requests, executor='web_worker')]
         if os.environ.get('INTAKE_V2_ENABLED') == 'true':
-            tasks.extend([lambda:prepare_initial_draft(db),lambda:cleanup_submission(db)])
-        if 'image' in capabilities and not config['intake_v2_only']:
+            tasks.extend([lambda:prepare_initial_draft(db),lambda:prepare_automatic_draft(db),lambda:cleanup_submission(db)])
+        if 'image' in capabilities:
             from image_worker import process_image_jobs
-            tasks.append(lambda:process_image_jobs(db.url, db.headers, os.environ['GEMINI_API_KEY'], requests, limit=1, executor='web_worker'))
+            tasks.append(lambda:process_image_jobs(db.url, db.headers, os.environ['GEMINI_API_KEY'], requests, limit=1, executor='web_worker', automatic_only=os.environ.get('WEB_API_IMAGES_ENABLED') != 'true' or config['intake_v2_only']))
         worked = False
         for task in tasks:
             try:

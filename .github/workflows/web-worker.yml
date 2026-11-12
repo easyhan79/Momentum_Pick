@@ -6,6 +6,14 @@ name: SpacePick web worker
 # The legacy worker runs unless WEB_WORKER_ENABLED is explicitly 'false'.
 # V2 queue processing remains off unless INTAKE_V2_ENABLED is 'true'.
 on:
+  push:
+    branches: [main]
+    paths:
+      - web_worker.py
+      - image_worker.py
+      - analysis_worker.py
+      - sales_analysis.py
+      - .github/workflows/web-worker.yml
   schedule:
     - cron: '*/10 * * * *'
   workflow_dispatch:
