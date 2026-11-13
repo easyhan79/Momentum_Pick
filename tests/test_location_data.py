@@ -185,15 +185,17 @@ class PublicDataTests(unittest.TestCase):
         self.assertEqual(report['sections'], {'kakao': 'done', 'commerce': 'unavailable', 'building': 'unavailable', 'landUse': 'unavailable'})
         self.assertTrue(report['nearby'], 'Kakao data is kept')
 
-    def test_no_data_is_an_empty_result_and_busy_servers_fail_the_report(self):
+    def test_no_data_is_an_empty_result_and_busy_servers_mark_only_their_section(self):
         report = self.report(public={'commerce': Response(200, {'header': {'resultCode': '03'}, 'body': {}}),
                                      'building': Response(200, {'response': {'header': {'resultCode': '00'}, 'body': {'items': '', 'totalCount': '0'}}})},
                              vworld={'response': Response(200, {'landUses': {'field': [], 'totalCount': '0'}})})
         self.assertEqual((report['commerce']['total'], report['building']['count'], report['landUse']['zones']), (0, 0, []))
-        for public in [{'commerce': Response(503, {})}, {'building': Response(200, {'response': {'header': {'resultCode': '22'}}})}]:
-            with self.subTest(public=public), self.assertRaises(LocationError) as caught:
-                build_report(AllSources(public=public), 'k', '주소', NOW, public_key='p')
-            self.assertTrue(caught.exception.retryable)
+        report = self.report(public={'commerce': Response(503, {}), 'building': Response(200, {'response': {'header': {'resultCode': '22'}}})},
+                             vworld={'response': Response(502, {})})
+        self.assertEqual((report['commerce'], report['building'], report['landUse']),
+                         ({'status': 'failed', 'error': 'public_503'}, {'status': 'failed', 'error': 'public_quota'}, {'status': 'failed', 'error': 'vworld_502'}))
+        self.assertEqual(report['sections']['kakao'], 'done')
+        self.assertTrue(report['nearby'], 'Kakao data is kept when another source is down')
 
     def test_lot_number_needed_for_register_and_zoning(self):
         self.assertEqual(pnu({'bCode': '4167025021', 'mainNo': '12', 'subNo': '3', 'mountain': True}), '4167025021200120003')

@@ -302,17 +302,16 @@ def land_use(requests, key, region, fetched):
 
 
 def _section(build):
-    """Retryable failures fail the whole report (it is retried); a key that is not approved yet only marks the section."""
+    """Extra sources never discard the Kakao result: a failure only marks its own section, which the
+    database hands back for another try after a day ("failed" = temporary, "unavailable" = key/approval)."""
     try:
         return build()
     except LocationError as exc:
-        if exc.retryable:
-            raise
-        return {'status': 'unavailable', 'error': exc.code}
+        return {'status': 'failed' if exc.retryable else 'unavailable', 'error': exc.code}
 
 
 def build_report(requests, key, address, now=None, public_key=None, vworld_key=None):
-    """Returns ('done', report) or ('not_found', {}). Raises LocationError on a retryable failure."""
+    """Returns ('done', report) or ('not_found', {}). Raises LocationError when Kakao fails."""
     place = geocode(requests, key, address)
     if place is None:
         return 'not_found', {}
