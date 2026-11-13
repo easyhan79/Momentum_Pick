@@ -138,3 +138,13 @@
 .brief-tone label{white-space:nowrap}
 .brief-tone input[type=radio]{width:auto;margin:0;accent-color:#d4af37}
 .brief-points .admin-toolbar .button{min-height:36px;padding:6px 12px}
+.workflow-progress{margin:0 0 20px}
+.workflow-progress ol{list-style:none;padding:0;margin:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}
+.workflow-progress li button{width:100%;text-align:left;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:#ffffff05;display:grid;gap:4px}
+.workflow-progress li strong{font-size:13px}
+.workflow-progress li span{font-size:12px;color:#a9b6b0}
+.workflow-progress li.workflow-done button{border-color:#2b826b;background:#10281f}
+.workflow-progress li.workflow-running button{border-color:#48baff66;background:#0f2230}
+.workflow-progress li.workflow-review button{border-color:#a48a46;background:#282316}
+.workflow-progress li.workflow-blocked button{border-color:#b36850;background:#2a1712}
+.workflow-action{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-top:12px;padding:12px;border:1px dashed #a48a46;border-radius:10px;font-size:13px}

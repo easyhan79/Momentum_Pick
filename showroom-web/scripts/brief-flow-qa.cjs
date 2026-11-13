@@ -7,12 +7,15 @@ const path=require('node:path');
 (async()=>{
  const {createHandler}=await import('../../supabase/functions/showroom-admin/index.ts');
  const property='10000000-0000-4000-8000-000000000001';
- let room={id:property,property_id:property,slug:'conflict-qa',showroom_status:'draft',revision:1,draft_content:{schema_version:'1.0',id:property,category:'commercial',title:'합성 상가 예시',subtitle:'처음 헤드라인',summary:'처음 요약입니다.',address:'합성 소재지',salesStrategy:{positioning:'역세권 테라스 상가',buyerSegments:[{label:'카페 창업자',rationale:'테라스 좌석 수요',sourceRefs:[{kind:'input_text'}]},{label:'학원 운영자',rationale:'학교 인접',sourceRefs:[{kind:'input_text'}]}],sellingPoints:[{fact:'테라스 20평',buyerBenefit:'야외 좌석 운영',sourceRefs:[{kind:'input_text',excerpt:'테라스 20평'}]},{fact:'역 도보 3분',buyerBenefit:'방문 편리',sourceRefs:[{kind:'input_text',excerpt:'역 3분'}]},{fact:'코너 자리',buyerBenefit:'가시성',sourceRefs:[{kind:'input_text'}]}],useScenarios:[],headlineVariants:[],materialConstraints:[{description:'권리금 조건 미확인',relatedClaim:'권리금'}],callToAction:'문의'},propertyProfile:{version:1,kind:'commercial',transaction:'sale',price:{status:'fixed',saleWon:300000000,depositWon:null,monthlyWon:null},fields:[{id:'initial-area',key:'exclusive_area',label:'전용면적',value:165.29,unit:'㎡',status:'provided',sourceText:'등록자 제공정보',sourceIds:[],useApproved:true,publication:'approved'}],sourcePermissions:[],highlights:[]},registration:{channel:'web',rightsApproved:true,contact:{name:'합성 담당자',phone:'010-0000-0000',publicApproved:true}},facts:[],concepts:[],unknowns:[],assets:[]}};let queued;
+ let room={id:property,property_id:property,slug:'conflict-qa',showroom_status:'draft',revision:1,draft_content:{schema_version:'1.0',id:property,category:'commercial',title:'합성 상가 예시',subtitle:'처음 헤드라인',summary:'처음 요약입니다.',address:'합성 소재지',salesStrategy:{positioning:'역세권 테라스 상가',buyerSegments:[{label:'카페 창업자',rationale:'테라스 좌석 수요',sourceRefs:[{kind:'input_text'}]},{label:'학원 운영자',rationale:'학교 인접',sourceRefs:[{kind:'input_text'}]}],sellingPoints:[{fact:'테라스 20평',buyerBenefit:'야외 좌석 운영',sourceRefs:[{kind:'input_text',excerpt:'테라스 20평'}]},{fact:'역 도보 3분',buyerBenefit:'방문 편리',sourceRefs:[{kind:'input_text',excerpt:'역 3분'}]},{fact:'코너 자리',buyerBenefit:'가시성',sourceRefs:[{kind:'input_text'}]}],useScenarios:[],headlineVariants:[],materialConstraints:[{description:'권리금 조건 미확인',relatedClaim:'권리금'}],callToAction:'문의'},propertyProfile:{version:1,kind:'commercial',transaction:'sale',price:{status:'fixed',saleWon:300000000,depositWon:null,monthlyWon:null},fields:[{id:'initial-area',key:'exclusive_area',label:'전용면적',value:165.29,unit:'㎡',status:'provided',sourceText:'등록자 제공정보',sourceIds:[],useApproved:true,publication:'approved'}],sourcePermissions:[],highlights:[]},registration:{channel:'web',rightsApproved:true,contact:{name:'합성 담당자',phone:'010-0000-0000',publicApproved:true}},facts:[],concepts:[],unknowns:[],assets:[]}};let queued,imageJobs=[];const imageRequests=[];
  const background=summary=>{room={...room,revision:room.revision+1,draft_content:{...room.draft_content,summary}};};
  const mockFetch=async(url,init={})=>{
    const pathname=String(url);
    if(pathname.endsWith('/rpc/copy_rewrite_queue')){queued=JSON.parse(init.body);return Response.json({id:queued.p_id,queued:true,state:'queued'});}
-   if(pathname.includes('/property_copy_rewrites?'))return Response.json([]);
+   if(pathname.includes('/property_copy_rewrites?'))return Response.json(queued?[{id:queued.p_id,property_id:property,base_revision:queued.p_revision,fields:queued.p_fields,instruction:queued.p_instruction,state:'queued',attempts:0,last_error_code:'',original:{},result:null,created_at:new Date().toISOString(),updated_at:new Date().toISOString()}]:[]);
+   if(pathname.endsWith('/rpc/image_enqueue')){const args=JSON.parse(init.body);imageRequests.push(args.p_slot);imageJobs=[{id:'40000000-0000-4000-8000-00000000000'+imageRequests.length,property_id:property,slot:args.p_slot,state:'queued',attempts:0,last_error_code:'',usage:{}}];return Response.json(imageJobs[0]);}
+   if(pathname.endsWith('/rpc/image_sync_assets'))return Response.json({});
+   if(pathname.includes('/property_image_jobs?'))return Response.json(imageJobs);
    if(pathname.endsWith('/auth/v1/user'))return Response.json({id:property,app_metadata:{showroom_admin:true}});
    if(pathname.endsWith('/rpc/showroom_save_concept_draft')){const args=JSON.parse(init.body);if(args.p_revision!==room.revision)return Response.json([]);room={...room,draft_content:args.p_content,revision:room.revision+1};return Response.json(room);}
    if(pathname.includes('/property_showrooms?')){
@@ -81,6 +84,16 @@ const path=require('node:path');
    for(const id of ['#copy-rewrite','#publish-review','#showroom-draft'])await page.locator(id).waitFor();
    assert.equal(await page.locator('#image-settings').count(),0);
    result.passed.push('brief check proposes from analysis, edits order and tone, then saves and requests rewrites of all copy from it');
+   const progress=page.locator('.workflow-progress');
+   await progress.locator('li.workflow-running',{hasText:'글'}).waitFor();
+   assert.match(await progress.locator('li',{hasText:'기획서'}).innerText(),/완료/);
+   page.once('dialog',dialog=>{assert.match(dialog.message(),/장당 최대 250원/);void dialog.accept();});
+   await progress.getByRole('button',{name:'이 글에 맞춰 이미지 만들기 (1장 · 최대 250원)',exact:true}).click();
+   await progress.getByText('이미지 1장을 요청했습니다.',{exact:false}).waitFor();
+   assert.deepEqual(imageRequests,['hero']);
+   await progress.locator('li.workflow-running',{hasText:'이미지'}).waitFor();
+   await page.locator('.workflow-progress').screenshot({path:path.join(directory,'workflow-progress.png')});
+   result.passed.push('progress line shows each stage and requests the missing images after a cost confirmation');
    await steps.getByRole('button',{name:'② 기획 확인',exact:true}).click();
    await brief.getByRole('button',{name:'사실정보 수정',exact:true}).click();
    await steps.getByRole('button',{name:'① 입력·자료',exact:true,pressed:true}).waitFor();
