@@ -161,3 +161,15 @@
 .media-queue li.media-failed{border-color:#b36850}
 .media-queue li select{width:auto;padding:4px 8px}.media-queue li em{font-style:normal;color:#a9b6b0}
 .admin-steps .save-status{margin-left:auto;align-self:center;font-size:12px;color:#a9b6b0}
+.location-meta{color:var(--muted,#aab);font-size:14px}
+.location-table{width:100%;border-collapse:collapse;margin:8px 0 14px;font-size:14px}
+.location-table th,.location-table td{padding:8px 6px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+.location-table thead th{font-weight:600;color:var(--muted,#aab)}
+.location-table td:nth-child(2),.location-table td:nth-child(3){white-space:nowrap}
+@media(max-width:560px){.location-table thead{display:none}.location-table tr{display:grid;grid-template-columns:auto auto 1fr;gap:2px 10px;padding:8px 0;border-bottom:1px solid var(--line)}.location-table th,.location-table td{border:0;padding:0}.location-table td:last-child{grid-column:1/-1;color:var(--muted,#aab)}}
+.location-section{border-top:1px solid var(--line);padding-top:14px;margin-top:14px}
+.location-section h3{font-size:16px;margin:0 0 8px}
+.location-chips{list-style:none;padding:0;margin:8px 0;display:flex;flex-wrap:wrap;gap:6px}
+.location-chips li{border:1px solid var(--line);border-radius:999px;padding:4px 10px;font-size:13px;background:#ffffff06}
+.location-chips small{color:var(--muted)}
+.location-building{margin:8px 0}.location-building ul{margin:6px 0 0;padding-left:18px;font-size:14px;line-height:1.7}

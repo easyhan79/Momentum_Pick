@@ -21,6 +21,7 @@ import {naturalCustomerCopy} from '../../../supabase/functions/_shared/customer-
 import {reapplyEdits} from '../lib/draftConflict';
 import {BriefConfirm} from '../components/BriefConfirm';
 import {WorkflowProgress} from '../components/WorkflowProgress';
+import {LocationReport} from '../components/LocationReport';
 import {briefFromStrategy,briefInstruction} from '../../../supabase/functions/_shared/brief.ts';
 import {rewriteFields} from '../../../supabase/functions/_shared/copy-rewrite.ts';
 import {publishCoreFacts} from '../../../supabase/functions/_shared/property-profile.ts';
@@ -92,6 +93,7 @@ const kindLabels:Record<string,string>={commercial:'상가',land:'토지',factor
     {signedIn&&show('input')&&draft?.draft_content.registration?.channel==='web'&&<section className="glass admin-editor"><PropertyMedia propertyId={draft.property_id} allowPhotos allowDocuments deferGeneration onChanged={()=>setMediaVersion(n=>n+1)}/></section>}
     {signedIn&&show('input')&&draft?.draft_content.registration?.channel==='web'&&adminWebMode===false&&<section className="glass admin-editor"><h2>AI 활용 초안 생성</h2><p>저장된 기본정보로 분석합니다. 사진·도면은 선택 사항이며, 제공 도면의 구역 분석은 아래에서 별도로 요청할 수 있습니다. 결과 가져오기는 기존 활용 콘셉트를 대체하며 사실정보와 승인본은 유지합니다.</p><div className="admin-toolbar"><button type="button" className="button button-outline" disabled={busy} onClick={()=>void run(queueWebAnalysis)}>저장 후 AI 분석 요청</button><button type="button" className="button button-outline" disabled={busy} onClick={()=>void run(applyWebAnalysis)}>완료된 AI 활용 콘셉트 가져오기</button></div></section>}
     {signedIn&&show('input')&&adminWebMode&&draft?.draft_content.registration?.channel==='web'&&<WebProcessingPanel key={`processing:${draft.property_id}`} room={draft} locked={busy||dirty||sourceDirty||marketingDirty} onBusyChange={setBusy} onApplied={room=>{setDraft(room);setDirty(false);setRewriteVersion(v=>v+1);}}/>}
+    {signedIn&&show('input')&&draft&&<LocationReport key={`location:${draft.property_id}`} propertyId={draft.property_id} address={String(draft.draft_content.address||'')} revision={draft.revision}/>}
     {signedIn&&show('input')&&draft&&<PropertyFactsEditor key={`facts:${draft.property_id}:${mediaVersion}`} propertyId={draft.property_id} content={draft.draft_content} busy={busy} onChange={content=>{setDirty(true);setDraft({...draft,draft_content:content});}}/>}
     {signedIn&&show('publish')&&draft&&<ShowroomAddress room={draft} locked={busy||dirty} onSaved={value=>setDraft(value)}/>}
     {signedIn&&show()&&draft&&<ImageSettingsEditor key={`image-settings:${draft.property_id}:${mediaVersion}`} content={draft.draft_content} busy={busy} onChange={content=>{setDirty(true);setDraft({...draft,draft_content:content});}}/>}

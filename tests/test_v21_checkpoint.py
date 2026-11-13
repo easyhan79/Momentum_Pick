@@ -6,7 +6,7 @@ from scripts import v21_checkpoint as checkpoint
 class CheckpointTests(unittest.TestCase):
     def setUp(self):
         self.directory=tempfile.TemporaryDirectory();self.addCleanup(self.directory.cleanup);self.root=Path(self.directory.name)
-        self.state=self.root/'SPACEPICK_V2_1_RUN_STATE.json';self.progress=self.root/'SPACEPICK_V2_1_PROGRESS.md'
+        archive=self.root/'docs'/'archive';archive.mkdir(parents=True);self.state=archive/'SPACEPICK_V2_1_RUN_STATE.json';self.progress=archive/'SPACEPICK_V2_1_PROGRESS.md'
         self.state.write_text(json.dumps({'schemaVersion':1,'stageOrder':['S0','S1','S2'],'stages':{},'lastCompletedStage':None}));self.progress.write_text('# synthetic progress\n')
         self.addCleanup(patch.stopall);patch.object(checkpoint,'ROOT',self.root).start();patch.object(checkpoint.subprocess,'check_output',side_effect=lambda command,**kw:'a'*40 if 'rev-parse' in command else ' M synthetic.ts\n' if 'status' in command else 'feature/synthetic').start()
     def run_checkpoint(self,*args,**kwargs):

@@ -132,6 +132,12 @@ export function createHandler({url,key,fetcher=fetch,githubTokens=[],copyRewrite
         const rooms=await db(`property_showrooms?property_id=eq.${id}&select=draft_content`);
         return reply({content:marketingContent(properties[0].ai_contents,object(rooms[0]?.draft_content).marketing),copyReview:customerCopyReview(properties[0].ai_contents)});
       }
+      if(req.method==='GET'&&query.get('action')==='location'){
+        const id=query.get('propertyId')||'';if(!UUID.test(id))throw new ApiError(400,'invalid_property_id');
+        /* Built by the web worker from map/public data. Before the table exists the panel shows "not available". */
+        try{const rows=await db(`property_location_reports?property_id=eq.${id}&select=address,state,report,error_code,fetched_at,updated_at`);return reply({available:true,report:rows[0]||null});}
+        catch{return reply({available:false,report:null});}
+      }
       if(req.method==='GET'&&query.get('action')==='image-package'){
         const id=query.get('propertyId')||'';if(!UUID.test(id))throw new ApiError(400,'invalid_property_id');
         const jobs=await db(`property_image_jobs?property_id=eq.${id}&select=id,slot,state,attempts,asset_id,last_error_code,usage&order=updated_at`);
