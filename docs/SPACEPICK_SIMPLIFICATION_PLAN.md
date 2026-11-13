@@ -131,8 +131,8 @@
 - [x] ~~집 컴퓨터의 푸시하지 않은 코드 복구~~ → **사용자 결정(2026-11-12): 집 컴퓨터 코드는 반영하지 않는다. GitHub `main`을 기준으로 진행한다.** GitHub 코드로 운영에 배포하면 운영에만 있던 화면 기능(광고 자동 준비 화면, 카드뉴스 승인 등)은 사라진다. 필요한 기능은 이 계획의 단계에서 새로 만든다.
 - [ ] 운영 Supabase 함수(`showroom-admin` 등)와 DB가 GitHub 코드와 다를 수 있다. 첫 배포 전에 운영 함수 버전을 GitHub 코드로 덮어써도 되는지 확인한다.
 - [x] 운영 DB에서 3-4의 DB 함수 4개 정의를 받았다 → `supabase/review/production_v2_functions_20261112.sql`(참고용, 마이그레이션 아님).
-- [ ] **운영 전용 마이그레이션 4개 복구:** 운영 적용 기록 비교 결과(2026-11-13) `20261109041725_intake_submission_v2`, `20261109041738_channel_release_v2`, `20261109114504_web_worker_dispatch_lease`, `20261112014304_automatic_publication`이 저장소 어느 브랜치에도 없다. 운영 기록에 SQL 본문이 있으므로(statement_count 1) 꺼내서 `supabase/migrations`에 추가하고 새 DB 적용 테스트를 한다. (11/05~11/07의 11개는 운영 기록에 본문이 없지만 저장소에 있음)
-- [ ] **새로 발견:** 이 함수들이 쓰는 테이블 `web_submission_sessions`·`property_editor_versions`, 함수 `web_apply_v2_reanalysis`, `property_processing_runs`의 `is_v2_submission`·`prepared_run_id` 열도 저장소에 없다. 운영 DB의 적용 기록(`supabase_migrations.schema_migrations`)에서 저장소에 없는 마이그레이션을 찾아 복구한다.
+- [x] **운영 전용 마이그레이션 4개 복구 (2026-11-13):** 운영 적용 기록에서 SQL 본문을 꺼내 `supabase/migrations`에 추가(`20261109041725_intake_submission_v2`, `20261109041738_channel_release_v2`, `20261109114504_web_worker_dispatch_lease`, `20261112014304_automatic_publication`). 빈 DB에 전체 마이그레이션이 순서대로 적용되고, 자동 준비 함수 4개가 운영 정의와 똑같이 만들어짐을 `supabase/tests/all-migrations-db.test.mjs`로 검사한다.
+- [x] **새로 발견했던 누락 객체**(`web_submission_sessions`, `property_editor_versions`, `web_apply_v2_reanalysis`, `is_v2_submission`·`prepared_run_id` 열)는 복구한 마이그레이션에 모두 들어 있었다.
 - [x] 게시할 때 실제로 뜬 오류 확인 → 버전 충돌 계열 안내. 3-1의 "빠져나갈 수 없는 막힘"이 원인으로 보인다.
 - [ ] 집 컴퓨터 코드를 되살릴 수 없다면: 운영 번들과 GitHub 코드의 차이(화면 문구 249개)를 목록으로 만들어 다시 구현할 범위를 정한다.
 
@@ -263,3 +263,4 @@ AI는 숫자를 만들지 않는다. 공공데이터에서 가져온 값을 해�
 | 2026-11-12 | 결정 | 사용자: 공인중개사 광고 표시는 차후에 | 결정 |
 | 2026-11-12 | 3단계 | 네이버 블로그 복사·사진 ZIP·카드뉴스 ZIP 완료. 검사: JS/TS 213개 중 211개(기존 2개 제외 전부), Python 75개, 브라우저 검사 전부 통과 | 완료 |
 | 2026-11-13 | 0단계 | 운영 마이그레이션 기록 비교: 운영에만 있는 4개(intake_submission_v2, channel_release_v2, web_worker_dispatch_lease, automatic_publication) 확인, 모두 SQL 본문 보관됨 → 복구 가능. 본문 내보내기 쿼리를 사용자에게 요청 | 진행 |
+| 2026-11-13 | 0단계 | 운영 전용 마이그레이션 4개 복구 완료. 빈 DB에 전체 24개 적용 성공, 자동 준비 함수 4개가 운영 정의와 동일함을 검사로 확인. JS/TS 214개 중 212개(기존 2개 제외 전부), Python 75개 통과. 남은 0단계: 11/05~11/07 마이그레이션 11개는 운영 기록에 본문이 없어 운영과 같은지 직접 대조는 못 함 | 완료 |

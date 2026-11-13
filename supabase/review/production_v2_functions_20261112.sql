@@ -1,9 +1,8 @@
 -- Production-only function definitions exported from Supabase project aklcylhqslgntkgloqpi on 2026-11-12
 -- (SQL Editor: pg_get_functiondef). REFERENCE ONLY - NOT A MIGRATION.
--- These functions depend on objects that are missing from supabase/migrations:
---   tables web_submission_sessions, property_editor_versions; function web_apply_v2_reanalysis;
---   property_processing_runs columns is_v2_submission, prepared_run_id (and result/automation usage).
--- Applying this file to a fresh database fails until those objects are recovered.
+-- 2026-11-13: the migrations that create these functions were recovered from production into
+-- supabase/migrations (20261109041725, 20261109041738, 20261109114504, 20261112014304).
+-- supabase/tests/all-migrations-db.test.mjs checks that the recovered migrations recreate exactly these definitions.
 -- Image budget: web_automatic_apply and web_automatic_image_enqueue hard-code 500 KRW per image.
 
 -- web_automatic_apply
