@@ -57,6 +57,8 @@ jobs:
           ANTHROPIC_MODEL: ${{ vars.ANTHROPIC_MODEL || 'claude-sonnet-5-5' }}
           WEB_API_IMAGES_ENABLED: 'false'
           KAKAO_REST_API_KEY: ${{ secrets.KAKAO_REST_API_KEY }}
+          PUBLIC_DATA_API_KEY: ${{ secrets.PUBLIC_DATA_API_KEY }}
+          VWORLD_API_KEY: ${{ secrets.VWORLD_API_KEY }}
         run: |
           # 50 min of service, then SIGTERM; web_worker saves in-flight results (up to 6 min grace).
           timeout --signal=TERM --kill-after=360 3000 python -u web_worker.py || code=$?

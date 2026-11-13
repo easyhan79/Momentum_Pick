@@ -48,6 +48,17 @@ test('reports follow the current draft address and keep good data through a fail
   await save(db,id,'경기 여주시 가남읍 1','done',{version:1});
   await db.query(`UPDATE property_location_reports SET fetched_at=now()-interval '91 days'`);
   assert.equal((await next(db)).property_id,id);
+  // A worker that can now build more sections rebuilds reports that lack them;
+  // a section that was unavailable (key not approved) is retried after a day.
+  await db.query(`UPDATE property_location_reports SET fetched_at=now()`);
+  const nextWith=async sections=>(await db.query(`SELECT public.location_report_next($1) j`,[sections])).rows[0].j;
+  await save(db,id,'경기 여주시 가남읍 1','done',{version:1,sections:{kakao:'done'}});
+  assert.equal(await nextWith(['kakao']),null);
+  assert.equal((await nextWith(['kakao','commerce'])).property_id,id);
+  await save(db,id,'경기 여주시 가남읍 1','done',{version:1,sections:{kakao:'done',commerce:'unavailable'}});
+  assert.equal(await nextWith(['kakao','commerce']),null,'unavailable sections wait a day');
+  await db.query(`UPDATE property_location_reports SET fetched_at=now()-interval '25 hours'`);
+  assert.equal((await nextWith(['kakao','commerce'])).property_id,id);
   await assert.rejects(save(db,id,'경기 여주시 가남읍 1','unknown'),/location_report_invalid/);
 });
 

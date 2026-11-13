@@ -2,7 +2,8 @@
 
 Sources: Kakao Local API (address -> coordinate, nearby facilities by category) and, with a
 data.go.kr key, the 소상공인시장진흥공단 상가(상권)정보 (shops by industry within a radius) and the
-국토교통부 건축물대장 표제부 (building use, floors, approval date, areas).
+국토교통부 건축물대장 표제부 (building use, floors, approval date, areas), and with a VWorld key
+the 토지이용계획 (zoning districts that include or touch the lot).
 Numbers come from the provider as-is; the AI only interprets them. Every report carries
 its source, the date it was fetched and the search radius, so customer-facing text can
 cite them. The API key is read from the environment and never logged or stored.
@@ -241,6 +242,65 @@ def building(requests, key, region, fetched):
     return {'status': 'done', 'source': BUILDING_SOURCE, 'fetchedAt': fetched, 'count': len(main), 'buildings': buildings}
 
 
+# VWorld 국가중점데이터: land-use plan attributes for one lot (PNU).
+LANDUSE_URL = 'https://api.vworld.kr/ned/data/getLandUseAttr'
+LANDUSE_SOURCE = {'name': '국토교통부 토지이용계획(브이월드)', 'url': 'https://www.vworld.kr/dtna/dtna_apiSvcFc_s001.do'}
+VWORLD_DOMAIN = 'https://spacepick.kr'  # The service URL registered with the key.
+
+
+def pnu(region):
+    """19-digit parcel number: legal-dong code, 1 (land) or 2 (mountain), main and sub lot numbers."""
+    code, main, sub = region.get('bCode', ''), region.get('mainNo', ''), region.get('subNo') or '0'
+    if len(code) != 10 or not code.isdigit() or not main.isdigit() or not sub.isdigit():
+        return ''
+    return code + ('2' if region.get('mountain') else '1') + main.zfill(4) + sub.zfill(4)
+
+
+def land_use(requests, key, region, fetched):
+    lot = pnu(region)
+    if not lot:
+        return {'status': 'unavailable', 'error': 'lot_number_missing'}
+    try:
+        response = requests.get(LANDUSE_URL, params={'key': key, 'domain': VWORLD_DOMAIN, 'pnu': lot, 'format': 'json', 'numOfRows': 100, 'pageNo': 1},
+                                timeout=20, allow_redirects=False)
+    except Exception:
+        raise LocationError('vworld_transport', True) from None
+    if response.status_code in (401, 403):
+        raise LocationError('vworld_unauthorized')
+    if response.status_code == 429 or response.status_code >= 500:
+        raise LocationError('vworld_' + str(response.status_code), True)
+    if response.status_code != 200:
+        raise LocationError('vworld_' + str(response.status_code))
+    try:
+        data = response.json()
+    except ValueError:
+        raise LocationError('vworld_response_invalid', True) from None
+    body = data.get('landUses') if isinstance(data, dict) else None
+    if not isinstance(body, dict):
+        text = json.dumps(data, ensure_ascii=False)[:2000] if isinstance(data, (dict, list)) else ''
+        if 'KEY' in text.upper():
+            raise LocationError('vworld_unauthorized')
+        raise LocationError('vworld_response_invalid', True)
+    code = str(body.get('resultCode') or '').upper()
+    if code and code not in ('00', '0', 'OK', 'NORMAL_SERVICE', 'INFO-000'):
+        if 'KEY' in code or 'DOMAIN' in code or 'AUTH' in code:
+            raise LocationError('vworld_unauthorized')
+        if code in ('NOT_FOUND', 'INFO-200', '03'):
+            body = {}
+        else:
+            raise LocationError('vworld_result_' + _text(code, 20).lower())
+    rows = body.get('field') or []
+    rows = [rows] if isinstance(rows, dict) else [r for r in rows if isinstance(r, dict)] if isinstance(rows, list) else []
+    zones, seen = [], set()
+    for r in rows:
+        name = _text(r.get('prposAreaDstrcCodeNm'), 80)
+        relation = _text(r.get('cnflcAtNm'), 10)  # 포함 / 저촉 / 접합
+        if name and (name, relation) not in seen:
+            seen.add((name, relation))
+            zones.append({'name': name, 'relation': relation, 'updatedOn': _text(r.get('lastUpdtDt'), 10)})
+    return {'status': 'done', 'source': LANDUSE_SOURCE, 'fetchedAt': fetched, 'pnu': lot, 'zones': zones[:30]}
+
+
 def _section(build):
     """Retryable failures fail the whole report (it is retried); a key that is not approved yet only marks the section."""
     try:
@@ -251,7 +311,7 @@ def _section(build):
         return {'status': 'unavailable', 'error': exc.code}
 
 
-def build_report(requests, key, address, now=None, public_key=None):
+def build_report(requests, key, address, now=None, public_key=None, vworld_key=None):
     """Returns ('done', report) or ('not_found', {}). Raises LocationError on a retryable failure."""
     place = geocode(requests, key, address)
     if place is None:
@@ -270,20 +330,23 @@ def build_report(requests, key, address, now=None, public_key=None):
         report['commerce'] = _section(lambda: commerce(requests, public_key, place['coordinate'], fetched))
         report['building'] = _section(lambda: building(requests, public_key, place['region'], fetched))
         report['sections'].update(commerce=report['commerce']['status'], building=report['building']['status'])
+    if vworld_key:
+        report['landUse'] = _section(lambda: land_use(requests, vworld_key, place['region'], fetched))
+        report['sections']['landUse'] = report['landUse']['status']
     return 'done', report
 
 
-def sections_for(public_key):
-    return ['kakao', 'commerce', 'building'] if public_key else ['kakao']
+def sections_for(public_key=None, vworld_key=None):
+    return ['kakao'] + (['commerce', 'building'] if public_key else []) + (['landUse'] if vworld_key else [])
 
 
-def refresh_next(db, key, requests, emit=print, now=None, public_key=None):
+def refresh_next(db, key, requests, emit=print, now=None, public_key=None, vworld_key=None):
     """Builds the report for one listing that needs it. Returns True when work was done."""
-    job = db.rpc('location_report_next', {'p_sections': sections_for(public_key)})
+    job = db.rpc('location_report_next', {'p_sections': sections_for(public_key, vworld_key)})
     if not job:
         return False
     try:
-        state, report = build_report(requests, key, job['address'], now, public_key)
+        state, report = build_report(requests, key, job['address'], now, public_key, vworld_key)
         error = ''
     except LocationError as exc:
         state, report, error = 'failed', {}, exc.code
@@ -320,6 +383,9 @@ def prompt_context(report):
                  ('연면적 ' + str(b['totalArea']) + '㎡') if b.get('totalArea') else '',
                  ('주차 ' + str(b['parking']) + '대') if b.get('parking') else '']
         lines.append('건축물대장(출처: ' + register['source']['name'] + ') ' + (b.get('name') or b.get('dong') or '건물') + ': ' + ', '.join(p for p in parts if p))
+    zoning = report.get('landUse') or {}
+    if zoning.get('status') == 'done' and zoning.get('zones'):
+        lines.append('토지이용계획(출처: ' + zoning['source']['name'] + '): ' + ', '.join(z['name'] + ('(' + z['relation'] + ')' if z.get('relation') else '') for z in zoning['zones'][:12]))
     return head + '\n' + '\n'.join(lines)
 
 

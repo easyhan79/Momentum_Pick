@@ -1,0 +1,30 @@
+name: SpacePick location data check
+# Calls Kakao, data.go.kr and VWorld once for a public address (Seoul City Hall) and prints
+# only statuses and counts. Read-only; touches no database. Runs when the location code changes
+# on a working branch, or on demand.
+on:
+  push:
+    branches-ignore: [main]
+    paths:
+      - location_data.py
+      - scripts/location_probe.py
+      - .github/workflows/location-probe.yml
+  workflow_dispatch:
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install requests
+      - name: Check location data sources (values are never printed)
+        env:
+          KAKAO_REST_API_KEY: ${{ secrets.KAKAO_REST_API_KEY }}
+          PUBLIC_DATA_API_KEY: ${{ secrets.PUBLIC_DATA_API_KEY }}
+          VWORLD_API_KEY: ${{ secrets.VWORLD_API_KEY }}
+        run: python -u scripts/location_probe.py

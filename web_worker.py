@@ -439,7 +439,7 @@ def main():
             from location_data import refresh_next
             def location_task():
                 try:
-                    return refresh_next(db, os.environ['KAKAO_REST_API_KEY'], requests)
+                    return refresh_next(db, os.environ['KAKAO_REST_API_KEY'], requests, public_key=os.environ.get('PUBLIC_DATA_API_KEY') or None, vworld_key=os.environ.get('VWORLD_API_KEY') or None)
                 except RuntimeError:
                     location_pause[0] = time.monotonic() + 600  # Table not migrated yet or DB busy: retry in 10 minutes.
                     raise
