@@ -11,3 +11,6 @@ export function imageSettingsReady(settings:ImageSettings){return settings.mode=
 export function imageSettingSlots(previous:unknown,next:unknown,concepts:{id:string}[]){return JSON.stringify(previous??null)===JSON.stringify(next??null)?[]:['hero',...concepts.map(c=>c.id)];}
 
 export const imageTypeLabels={concept:'AI 활용 콘셉트 이미지 · 실제 매물 모습과 다를 수 있음',plan:'도면 기반 AI 활용 예상도 · 시공 및 인허가 검토 전',photo:'현장 사진 기반 AI 변환 이미지 · 실제 현황 아님'};
+
+// Budget reserved per image request; must match image_worker.RESERVATION_KRW and the database functions.
+export const IMAGE_RESERVATION_KRW=250;

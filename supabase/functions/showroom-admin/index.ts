@@ -7,6 +7,7 @@ import {registrationDraft,registrationContact,registrationIssues,webAnalysisInpu
 import {validateProfile,ProfileError,profilePublicationIssues,visibleField} from '../_shared/property-profile.ts';
 import {originAllowed,corsOrigin,validSlug,slugSuggestions} from '../_shared/site.ts';
 import {publicationIssues} from '../_shared/publication.ts';
+import {validateBrief} from '../_shared/brief.ts';
 import {queuePlan,dispatchPlan} from '../_shared/plan-queue.ts';
 import {naturalCustomerCopy,customerCopyReview} from '../_shared/customer-copy.ts';
 import {rewriteSnapshot,rewriteJob,selectedRewriteFields,dispatchRewrite} from '../_shared/copy-rewrite.ts';
@@ -383,6 +384,8 @@ export function createHandler({url,key,fetcher=fetch,githubTokens=[],copyRewrite
         const manualComplete=validated.some(c=>c.plan)&&validated.every(c=>!c.plan||c.zones.every((z:Json)=>z.position));
         const planAnalysis=manualComplete&&['failed','needs_review'].includes(object(prior.planAnalysis).state)?{...prior.planAnalysis,state:'manual_reviewed'}:prior.planAnalysis;
         const content:Json={...prior,planAnalysis,concepts:validated,title:edits.title.trim(),subtitle:edits.subtitle.trim(),summary:edits.summary.trim()};
+        // 기획서 confirmed by the admin; later rewrites and image prompts follow it.
+        if(edits.brief!==undefined){try{content.brief={...validateBrief(edits.brief),updatedAt:new Date().toISOString(),updatedBy:user.id};}catch{throw new ApiError(400,'invalid_brief');}}
         if(edits.propertyProfile!==undefined){
           const sources=await db(`property_assets?property_id=eq.${id}&bucket_id=eq.showroom-private-media&select=id,source_type`);
           content.propertyProfile=validateProfile(edits.propertyProfile,{assets:sources,userId:user.id,now:new Date().toISOString(),previous:prior.propertyProfile});

@@ -27,7 +27,7 @@ class Requests:
         if url.endswith(':countTokens'):return Response({'totalTokens':99999 if self.too_big else 1000})
         if url.endswith(':generateContent'):
             assert json['generationConfig']['candidateCount']==1
-            assert json['generationConfig']['maxOutputTokens']==4096
+            assert json['generationConfig']['maxOutputTokens']==2250
             assert json['generationConfig']['imageConfig']['imageSize']=='1K'
             return Response({'usageMetadata':{'promptTokenCount':1000,'totalTokenCount':2200},'candidates':[{'content':{'parts':[] if self.no_image else [{'inlineData':{'data':base64.b64encode(PNG).decode()}}]}}]})
         if '/storage/v1/object/' in url:return Response({},201)
@@ -66,7 +66,7 @@ class ImageWorkerTest(unittest.TestCase):
     def test_bounded_single_generation_and_private_attachment(self):
         r=Requests();process_image_jobs('https://db',{'apikey':'SECRET'},'SECRET',r,emit=lambda *a,**k:None)
         self.assertEqual(sum(c[1].endswith(':generateContent') for c in r.calls),1)
-        self.assertIsNotNone(r.completed['p_asset']);self.assertEqual(r.completed['p_usage']['reserved_krw'],500)
+        self.assertIsNotNone(r.completed['p_asset']);self.assertEqual(r.completed['p_usage']['reserved_krw'],250)
         asset=next(c[2] for c in r.calls if c[1]=='property_assets')
         self.assertFalse(asset['is_approved']);self.assertEqual(asset['source_type'],'ai_generated')
     def test_imported_raster_document_is_usable_without_public_reclassification(self):
@@ -101,7 +101,9 @@ class ImageWorkerTest(unittest.TestCase):
         self.assertIn('overhead/isometric',prompt);self.assertIn('27',prompt)
         self.assertEqual(zoning_for(draft,'concept-1'),[{'zoneId':'z1','x':27,'y':28},{'zoneId':'z2','x':73,'y':28}])
     def test_conservative_max_request_is_below_reservation(self):
-        self.assertLessEqual(estimate_upper_krw(MAX_INPUT_TOKENS,MAX_OUTPUT_TOKENS),500)
+        self.assertLessEqual(estimate_upper_krw(MAX_INPUT_TOKENS,MAX_OUTPUT_TOKENS),250)
+        # Measured production images used up to 1,864 output tokens; keep a margin above that.
+        self.assertGreaterEqual(MAX_OUTPUT_TOKENS,2200)
         with self.assertRaises(ValueError):prompt_for('concept-2',{'concepts':[]})
 
 if __name__=='__main__':unittest.main()
@@ -113,3 +115,17 @@ class PurposeImagePrompt(unittest.TestCase):
         prompt=prompt_for('concept-1',draft)
         self.assertIn('purpose_requirements',prompt);self.assertIn('power_capacity',prompt)
         self.assertIn('not verified facilities',prompt);self.assertIn('missing operating conditions hypothetical',prompt)
+
+
+class BriefPromptTest(unittest.TestCase):
+    def test_confirmed_brief_points_and_target_drive_the_image_prompt(self):
+        from image_worker import prompt_for
+        draft = {'automation': {'imageStyle': 'photorealistic'}, 'concepts': [{'id': 'concept-1', 'conceptName': '카페'}],
+                 'salesStrategy': {'positioning': '상가', 'sellingPoints': [{'fact': '분석 원래 장점', 'buyerBenefit': 'x'}]},
+                 'brief': {'version': 1, 'target': '카페 창업자', 'tone': 'friendly', 'avoid': '', 'points': [{'fact': '테라스 20평', 'buyerBenefit': '야외 좌석', 'source': ''}]}}
+        prompt = prompt_for('hero', draft)
+        self.assertIn('테라스 20평', prompt)
+        self.assertIn('카페 창업자', prompt)
+        self.assertNotIn('분석 원래 장점', prompt)
+        del draft['brief']
+        self.assertIn('분석 원래 장점', prompt_for('hero', draft))

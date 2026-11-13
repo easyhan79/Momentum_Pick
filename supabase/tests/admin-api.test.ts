@@ -135,3 +135,11 @@ test('AI layout switch cancels reference plan marker with revision CAS and prese
  assert.equal(patch.draft_content.visualMode,'ai_generated');assert.equal(patch.draft_content.planAnalysis,undefined);assert.equal(patch.draft_content.concepts[0].plan,undefined);assert.deepEqual(patch.draft_content.marketing,prior.marketing);assert.deepEqual(Object.keys(patch).sort(),['draft_content','revision']);
  assert.equal((await h.handler(req('POST',{action:'use-generated-layout',propertyId:id,revision:4}))).status,409);
 });
+test('save stores a validated brief with who changed it and rejects a malformed one',async()=>{
+  const brief={version:1,target:'카페 창업자',tone:'friendly',avoid:'',points:[{fact:'테라스 20평',buyerBenefit:'야외 좌석',source:'등록자 제공자료'}]};
+  let saved:any;
+  const h=harness({id,app_metadata:{showroom_admin:true}},(_url,init)=>{if(init.method==='PATCH'){saved=JSON.parse(init.body as string).draft_content;return[{revision:3}];}return[{revision:2,draft_content:{schema_version:'1.0',assets:[]}}];});
+  assert.equal((await h.handler(req('PATCH',{propertyId:id,action:'save-draft',revision:2,edits:{title:'검토',subtitle:'가설',summary:'요약',brief:{...brief,extra:'x'}}}))).status,200);
+  assert.deepEqual({...saved.brief,updatedAt:undefined},{...brief,updatedBy:id,updatedAt:undefined});
+  assert.equal((await h.handler(req('PATCH',{propertyId:id,action:'save-draft',revision:2,edits:{title:'검토',subtitle:'가설',summary:'요약',brief:{...brief,tone:'loud'}}}))).status,400);
+});

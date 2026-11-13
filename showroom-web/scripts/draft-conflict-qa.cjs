@@ -33,7 +33,7 @@ const path=require('node:path');
  const browser=await chromium.launch({headless:true,...(process.env.CHROME_PATH?{executablePath:process.env.CHROME_PATH}:{})});
  let page;
  try{
-   page=await browser.newPage({viewport:{width:1440,height:900}});
+   page=await browser.newPage({viewport:{width:1440,height:900}});/* These checks control saving explicitly. */await page.addInitScript(()=>{try{localStorage.setItem('spacepick-autosave','off');}catch{}});
    page.on('pageerror',error=>errors.push(error.message));
    await page.route('**/*',async route=>{
      const request=route.request(),url=new URL(request.url());
@@ -54,7 +54,7 @@ const path=require('node:path');
    await page.getByLabel('이메일',{exact:true}).fill('qa@example.invalid');
    await page.getByLabel('비밀번호',{exact:true}).fill('synthetic-password-123');
    await page.getByRole('button',{name:'로그인',exact:true}).click();
-   await page.getByRole('button',{name:'초안 열기',exact:true}).click();
+   await page.getByRole('button',{name:'초안 열기',exact:true}).click();await page.getByRole('button',{name:'고급 편집 · 전체 패널',exact:true}).click();/* these checks cover every panel */
    const headline=page.locator('#draft-subtitle'),conflict=page.locator('.admin-conflict');
    await headline.waitFor();
 

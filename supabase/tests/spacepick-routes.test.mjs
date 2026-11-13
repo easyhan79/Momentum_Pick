@@ -1,4 +1,4 @@
-import {PGlite} from '@electric-sql/pglite';import assert from 'node:assert/strict';import {readFile} from 'node:fs/promises';
+const {PGlite}=await import(process.env.PGLITE_MODULE||'@electric-sql/pglite');import assert from 'node:assert/strict';import {readFile} from 'node:fs/promises';
 const db=new PGlite(),id='10000000-0000-4000-8000-000000000001',other='10000000-0000-4000-8000-000000000002',actor='20000000-0000-4000-8000-000000000001';
 await db.exec(`CREATE ROLE anon NOLOGIN;CREATE ROLE authenticated NOLOGIN;CREATE ROLE service_role NOLOGIN BYPASSRLS;GRANT USAGE ON SCHEMA public TO anon,authenticated,service_role;ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon,authenticated,service_role;CREATE SCHEMA auth;CREATE TABLE auth.users(id uuid PRIMARY KEY);CREATE TABLE properties(id uuid PRIMARY KEY,raw_input text NOT NULL);`);
 for(const file of ['migrations/20261102115440_showroom_private_schema.sql','migrations/20261103081255_inquiry_crm.sql'])await db.exec(await readFile(new URL('../'+file,import.meta.url),'utf8'));

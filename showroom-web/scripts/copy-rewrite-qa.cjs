@@ -35,7 +35,7 @@ const {chromium}=require('playwright');
    }catch(e){return Response.json({message:e.message,code:e.code},{status:400});}
   };
   const handler=createHandler({url:'https://mock-db',key:'synthetic',fetcher:mockFetch,copyRewriteEnabled:true});
-  browser=await chromium.launch({headless:true,executablePath:process.env.CHROME_PATH||'/usr/bin/chromium'});page=await browser.newPage({viewport:{width:1440,height:1000},timezoneId:'Asia/Seoul'});
+  browser=await chromium.launch({headless:true,executablePath:process.env.CHROME_PATH||'/usr/bin/chromium'});page=await browser.newPage({viewport:{width:1440,height:1000},timezoneId:'Asia/Seoul'});/* These checks control saving explicitly. */await page.addInitScript(()=>{try{localStorage.setItem('spacepick-autosave','off');}catch{}});
   page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error'&&m.text().includes('same key'))errors.push(m.text());});
   await page.route('**/*',async route=>{const request=route.request(),url=new URL(request.url());
    if(url.origin===new URL(base).origin){if(url.pathname==='/supabase-public.json')return route.fulfill({json:{publishableKey:'synthetic'}});return route.continue();}
@@ -46,7 +46,7 @@ const {chromium}=require('playwright');
    if(url.pathname==='/functions/v1/showroom-admin'){const response=await handler(new Request(request.url(),{method:request.method(),headers:{Authorization:'Bearer synthetic','Content-Type':'application/json'},...(request.postData()?{body:request.postData()}:{})}));return route.fulfill({status:response.status,body:await response.text(),headers:{'content-type':'application/json','access-control-allow-origin':'*'}});}
    unexpected.push(url.pathname);return route.abort();
   });
-  const login=async()=>{await page.goto(base+'/admin');await page.getByLabel('이메일',{exact:true}).fill('qa@example.invalid');await page.getByLabel('비밀번호',{exact:true}).fill('synthetic-password');await page.getByRole('button',{name:'로그인',exact:true}).click();await page.getByRole('button',{name:'초안 열기',exact:true}).click();await page.locator('#copy-rewrite').waitFor();};
+  const login=async()=>{await page.goto(base+'/admin');await page.getByLabel('이메일',{exact:true}).fill('qa@example.invalid');await page.getByLabel('비밀번호',{exact:true}).fill('synthetic-password');await page.getByRole('button',{name:'로그인',exact:true}).click();await page.getByRole('button',{name:'초안 열기',exact:true}).click();await page.getByRole('button',{name:'고급 편집 · 전체 패널',exact:true}).click();/* these checks cover every panel */await page.locator('#copy-rewrite').waitFor();};
   await login();let panel=page.locator('#copy-rewrite');const start=()=>panel.getByRole('button',{name:'선택한 항목 다시 글작성',exact:true});
   await page.getByLabel('요약 · AI 문구 검토 필요',{exact:true}).fill('미저장 편집');assert.equal(await start().isDisabled(),true);
   await page.getByLabel('요약 · AI 문구 검토 필요',{exact:true}).fill(original.summary);await page.locator('#showroom-draft').getByRole('button',{name:'초안 저장',exact:true}).click();await page.waitForFunction(()=>document.querySelector('.admin-message')?.textContent.includes('저장했습니다'));

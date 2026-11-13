@@ -65,7 +65,7 @@ const path=require('node:path');
  const browser=await chromium.launch({headless:true,...(process.env.CHROME_PATH?{executablePath:process.env.CHROME_PATH}:{})});
  let page;
  try{
-   page=await browser.newPage({viewport:{width:1440,height:1000}});
+   page=await browser.newPage({viewport:{width:1440,height:1000}});/* These checks control saving explicitly. */await page.addInitScript(()=>{try{localStorage.setItem('spacepick-autosave','off');}catch{}});
    page.on('pageerror',error=>errors.push(error.message));
    page.on('console',message=>{if(message.type()==='error'&&message.text().includes('same key'))errors.push(message.text());});
    await page.route('**/*',async route=>{
@@ -198,7 +198,7 @@ const path=require('node:path');
        assert.deepEqual(errors,[]);assert.deepEqual(unexpected,[]);return;
      }
    }
-   await page.getByRole('button',{name:'초안 열기',exact:true}).click();
+   await page.getByRole('button',{name:'초안 열기',exact:true}).click();await page.getByRole('button',{name:'고급 편집 · 전체 패널',exact:true}).click();/* these checks cover every panel */
    if(imagePromptMode){
      const before=structuredClone(room),panel=page.locator('#image-prompt-panel'),settings=page.locator('#image-settings');
      const output=panel.getByLabel('Gemini 웹용 완성 프롬프트',{exact:true}),copy=panel.getByRole('button',{name:'이미지 프롬프트 복사',exact:true});

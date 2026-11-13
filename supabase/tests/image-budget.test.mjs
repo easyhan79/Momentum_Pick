@@ -1,4 +1,4 @@
-import {PGlite} from '@electric-sql/pglite';import assert from 'node:assert/strict';import {readFile} from 'node:fs/promises';
+const {PGlite}=await import(process.env.PGLITE_MODULE||'@electric-sql/pglite');import assert from 'node:assert/strict';import {readFile} from 'node:fs/promises';
 const db=new PGlite();
 await db.exec(`CREATE ROLE anon;CREATE ROLE authenticated;CREATE ROLE service_role BYPASSRLS;GRANT USAGE ON SCHEMA public TO service_role;
 CREATE TABLE properties(id uuid PRIMARY KEY);
