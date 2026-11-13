@@ -7,7 +7,7 @@ ROOT=Path(__file__).resolve().parents[1]
 def save(path,text):
     temp=path.with_name(path.name+'.tmp');temp.write_text(text);os.replace(temp,path)
 def checkpoint(stage,status,note,next_action,check=None,complete=False,pushed=False):
-    path=ROOT/'SPACEPICK_V2_1_RUN_STATE.json';state=json.loads(path.read_text())
+    path=ROOT/'docs'/'archive'/'SPACEPICK_V2_1_RUN_STATE.json';state=json.loads(path.read_text())
     now=datetime.now(ZoneInfo('Asia/Seoul')).isoformat()
     head=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip()
     branch=subprocess.check_output(['git','branch','--show-current'],cwd=ROOT,text=True).strip()
@@ -22,7 +22,7 @@ def checkpoint(stage,status,note,next_action,check=None,complete=False,pushed=Fa
     if check:state['lastSuccessfulCheck']={'command':check,'at':now}
     save(path,json.dumps(state,ensure_ascii=False,indent=2)+'\n')
     json.loads(path.read_text())
-    progress=ROOT/'SPACEPICK_V2_1_PROGRESS.md'
+    progress=ROOT/'docs'/'archive'/'SPACEPICK_V2_1_PROGRESS.md'
     save(progress,progress.read_text()+f'\n## {now} — {stage} / {status}\n\n- 변경/완료 상태: {note}\n- 검증: {check or "이 체크포인트에서 새 검증 없음"}\n- 변경 파일: {', '.join(state['workingTreeChanges']) or '없음'}\n- Git: {branch} / {head}; v2.1 운영 배포 없음.\n- 다음: {next_action}\n')
     print(stage,status,'checkpoint saved')
 if __name__=='__main__':

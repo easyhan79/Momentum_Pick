@@ -1,7 +1,7 @@
 """Repeatable local validation; never calls production APIs or AI providers.
 
 Install the optional standalone SQL test tool as documented in
-docs/SPACEPICK_V2_VALIDATION.md, then set PGLITE_MODULE to its ESM entry.
+docs/archive/SPACEPICK_V2_VALIDATION.md, then set PGLITE_MODULE to its ESM entry.
 Missing SQL tooling is reported as unrun and makes this full check incomplete.
 Browser checks require a local server and are documented separately.
 """
