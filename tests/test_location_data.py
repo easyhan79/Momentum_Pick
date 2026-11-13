@@ -1,6 +1,6 @@
 import datetime
 import unittest
-from location_data import CATEGORIES, LocationError, build_report, pnu, prompt_context, refresh_next, sections_for
+from location_data import CATEGORIES, LocationError, build_report, pnu, prompt_context, refresh_next, refresh_property, sections_for
 
 
 class Response:
@@ -90,6 +90,21 @@ class LocationReportTests(unittest.TestCase):
         failing = Db({'property_id': 'p1', 'address': 'a'})
         refresh_next(failing, 'k', Kakao(category_status=401), quiet, NOW)
         self.assertEqual((failing.saved[0]['p_state'], failing.saved[0]['p_error'], failing.saved[0]['p_report']), ('failed', 'kakao_unauthorized', {}))
+
+    def test_report_is_built_for_one_listing_before_its_analysis(self):
+        class Db:
+            def __init__(self, address):
+                self.address, self.calls = address, []
+            def rpc(self, name, body):
+                self.calls.append((name, body))
+                return self.address if name == 'location_current_address' else True
+        db = Db('서울 강남구 테헤란로 152')
+        self.assertEqual(refresh_property(db, 'p1', 'k', Kakao(), lambda *a, **k: None, NOW), 'done')
+        self.assertEqual(db.calls[0], ('location_current_address', {'p_property': 'p1'}))
+        self.assertEqual((db.calls[1][0], db.calls[1][1]['p_address'], db.calls[1][1]['p_state']), ('location_report_save', '서울 강남구 테헤란로 152', 'done'))
+        empty = Db(None)
+        self.assertEqual(refresh_property(empty, 'p1', 'k', Kakao(), lambda *a, **k: None, NOW), '')
+        self.assertEqual(len(empty.calls), 1, 'no address, no provider call')
 
     def test_prompt_context_lists_counts_with_source_and_date(self):
         _, report = build_report(Kakao(), 'k', '주소', NOW)
