@@ -115,3 +115,17 @@ class PurposeImagePrompt(unittest.TestCase):
         prompt=prompt_for('concept-1',draft)
         self.assertIn('purpose_requirements',prompt);self.assertIn('power_capacity',prompt)
         self.assertIn('not verified facilities',prompt);self.assertIn('missing operating conditions hypothetical',prompt)
+
+
+class BriefPromptTest(unittest.TestCase):
+    def test_confirmed_brief_points_and_target_drive_the_image_prompt(self):
+        from image_worker import prompt_for
+        draft = {'automation': {'imageStyle': 'photorealistic'}, 'concepts': [{'id': 'concept-1', 'conceptName': '카페'}],
+                 'salesStrategy': {'positioning': '상가', 'sellingPoints': [{'fact': '분석 원래 장점', 'buyerBenefit': 'x'}]},
+                 'brief': {'version': 1, 'target': '카페 창업자', 'tone': 'friendly', 'avoid': '', 'points': [{'fact': '테라스 20평', 'buyerBenefit': '야외 좌석', 'source': ''}]}}
+        prompt = prompt_for('hero', draft)
+        self.assertIn('테라스 20평', prompt)
+        self.assertIn('카페 창업자', prompt)
+        self.assertNotIn('분석 원래 장점', prompt)
+        del draft['brief']
+        self.assertIn('분석 원래 장점', prompt_for('hero', draft))

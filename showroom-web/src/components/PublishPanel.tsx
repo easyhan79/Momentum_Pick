@@ -4,9 +4,9 @@ import {blockingIssues,publicationChecklist,publishConfirmMessage,warningIssues}
 import type {PublicationIssue} from '../lib/publication';
 type Room={property_id:string;slug:string;revision:number;published_revision?:number;showroom_status:string};
 type Readiness={revision:number;issues:PublicationIssue[]};
-type Props={room:Room;busy:boolean;dirty:boolean;onPublish:()=>Promise<void>;onSave:()=>void;onReload:()=>void;onUnpublish:()=>void;onUnlinkPlan:(assetId:string)=>void;onPublishCoreFacts:()=>void};
+type Props={room:Room;busy:boolean;dirty:boolean;onPublish:()=>Promise<void>;onSave:()=>void;onReload:()=>void;onUnpublish:()=>void;onUnlinkPlan:(assetId:string)=>void;onPublishCoreFacts:()=>void;onNavigate?:(targetId:string)=>void};
 
-export function PublishPanel({room,busy,dirty,onPublish,onSave,onReload,onUnpublish,onUnlinkPlan,onPublishCoreFacts}:Props){
+export function PublishPanel({room,busy,dirty,onPublish,onSave,onReload,onUnpublish,onUnlinkPlan,onPublishCoreFacts,onNavigate}:Props){
  const [report,setReport]=useState<Readiness>(),[checking,setChecking]=useState(false),[showIssues,setShowIssues]=useState(false),[error,setError]=useState('');
  const alive=useRef(true),sequence=useRef(0),notice=useRef<HTMLDivElement>(null);
  useEffect(()=>{alive.current=true;return()=>{alive.current=false;sequence.current++;};},[]);
@@ -32,7 +32,8 @@ export function PublishPanel({room,busy,dirty,onPublish,onSave,onReload,onUnpubl
  const published=room.showroom_status==='published'&&room.published_revision===room.revision&&!dirty;
 
  function move(targetId:string){
-  const target=document.getElementById(targetId);if(!target)return;
+  // A panel outside the current step is opened through the page (which switches to the full panel view).
+  const target=document.getElementById(targetId);if(!target){onNavigate?.(targetId);return;}
   target.scrollIntoView({behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth',block:'center'});
   const control=target.matches('input,textarea,select,button')?target:target.querySelector<HTMLElement>('input,textarea,select,button');
   (control as HTMLElement|null)?.focus({preventScroll:true});

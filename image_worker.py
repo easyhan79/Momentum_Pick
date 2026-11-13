@@ -37,11 +37,14 @@ def prompt_for(slot, draft):
         if slot != 'hero' and not concept:
             raise ValueError('concept_missing')
         strategy = draft.get('salesStrategy') or {}
-        points = [{'fact': p.get('fact'), 'buyerBenefit': p.get('buyerBenefit')} for p in strategy.get('sellingPoints', [])[:3]]
+        # The admin-confirmed brief (기획서) takes precedence so images carry the same message as the copy.
+        brief = draft.get('brief') if isinstance(draft.get('brief'), dict) else {}
+        chosen = brief.get('points') if isinstance(brief.get('points'), list) and brief.get('points') else strategy.get('sellingPoints', [])
+        points = [{'fact': p.get('fact'), 'buyerBenefit': p.get('buyerBenefit')} for p in chosen[:3] if isinstance(p, dict)]
         scene = concept or {'purpose': 'A compelling cover that shows this property’s strongest distinctive features',
                             'useDirection': (draft.get('concepts') or [{}])[0].get('conceptName')}
         context = {k: draft.get(k) for k in ('category', 'title', 'subtitle', 'summary')}
-        context.update(sellingPoints=points, positioning=strategy.get('positioning'), scene=scene)
+        context.update(sellingPoints=points, positioning=strategy.get('positioning'), targetCustomer=brief.get('target') or None, scene=scene)
         context['providedFacts'] = [{k: f.get(k) for k in ('label', 'value', 'unit')} for f in (draft.get('propertyProfile') or {}).get('fields', []) if f.get('status') == 'provided' and f.get('useApproved')]
         mode = (draft.get('imageSettings') or {}).get('mode')
         reference = {'photo': 'Preserve the supplied photo’s camera viewpoint, structure, openings and visible surroundings.',

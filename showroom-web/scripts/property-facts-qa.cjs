@@ -198,7 +198,7 @@ const path=require('node:path');
        assert.deepEqual(errors,[]);assert.deepEqual(unexpected,[]);return;
      }
    }
-   await page.getByRole('button',{name:'초안 열기',exact:true}).click();
+   await page.getByRole('button',{name:'초안 열기',exact:true}).click();await page.getByRole('button',{name:'고급 편집 · 전체 패널',exact:true}).click();/* these checks cover every panel */
    if(imagePromptMode){
      const before=structuredClone(room),panel=page.locator('#image-prompt-panel'),settings=page.locator('#image-settings');
      const output=panel.getByLabel('Gemini 웹용 완성 프롬프트',{exact:true}),copy=panel.getByRole('button',{name:'이미지 프롬프트 복사',exact:true});

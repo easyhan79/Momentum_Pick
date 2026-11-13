@@ -1,7 +1,7 @@
 import type {Showroom} from '../types/showroom';
 
 // Draft fields that the admin page sends with save-draft.
-export const editableDraftKeys=['title','subtitle','summary','concepts','imageSettings','propertyProfile','address','registration'] as const;
+export const editableDraftKeys=['title','subtitle','summary','concepts','imageSettings','propertyProfile','address','registration','brief'] as const;
 
 // After a revision conflict, keep the latest server draft and re-apply only the
 // fields the admin changed since the draft they started editing (base).

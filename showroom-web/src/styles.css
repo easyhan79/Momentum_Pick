@@ -121,3 +121,20 @@
 .naver-export{margin-top:20px;padding:18px;border:1px solid #03c75a66;border-radius:12px;background:#03c75a0d}
 .naver-export h4{font-size:16px;margin:0 0 8px}
 .naver-export ol{margin:0 0 12px;padding-left:20px;line-height:1.8;font-size:13px;color:#c9d3cc}
+.admin-steps{position:sticky;top:0;z-index:35;display:flex;flex-wrap:wrap;gap:8px;padding:12px 0;margin:8px 0 20px;background:#070b0ef2;border-bottom:1px solid var(--line)}
+.admin-steps .button{min-height:40px;padding:9px 14px;font-size:13px}
+.brief-confirm h3{margin-top:24px}
+.brief-confirm h3 small{font-size:12px;color:#9fb3aa;margin-left:8px;font-weight:400}
+.brief-facts{list-style:none;padding:0;margin:12px 0;display:grid;gap:8px}
+.brief-facts li{display:flex;justify-content:space-between;gap:12px;padding:12px 14px;border:1px solid var(--line);border-radius:10px}
+.brief-facts li span{color:#a9b6b0}
+.brief-facts li.brief-missing{border-color:#a48a46}
+.brief-facts li.brief-missing strong{color:#e1cf8c}
+.brief-points{padding-left:20px;display:grid;gap:14px}
+.brief-points li{padding:12px;border:1px solid var(--line);border-radius:10px}
+.brief-points label{display:block;margin-top:6px}
+.brief-tone{border:0;padding:0;margin:16px 0;display:flex;flex-wrap:wrap;gap:14px}
+.brief-tone label{display:flex;align-items:center;gap:6px}
+.brief-tone label{white-space:nowrap}
+.brief-tone input[type=radio]{width:auto;margin:0;accent-color:#d4af37}
+.brief-points .admin-toolbar .button{min-height:36px;padding:6px 12px}

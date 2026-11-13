@@ -28,6 +28,8 @@ export type Showroom = {
   rentalScenario?: import('../../../supabase/functions/_shared/rental-scenario.ts').RentalScenario;
   propertyProfile?: PropertyProfile;
   imageSettings?: ImageSettings;
+  brief?: import('../../../supabase/functions/_shared/brief.ts').Brief;
+  salesStrategy?: unknown;
   registration?: {channel:'web';rightsApproved:boolean;analysisDocumentIds?:string[];contact:{name:string;phone:string;publicApproved:boolean}};
   publicContact?: {name:string;phone:string};
   highlights?: {title:string;description:string;constraints:string;references:Fact[]}[];
