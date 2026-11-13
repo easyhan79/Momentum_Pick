@@ -7,7 +7,7 @@ const {PGlite}=await import(process.env.PGLITE_MODULE||'@electric-sql/pglite');
 const dir=new URL('../migrations/',import.meta.url);
 const norm=s=>s.replace(/--[^\n]*/g,'').replace(/\s+/g,'').toLowerCase();
 
-test('all migrations apply in order and recreate the production v2 functions exactly',async()=>{
+test('all migrations apply in order; the recovered ones recreate the production v2 functions exactly',async()=>{
   const db=new PGlite();
   // Objects Supabase or the legacy bot provide outside these migrations.
   await db.exec(`CREATE ROLE anon NOLOGIN;CREATE ROLE authenticated NOLOGIN;CREATE ROLE service_role NOLOGIN BYPASSRLS;
@@ -17,7 +17,9 @@ CREATE TABLE public.properties(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),add
 GRANT USAGE ON SCHEMA public,auth TO anon,authenticated,service_role;`);
   const files=(await readdir(dir)).filter(f=>f.endsWith('.sql')).sort();
   assert.ok(files.length>=24);
-  for(const f of files)await assert.doesNotReject(db.exec(await readFile(new URL(f,dir),'utf8')),f);
+  // Compare with production at the point the recovered migrations end; later migrations may change these functions.
+  const RECOVERED_UNTIL='20261112014304_automatic_publication.sql';
+  for(const f of files.filter(f=>f<=RECOVERED_UNTIL))await assert.doesNotReject(db.exec(await readFile(new URL(f,dir),'utf8')),f);
   for(const table of ['web_submission_sessions','property_editor_versions','property_channel_releases','web_worker_dispatch_leases'])
     assert.equal((await db.query(`select to_regclass('public.${table}') r`)).rows[0].r,table,table);
   const exported=await readFile(new URL('../review/production_v2_functions_20261112.sql',import.meta.url),'utf8');
@@ -27,5 +29,6 @@ GRANT USAGE ON SCHEMA public,auth TO anon,authenticated,service_role;`);
     const production=exported.slice(start,end<0?undefined:end).replace(`-- ${name}`,'').replace(/;\s*$/,'');
     assert.equal(norm(r.rows[0].d),norm(production),name);
   }
+  for(const f of files.filter(f=>f>RECOVERED_UNTIL))await assert.doesNotReject(db.exec(await readFile(new URL(f,dir),'utf8')),f);
   await db.close();
 });
