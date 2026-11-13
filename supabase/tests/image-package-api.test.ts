@@ -36,3 +36,14 @@ test('public generated concept image includes bounded zone coordinates and conce
  const handler=createPublicHandler('https://db','server',(async()=>Response.json([{approved_by:'admin',approved_at:'now',published_at:'now',published_revision:1,published_content:content}])) as typeof fetch);
  const result=await (await handler(new Request('https://x?slug=test-property'))).json();assert.equal(result.showroom.assets[0].conceptId,'concept-1');assert.deepEqual(result.showroom.assets[0].zoning,[{zoneId:'z1',x:27,y:28}]);
 });
+
+test('location report is read for the requested listing only and missing tables degrade quietly',async()=>{
+ const seen:string[]=[];let fail=false;
+ const report={address:'서울 강남구 테헤란로 152',state:'done',report:{version:1,nearby:[]},error_code:'',fetched_at:'2026-11-14T03:00:00Z',updated_at:'2026-11-14T03:00:00Z'};
+ const handler=createHandler({url:'https://db',key:'server',fetcher:(async url=>{const p=String(url);if(p.endsWith('/auth/v1/user'))return Response.json(admin);seen.push(p);if(fail)return Response.json({message:'relation does not exist'},{status:404});return Response.json(p.includes('property_location_reports')?[report]:[]);}) as typeof fetch});
+ const get=(q:string)=>handler(new Request(`https://x?action=location&${q}`,{headers:{Authorization:'Bearer user'}}));
+ assert.equal((await get('propertyId=bad')).status,400);assert.equal(seen.length,0);
+ assert.deepEqual(await (await get(`propertyId=${id}`)).json(),{available:true,report});
+ assert.match(seen[0],new RegExp(`property_location_reports\\?property_id=eq\\.${id}&`));
+ fail=true;assert.deepEqual(await (await get(`propertyId=${id}`)).json(),{available:false,report:null});
+});

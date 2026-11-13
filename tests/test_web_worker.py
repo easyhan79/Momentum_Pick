@@ -47,6 +47,13 @@ class WebWorkerTests(unittest.TestCase):
         self.assertEqual([b['p_phase'] for n,b in db.calls if n=='web_analysis_progress'],['generating','saving'])
         self.assertEqual(db.calls[-2][1]['p_candidate'],result)
 
+    def test_location_report_is_added_to_the_analysis_input(self):
+        result={'usp_summary':'new','landing_copy':'safe','showroom_concepts':[]}
+        db=Db();parts=[];asked=[]
+        db.location_context=lambda pid:(asked.append(pid) or '주변 환경 데이터(출처: 카카오 로컬)')
+        execute_analysis(db,'worker',lambda p:(parts.extend(p) or json.dumps(result)),json.loads,emit=lambda *a,**k:None)
+        self.assertEqual(asked,['private-property'])
+        self.assertIn('ORIGINAL',parts[-1]);self.assertIn('주변 환경 데이터(출처: 카카오 로컬)',parts[-1])
     def test_db_failure_after_candidate_never_classified_as_provider(self):
         db=Db();db.fail_save=True;calls=[]
         with self.assertRaises(RuntimeError):
