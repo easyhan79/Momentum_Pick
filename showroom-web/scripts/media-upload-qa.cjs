@@ -37,7 +37,7 @@ const path=require('node:path');
  const browser=await chromium.launch({headless:true,...(process.env.CHROME_PATH?{executablePath:process.env.CHROME_PATH}:{})});
  let page;
  try{
-   page=await browser.newPage({viewport:{width:1440,height:900}});
+   page=await browser.newPage({viewport:{width:1440,height:900}});/* These checks control saving explicitly. */await page.addInitScript(()=>{try{localStorage.setItem('spacepick-autosave','off');}catch{}});
    page.on('pageerror',error=>errors.push(error.message));
    await page.route('**/*',async route=>{
      const request=route.request(),url=new URL(request.url());
@@ -96,6 +96,8 @@ const path=require('node:path');
    assert.equal(byName['plan.png'].type,'image/png');assert.deepEqual([byName['plan.png'].width,byName['plan.png'].height],[800,600]);assert.equal(byName['plan.png'].kind,'provided_plan');assert.equal(byName['IMG_4032.jpg'].kind,'photo');
    assert.equal(byName['proposal.pdf'].kind,'document');
    await media.screenshot({path:path.join(directory,'media-upload.png')});
+   for(const width of [375,768]){await page.setViewportSize({width,height:900});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`upload area overflows at ${width}`);}
+   await page.setViewportSize({width:1440,height:900});
    result.passed.push('three dropped files upload in turn; the large photo is scaled to 2,560px, the small plan and PDF are sent unchanged; each image keeps the type chosen for it');
 
    if(errors.length)throw Error('Page errors: '+errors.join(' | '));

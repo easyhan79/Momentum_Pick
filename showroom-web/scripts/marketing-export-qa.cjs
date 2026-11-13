@@ -33,7 +33,7 @@ const path=require('node:path');
  const browser=await chromium.launch({headless:true,...(process.env.CHROME_PATH?{executablePath:process.env.CHROME_PATH}:{})});
  let page;
  try{
-   page=await browser.newPage({viewport:{width:1440,height:900}});
+   page=await browser.newPage({viewport:{width:1440,height:900}});/* These checks control saving explicitly. */await page.addInitScript(()=>{try{localStorage.setItem('spacepick-autosave','off');}catch{}});
    page.on('pageerror',error=>errors.push(error.message));
    await page.route('**/*',async route=>{
      const request=route.request(),url=new URL(request.url());

@@ -35,7 +35,7 @@ const {chromium}=require('playwright');
    }catch(e){return Response.json({message:e.message,code:e.code},{status:400});}
   };
   const handler=createHandler({url:'https://mock-db',key:'synthetic',fetcher:mockFetch,copyRewriteEnabled:true});
-  browser=await chromium.launch({headless:true,executablePath:process.env.CHROME_PATH||'/usr/bin/chromium'});page=await browser.newPage({viewport:{width:1440,height:1000},timezoneId:'Asia/Seoul'});
+  browser=await chromium.launch({headless:true,executablePath:process.env.CHROME_PATH||'/usr/bin/chromium'});page=await browser.newPage({viewport:{width:1440,height:1000},timezoneId:'Asia/Seoul'});/* These checks control saving explicitly. */await page.addInitScript(()=>{try{localStorage.setItem('spacepick-autosave','off');}catch{}});
   page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error'&&m.text().includes('same key'))errors.push(m.text());});
   await page.route('**/*',async route=>{const request=route.request(),url=new URL(request.url());
    if(url.origin===new URL(base).origin){if(url.pathname==='/supabase-public.json')return route.fulfill({json:{publishableKey:'synthetic'}});return route.continue();}

@@ -148,7 +148,8 @@
 .workflow-progress li.workflow-review button{border-color:#a48a46;background:#282316}
 .workflow-progress li.workflow-blocked button{border-color:#b36850;background:#2a1712}
 .workflow-action{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-top:12px;padding:12px;border:1px dashed #a48a46;border-radius:10px;font-size:13px}
-.visually-hidden{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.visually-hidden{position:absolute!important;width:1px!important;height:1px!important;min-width:0!important;padding:0!important;margin:-1px!important;border:0!important;overflow:hidden!important;clip:rect(0 0 0 0);white-space:nowrap}
+.media-drop label{position:relative}
 .media-drop{display:grid;justify-items:center;gap:8px;padding:22px;margin:12px 0;border:2px dashed #ffffff2e;border-radius:12px;text-align:center}
 .media-drop-over{border-color:#d4af37;background:#d4af3712}
 .media-queue{list-style:none;padding:0;margin:12px 0;display:grid;gap:6px}
@@ -159,3 +160,4 @@
 .media-queue li.media-done{border-color:#2b826b}
 .media-queue li.media-failed{border-color:#b36850}
 .media-queue li select{width:auto;padding:4px 8px}.media-queue li em{font-style:normal;color:#a9b6b0}
+.admin-steps .save-status{margin-left:auto;align-self:center;font-size:12px;color:#a9b6b0}
