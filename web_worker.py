@@ -111,13 +111,21 @@ class Database:
             raise ValueError('document_snapshot_mismatch')
         return part
 
+    location_builder = None  # Set by main() when map/public data keys exist.
+
     def location_context(self, property_id):
-        """Prompt text from the listing's location report; empty when there is none."""
+        """Prompt text from the listing's location report; empty when there is none.
+        A listing without a report gets one built first, so its analysis can use it."""
         if not re.fullmatch(r'[0-9a-f-]{36}', property_id or '', re.I):
             return ''
-        try:
+        def read():
             response = self.requests.get(self.url + '/rest/v1/property_location_reports?property_id=eq.' + property_id + '&state=eq.done&select=report', headers=self.headers, timeout=20, allow_redirects=False)
-            rows = response.json() if response.status_code == 200 else []
+            return response.json() if response.status_code == 200 else []
+        try:
+            rows = read()
+            if not rows and self.location_builder:
+                self.location_builder(property_id)
+                rows = read()
         except Exception:
             return ''  # The report is optional context; analysis goes ahead without it.
         from location_data import prompt_context
@@ -425,6 +433,9 @@ def main():
     if config['intake_v2_enabled'] or os.environ.get('WEB_API_IMAGES_ENABLED') == 'true' and not config['intake_v2_only']:
         capabilities.append('image')
     location_pause = [0.0]
+    if os.environ.get('KAKAO_REST_API_KEY'):
+        from location_data import refresh_property
+        db.location_builder = lambda pid: refresh_property(db, pid, os.environ['KAKAO_REST_API_KEY'], requests, public_key=os.environ.get('PUBLIC_DATA_API_KEY') or None, vworld_key=os.environ.get('VWORLD_API_KEY') or None)
     def auxiliary():
         def rewrite_api(name, body):
             return db.rpc('web_copy_rewrite_claim' if name == 'copy_rewrite_claim' else name, body)

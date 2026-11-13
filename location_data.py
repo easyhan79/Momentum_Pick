@@ -339,19 +339,32 @@ def sections_for(public_key=None, vworld_key=None):
     return ['kakao'] + (['commerce', 'building'] if public_key else []) + (['landUse'] if vworld_key else [])
 
 
+def _build_and_save(db, property_id, address, key, requests, emit, now, public_key, vworld_key):
+    try:
+        state, report = build_report(requests, key, address, now, public_key, vworld_key)
+        error = ''
+    except LocationError as exc:
+        state, report, error = 'failed', {}, exc.code
+    db.rpc('location_report_save', {'p_property': property_id, 'p_address': address,
+                                    'p_state': state, 'p_report': report, 'p_error': error})
+    emit('location report ' + state + (' code=' + error if error else ''), flush=True)
+    return state
+
+
+def refresh_property(db, property_id, key, requests, emit=print, now=None, public_key=None, vworld_key=None):
+    """Builds one listing's report right away (used just before its analysis). Returns the state or ''."""
+    address = db.rpc('location_current_address', {'p_property': property_id})
+    if not isinstance(address, str) or not address.strip():
+        return ''
+    return _build_and_save(db, property_id, address, key, requests, emit, now, public_key, vworld_key)
+
+
 def refresh_next(db, key, requests, emit=print, now=None, public_key=None, vworld_key=None):
     """Builds the report for one listing that needs it. Returns True when work was done."""
     job = db.rpc('location_report_next', {'p_sections': sections_for(public_key, vworld_key)})
     if not job:
         return False
-    try:
-        state, report = build_report(requests, key, job['address'], now, public_key, vworld_key)
-        error = ''
-    except LocationError as exc:
-        state, report, error = 'failed', {}, exc.code
-    db.rpc('location_report_save', {'p_property': job['property_id'], 'p_address': job['address'],
-                                    'p_state': state, 'p_report': report, 'p_error': error})
-    emit('location report ' + state + (' code=' + error if error else ''), flush=True)
+    _build_and_save(db, job['property_id'], job['address'], key, requests, emit, now, public_key, vworld_key)
     return True
 
 

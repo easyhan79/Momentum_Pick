@@ -54,6 +54,23 @@ class WebWorkerTests(unittest.TestCase):
         execute_analysis(db,'worker',lambda p:(parts.extend(p) or json.dumps(result)),json.loads,emit=lambda *a,**k:None)
         self.assertEqual(asked,['private-property'])
         self.assertIn('ORIGINAL',parts[-1]);self.assertIn('주변 환경 데이터(출처: 카카오 로컬)',parts[-1])
+    def test_missing_location_report_is_built_before_analysis(self):
+        from web_worker import Database
+        class Resp:
+            def __init__(self, rows): self.status_code, self.rows = 200, rows
+            def json(self): return self.rows
+        reports = []
+        class Requests:
+            def get(self, url, **kw): return Resp([{'report': r} for r in reports])
+        db = Database({'url': 'https://x.supabase.co', 'key': 'sb_secret_synthetic'}, Requests())
+        built = []
+        db.location_builder = lambda pid: (built.append(pid), reports.append({'source': {'name': '카카오 로컬'}, 'fetchedAt': '2026-11-14T00:00:00Z', 'nearby': [{'label': '지하철역', 'radius': 1000, 'count': 2, 'nearest': []}]}))
+        pid = '418825ee-fad4-4363-80a6-43a5a811ecb3'
+        self.assertIn('지하철역 (반경 1000m): 2곳', db.location_context(pid))
+        self.assertEqual(built, [pid])
+        self.assertIn('지하철역', db.location_context(pid))
+        self.assertEqual(built, [pid], 'an existing report is not rebuilt')
+
     def test_db_failure_after_candidate_never_classified_as_provider(self):
         db=Db();db.fail_save=True;calls=[]
         with self.assertRaises(RuntimeError):
