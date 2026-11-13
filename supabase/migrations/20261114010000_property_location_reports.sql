@@ -34,7 +34,10 @@ $function$;
 -- Next listing whose report is missing or describes another address. A failed fetch is retried
 -- after an hour (at most 5 times per address); "not found" waits until the address changes;
 -- a good report is refreshed after 90 days because shops and facilities change.
-CREATE OR REPLACE FUNCTION public.location_report_next()
+-- p_sections lists the sections the worker can now build (e.g. kakao, commerce, building): a report
+-- without one of them is rebuilt, and a section that was unavailable (key not approved yet) is
+-- retried after a day.
+CREATE OR REPLACE FUNCTION public.location_report_next(p_sections text[] DEFAULT '{}')
  RETURNS jsonb
  LANGUAGE sql
  STABLE
@@ -50,7 +53,9 @@ AS $function$
  WHERE c.address IS NOT NULL AND length(c.address)<=300
    AND (r.property_id IS NULL OR r.address<>c.address
         OR r.state='failed' AND r.attempts<5 AND r.updated_at<now()-interval '1 hour'
-        OR r.state='done' AND r.fetched_at<now()-interval '90 days')
+        OR r.state='done' AND r.fetched_at<now()-interval '90 days'
+        OR r.state='done' AND EXISTS(SELECT 1 FROM unnest(p_sections) n
+             WHERE r.report->'sections'->>n IS NULL OR r.report->'sections'->>n<>'done' AND r.fetched_at<now()-interval '1 day'))
  ORDER BY (r.property_id IS NULL) DESC,c.created_at DESC
  LIMIT 1
 $function$;
@@ -75,7 +80,7 @@ BEGIN
  RETURN true;
 END $function$;
 
-REVOKE ALL ON FUNCTION public.location_current_address(uuid),public.location_report_next(),public.location_report_save(uuid,text,text,jsonb,text) FROM PUBLIC,anon,authenticated;
-GRANT EXECUTE ON FUNCTION public.location_current_address(uuid),public.location_report_next(),public.location_report_save(uuid,text,text,jsonb,text) TO service_role;
+REVOKE ALL ON FUNCTION public.location_current_address(uuid),public.location_report_next(text[]),public.location_report_save(uuid,text,text,jsonb,text) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.location_current_address(uuid),public.location_report_next(text[]),public.location_report_save(uuid,text,text,jsonb,text) TO service_role;
 
 COMMIT;
