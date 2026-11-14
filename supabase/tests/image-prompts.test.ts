@@ -32,3 +32,49 @@ test('missing facts never become zeros; legacy unknown/private/generated facts s
  const r=buildImagePrompt(content,[]);assert.match(r.prompt,/공개 제공 토지: 0 ㎡/);assert.doesNotMatch(r.prompt,/PRIVATE_|없는 시설:/);
  content.facts=[];assert.match(buildImagePrompt(content,[]).prompt,/제공값 없음/);assert.doesNotMatch(buildImagePrompt(content,[]).prompt,/토지: 0/);
 });
+
+test('scene uses at most two matching public visual facts and safe buyer benefit cues', () => {
+ const content = draft('commercial');
+ const field = (id:string, key:string, label:string, value:string|number, unit='') => ({
+  ...content.propertyProfile.fields[0], id, key, label, value, unit,
+ });
+ const area = field('area','exclusive_area','전용면적',65,'㎡');
+ content.propertyProfile.fields = [area,field('access','entrance','출입구',1,'개'),field('terrace','terrace_area','테라스 면적',12,'㎡')];
+ const sourceRefs = [{kind:'input_text',inputVersionId:'PRIVATE_REVISION',excerpt:'PRIVATE_EXCERPT'}];
+ content.salesStrategy = {sellingPoints:[
+  {fact:'전용면적은 65㎡입니다.',buyerBenefit:'좌석과 이동 공간 PRIVATE_BENEFIT',sourceRefs},
+  {fact:'출입구: 1개',buyerBenefit:'고객 출입',sourceRefs},
+  {fact:'테라스 면적: 12㎡',buyerBenefit:'테라스',sourceRefs},
+ ]};
+ const section = () => buildImagePrompt(content,[]).prompt.split('[주요 장면]\n')[1].split('\n\n')[0];
+ assert.match(section(),/전용면적: 65 ㎡.*이동 경로/);
+ assert.match(section(),/출입구: 1 개.*시선이나 이동 흐름/);
+ assert.doesNotMatch(section(),/테라스|PRIVATE_/);
+ assert.doesNotMatch(buildImagePrompt(content,[]).prompt,/PRIVATE_(REVISION|EXCERPT|BENEFIT)/);
+ content.salesStrategy.sellingPoints = [{...content.salesStrategy.sellingPoints[0],fact:'전용면적: 65㎡ 및 테라스 있음'}];
+ assert.doesNotMatch(section(),/전용면적|테라스/);
+ area.publication='private';
+ content.salesStrategy.sellingPoints[0].fact='전용면적: 65㎡';
+ assert.doesNotMatch(buildImagePrompt(content,[]).prompt,/전용면적: 65/);
+});
+
+test('a plan supplies geometry while a selling point requires its approved original source', () => {
+ const content = draft('commercial');
+ content.concepts = [{id:'concept-1',conceptName:'다이닝펍',zones:[{title:'좌석 구역'},{title:'주방 동선'}]}];
+ content.propertyProfile.fields = [{...content.propertyProfile.fields[0],id:'area',key:'exclusive_area',label:'전용면적',value:65,unit:'㎡',sourceIds:[asset]}];
+ content.propertyProfile.sourcePermissions = [{assetId:asset,useApproved:true,allowDerivedPublication:true}];
+ content.salesStrategy = {sellingPoints:[{fact:'전용면적 65㎡',buyerBenefit:'좌석 배치',sourceRefs:[{kind:'plan',assetId:asset}]}]};
+ content.imageSettings = {mode:'plan',sourceAssetId:asset,rightsApproved:true};
+ const plan = {id:asset,kind:'provided_plan',source_type:'owner_provided',property_id:property};
+ const prompt = buildImagePrompt(content,[plan],'concept-1').prompt;
+ assert.match(prompt,/\[주요 장면\][\s\S]*가상 활용 콘셉트: "다이닝펍"[\s\S]*전용면적: 65 ㎡[\s\S]*좌석 구역[\s\S]*주방 동선[\s\S]*\[출력\]/);
+ assert.match(prompt,/도면에서 확인되는 관계를 따르고/);
+ assert.doesNotMatch(prompt,/x=\d+%|아이소메트릭|20000000/);
+ content.propertyProfile.sourcePermissions[0].allowDerivedPublication=false;
+ assert.doesNotMatch(buildImagePrompt(content,[plan],'concept-1').prompt,/전용면적: 65/);
+ content.propertyProfile.sourcePermissions[0].allowDerivedPublication=true;
+ content.imageSettings = {mode:'concept',sourceAssetId:null,rightsApproved:false};
+ const missingOriginal = buildImagePrompt(content,[],'concept-1').prompt;
+ assert.doesNotMatch(missingOriginal.split('[활용 가설·구역]')[0],/전용면적: 65/);
+ assert.match(missingOriginal,/다이닝펍[\s\S]*좌석 구역[\s\S]*x=27%, y=28%/);
+});
