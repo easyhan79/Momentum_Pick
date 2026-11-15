@@ -1,7 +1,7 @@
 import {clientDeployment} from '../src/lib/deployment.ts';
 import fs from 'node:fs';import path from 'node:path';
 const root=process.cwd(),dist=path.join(root,'dist');
-const types={'.js':'text/javascript; charset=utf-8','.mjs':'text/javascript; charset=utf-8','.wasm':'application/wasm','.css':'text/css; charset=utf-8','.png':'image/png','.svg':'image/svg+xml','.json':'application/json; charset=utf-8','.woff2':'font/woff2'};
+const types={'.js':'text/javascript; charset=utf-8','.mjs':'text/javascript; charset=utf-8','.wasm':'application/wasm','.css':'text/css; charset=utf-8','.png':'image/png','.svg':'image/svg+xml','.json':'application/json; charset=utf-8','.woff2':'font/woff2','.jpg':'image/jpeg','.jpeg':'image/jpeg','.webp':'image/webp','.html':'text/html; charset=utf-8'};
 const assets={};
 function collect(dir){for(const entry of fs.readdirSync(dir,{withFileTypes:true})){if(entry.name==='server'||entry.name==='.openai'||entry.name==='index.html')continue;const file=path.join(dir,entry.name);if(entry.isDirectory())collect(file);else{const key='/'+path.relative(dist,file).split(path.sep).join('/');assets[key]={type:types[path.extname(file)]||'application/octet-stream',data:fs.readFileSync(file).toString('base64')};}}}
 const deployment=clientDeployment({environment:process.env.VITE_SPACEPICK_ENV,url:process.env.VITE_SUPABASE_URL,publishableKey:process.env.VITE_SUPABASE_PUBLISHABLE_KEY,privatePreview:process.env.VITE_PRIVATE_PREVIEW});

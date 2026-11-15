@@ -17,3 +17,13 @@ test('showroom metadata works on Worker runtimes that reject redirect:error and 
   assert.equal(redirected.status,503);
  }finally{console.error=quiet;}
 });
+
+test('hand-built listing pages are served at their own path without a database call',async()=>{
+ const page=btoa(unescape(encodeURIComponent('<!doctype html><title>테라스샵 201호</title>')));
+ let called=0;const handle=createSiteFetch({'/terrace-shop-201/page.html':{type:'text/html; charset=utf-8',data:page},'/terrace-shop-201/terrace.jpg':{type:'image/jpeg',data:btoa('jpg')}},'<html><head><title>x</title></head><body></body></html>',async()=>{called++;return Response.json({});});
+ const r=await handle(new Request('https://spacepick.kr/terrace-shop-201'),{});
+ assert.equal(r.status,200);assert.match(r.headers.get('content-type'),/text\/html/);assert.match(await r.text(),/테라스샵 201호/);
+ const slash=await handle(new Request('https://spacepick.kr/terrace-shop-201/'),{});assert.equal(slash.status,301);assert.equal(slash.headers.get('location'),'/terrace-shop-201');
+ const img=await handle(new Request('https://spacepick.kr/terrace-shop-201/terrace.jpg'),{});assert.equal(img.headers.get('content-type'),'image/jpeg');
+ assert.equal(called,0,'no showroom lookup for a hand-built page');
+});
